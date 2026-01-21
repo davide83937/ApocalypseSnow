@@ -28,3 +28,11 @@ D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\Apoca
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_blue_gathering.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\libPhysicsDll.dll
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\obj\Debug\net9.0-windows\ApocalypseSnow.sourcelink.json
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\egg.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_blue_walking.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_blue_walking_egg.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_blue_walking_snowball.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_red_gathering.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_red_walking.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_red_walking_egg.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_red_walking_snowball.png

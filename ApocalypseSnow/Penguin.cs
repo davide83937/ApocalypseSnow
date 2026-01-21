@@ -17,6 +17,10 @@ public class Penguin: DrawableGameComponent
     private Rectangle _sourceRect;
     private KeyboardState _oldState;
     private int _ammo;
+    private float temp_time;
+    private bool isMoving = false;
+    private int _currentFrame;     // L'indice del frame attuale (0, 1 o 2)
+    private float _frameSpeed = 0.1f; // Velocità dell'animazione (più basso = più veloce)
     
     public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed) : base(game)
     {
@@ -46,6 +50,29 @@ public class Penguin: DrawableGameComponent
             this._textures[key] = Texture2D.FromStream(GraphicsDevice, stream);
         }
     }
+
+    private void walking_animation(float gameTime)
+    {
+        if (isMoving)
+        {
+            temp_time += gameTime;
+            if (temp_time > _frameSpeed)
+            {
+                _currentFrame++;
+                // Dato che la tua texture ha 3 colonne (_texture.Width / 3)
+                if (_currentFrame >= 3) 
+                    _currentFrame = 0;
+                temp_time = 0f;
+            }
+        }
+        else
+        {
+            _currentFrame = 1; // Frame di riposo (solitamente quello centrale)
+        }
+        // Applichiamo il calcolo della X nel rettangolo di ritaglio
+        _sourceRect.X = _currentFrame * (_texture.Width / 3);
+    }
+    
     
     protected override void LoadContent()
     {
@@ -81,29 +108,38 @@ public class Penguin: DrawableGameComponent
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         KeyboardState newState = Keyboard.GetState();
+        isMoving = false;
         
         if (newState.IsKeyDown(Keys.S))
         {
             this._position.Y = uniform_rectilinear_motion(_position.Y, 100, deltaTime);
+            _sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 0 * (_texture.Height / 4);
+            isMoving = true;
         }
         
         if (newState.IsKeyDown(Keys.W))
         {
             this._position.Y = uniform_rectilinear_motion(_position.Y, -100, deltaTime);
+            _sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 3 * (_texture.Height / 4);
+            isMoving = true;
         }
         
         if (newState.IsKeyDown(Keys.D))
         {
             this._position.X = uniform_rectilinear_motion(_position.X, 100, deltaTime);
+            _sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 2 * (_texture.Height / 4);
+            isMoving = true;
         }
         
         if (newState.IsKeyDown(Keys.A))
         {
             this._position.X = uniform_rectilinear_motion(_position.X, -100, deltaTime);
+            _sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 1 * (_texture.Height / 4);
+            isMoving = true;
         }
         
         if (newState.IsKeyUp(Keys.S) && _oldState.IsKeyDown(Keys.S))
@@ -127,6 +163,7 @@ public class Penguin: DrawableGameComponent
         }
         
         normalizeVelocity(ref this._speed.X, ref this._speed.Y);
+        walking_animation(deltaTime);
         _oldState = newState;
    
     }

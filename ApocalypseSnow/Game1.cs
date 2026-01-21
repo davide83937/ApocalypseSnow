@@ -18,11 +18,22 @@ public class Game1: Game
         Content.RootDirectory = "Content";
     }
     
+    protected override void Initialize()
+    {
+        // 1. Crea il pinguino qui
+        _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero);
+    
+        // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()
+        Components.Add(_myPenguin);
+
+        // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
+        // l'Initialize e il LoadContent di tutti i componenti in lista.
+        base.Initialize();
+    }
+    
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        _myPenguin = new Penguin(this, new Vector2(0, 0), new Vector2(0, 0));
-        Components.Add(_myPenguin); // <--- QUESTA RIGA È FONDAMENTALE
         base.LoadContent();
     }
     

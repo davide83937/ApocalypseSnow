@@ -19,9 +19,9 @@
         <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*"/>
     </ItemGroup>
     <ItemGroup>
-      <None Update="Content\images\penguin_blue_gathering.png">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
+        <None Update="Content\images\**\*.*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
     <ItemGroup>
       <Content Include="..\Physics\cmake-build-debug\libPhysicsDll.dll">

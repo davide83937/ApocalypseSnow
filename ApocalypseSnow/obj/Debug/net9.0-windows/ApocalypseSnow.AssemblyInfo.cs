@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ApocalypseSnow")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3a2a176f53eb30b9d4d1c614d2f15231869e007d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5491c1293590ddd2ad30551f7e2742fc924ddfe6")]
 [assembly: System.Reflection.AssemblyProductAttribute("ApocalypseSnow")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ApocalypseSnow")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
