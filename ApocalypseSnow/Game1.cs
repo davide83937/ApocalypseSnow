@@ -25,11 +25,12 @@ public class Game1: Game
         // CARICAMENTO DIRETTO: Nessun MGCB, nessun .xnb
         // Usiamo System.IO per aprire il file come un flusso di dati (stream)
         string path = "Content/images/penguin_blue_gathering.png";
+        //string path1 = "Content/images/penguin_blue_gathering.png";
         using (var stream = System.IO.File.OpenRead(path))
         {
             // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
             pinguTexture = Texture2D.FromStream(GraphicsDevice, stream);
-            _myPenguin = new Penguin(this, pinguTexture, new Vector2(0, 0), new Vector2(0, 0));
+            _myPenguin = new Penguin(this, new Vector2(0, 0), new Vector2(0, 0));
             Components.Add(_myPenguin); // <--- QUESTA RIGA È FONDAMENTALE
         }
     }
