@@ -21,18 +21,9 @@ public class Game1: Game
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-
-        // CARICAMENTO DIRETTO: Nessun MGCB, nessun .xnb
-        // Usiamo System.IO per aprire il file come un flusso di dati (stream)
-        string path = "Content/images/penguin_blue_gathering.png";
-        //string path1 = "Content/images/penguin_blue_gathering.png";
-        using (var stream = System.IO.File.OpenRead(path))
-        {
-            // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
-            pinguTexture = Texture2D.FromStream(GraphicsDevice, stream);
-            _myPenguin = new Penguin(this, new Vector2(0, 0), new Vector2(0, 0));
-            Components.Add(_myPenguin); // <--- QUESTA RIGA È FONDAMENTALE
-        }
+        _myPenguin = new Penguin(this, new Vector2(0, 0), new Vector2(0, 0));
+        Components.Add(_myPenguin); // <--- QUESTA RIGA È FONDAMENTALE
+        base.LoadContent();
     }
     
     protected override void Draw(GameTime gameTime)
