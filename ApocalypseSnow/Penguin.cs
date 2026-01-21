@@ -51,10 +51,6 @@ public class Penguin: DrawableGameComponent
     {
         load_texture(1, "Content/images/penguin_blue_walking.png");
         load_texture(2, "Content/images/penguin_blue_walking_snowball.png");
-    }
-    
-    public override void Initialize()
-    {
         _texture = _textures[1];
         // CALCOLO DEL RITAGLIO
         // Dividiamo la larghezza totale per 3 colonne
@@ -64,6 +60,8 @@ public class Penguin: DrawableGameComponent
         _sourceRect.Width = width;
         _sourceRect.Height = height;
     }
+    
+    
     
     public void Draw(SpriteBatch spriteBatch)
     {
