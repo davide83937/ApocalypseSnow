@@ -31,14 +31,13 @@ public class Game1: Game
             pinguTexture = Texture2D.FromStream(GraphicsDevice, stream);
             _myPenguin = new Penguin(this, pinguTexture, new Vector2(0, 0), new Vector2(0, 0));
             Components.Add(_myPenguin); // <--- QUESTA RIGA È FONDAMENTALE
-            
         }
     }
     
     protected override void Draw(GameTime gameTime)
     {
         // 1. Pulisce lo schermo (il "famoso" azzurro CornflowerBlue)
-        GraphicsDevice.Clear(Color.CornflowerBlue);
+        GraphicsDevice.Clear(Color.White);
 
         // 2. Inizia la coda di disegno
         _spriteBatch.Begin();

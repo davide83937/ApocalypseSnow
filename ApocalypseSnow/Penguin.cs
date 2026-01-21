@@ -44,27 +44,30 @@ public class Penguin: DrawableGameComponent
     public override void Update(GameTime gameTime)
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        
         KeyboardState newState = Keyboard.GetState();
         
         if (newState.IsKeyDown(Keys.S))
         {
             this._position.Y = uniform_rectilinear_motion(_position.Y, 100, deltaTime);
+            _sourceRect.Y = 0 * (_texture.Height / 4);
         }
         
         if (newState.IsKeyDown(Keys.W))
         {
             this._position.Y = uniform_rectilinear_motion(_position.Y, -100, deltaTime);
+            _sourceRect.Y = 3 * (_texture.Height / 4);
         }
         
         if (newState.IsKeyDown(Keys.D))
         {
             this._position.X = uniform_rectilinear_motion(_position.X, 100, deltaTime);
+            _sourceRect.Y = 2 * (_texture.Height / 4);
         }
         
         if (newState.IsKeyDown(Keys.A))
         {
             this._position.X = uniform_rectilinear_motion(_position.X, -100, deltaTime);
+            _sourceRect.Y = 1 * (_texture.Height / 4);
         }
         
         if (newState.IsKeyUp(Keys.S) && _oldState.IsKeyDown(Keys.S))
@@ -88,7 +91,6 @@ public class Penguin: DrawableGameComponent
         }
         
         normalizeVelocity(ref this._speed.X, ref this._speed.Y);
-        
         _oldState = newState;
    
     }
