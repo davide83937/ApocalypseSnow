@@ -16,11 +16,14 @@ public class Penguin: DrawableGameComponent
     private Vector2 _speed;
     private Rectangle _sourceRect;
     private KeyboardState _oldState;
-    private int _ammo;
+    public int _ammo;
     private float temp_time;
+    private float reload_time;
     private bool isMoving = false;
+    private bool isReloading = false;
     private int _currentFrame;     // L'indice del frame attuale (0, 1 o 2)
     private float _frameSpeed = 0.1f; // Velocità dell'animazione (più basso = più veloce)
+    private int _frameReload = 3;
     
     public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed) : base(game)
     {
@@ -51,9 +54,22 @@ public class Penguin: DrawableGameComponent
         }
     }
 
+    private void reload(float gameTime)
+    {
+        if (isReloading)
+        {
+            reload_time += gameTime;
+            if (reload_time > _frameReload)
+            {
+                _ammo++;
+                reload_time = 0f;
+            }
+        }
+    }
+    
     private void walking_animation(float gameTime)
     {
-        if (isMoving)
+        if (isMoving || isReloading)
         {
             temp_time += gameTime;
             if (temp_time > _frameSpeed)
@@ -78,6 +94,7 @@ public class Penguin: DrawableGameComponent
     {
         load_texture(1, "Content/images/penguin_blue_walking.png");
         load_texture(2, "Content/images/penguin_blue_walking_snowball.png");
+        load_texture(3, "Content/images/penguin_blue_gathering.png");
         _texture = _textures[1];
         // CALCOLO DEL RITAGLIO
         // Dividiamo la larghezza totale per 3 colonne
@@ -92,9 +109,13 @@ public class Penguin: DrawableGameComponent
     
     public void Draw(SpriteBatch spriteBatch)
     {
-        if (_ammo == 0)
+        if (_ammo == 0 &&  !isReloading)
         {
             this._texture = _textures[1];
+        }
+        else if (isReloading)
+        {
+             this._texture = _textures[3];
         }
         else
         {
@@ -110,7 +131,7 @@ public class Penguin: DrawableGameComponent
         KeyboardState newState = Keyboard.GetState();
         isMoving = false;
         
-        if (newState.IsKeyDown(Keys.S))
+        if (newState.IsKeyDown(Keys.S) && isReloading == false)
         {
             this._position.Y = uniform_rectilinear_motion(_position.Y, 100, deltaTime);
             _sourceRect.X = 1 * (_texture.Width / 3);
@@ -118,7 +139,7 @@ public class Penguin: DrawableGameComponent
             isMoving = true;
         }
         
-        if (newState.IsKeyDown(Keys.W))
+        if (newState.IsKeyDown(Keys.W) && isReloading == false)
         {
             this._position.Y = uniform_rectilinear_motion(_position.Y, -100, deltaTime);
             _sourceRect.X = 1 * (_texture.Width / 3);
@@ -126,7 +147,7 @@ public class Penguin: DrawableGameComponent
             isMoving = true;
         }
         
-        if (newState.IsKeyDown(Keys.D))
+        if (newState.IsKeyDown(Keys.D) && isReloading == false)
         {
             this._position.X = uniform_rectilinear_motion(_position.X, 100, deltaTime);
             _sourceRect.X = 1 * (_texture.Width / 3);
@@ -134,7 +155,7 @@ public class Penguin: DrawableGameComponent
             isMoving = true;
         }
         
-        if (newState.IsKeyDown(Keys.A))
+        if (newState.IsKeyDown(Keys.A) && isReloading == false)
         {
             this._position.X = uniform_rectilinear_motion(_position.X, -100, deltaTime);
             _sourceRect.X = 1 * (_texture.Width / 3);
@@ -161,9 +182,21 @@ public class Penguin: DrawableGameComponent
         {
             this._speed.Y = 0;
         }
+
+        if (newState.IsKeyDown(Keys.R))
+        {
+            isReloading = true;
+        }
+        
+        if (newState.IsKeyUp(Keys.R) && _oldState.IsKeyDown(Keys.R))
+        {
+            isReloading = false;
+            reload_time = 0f;
+        }
         
         normalizeVelocity(ref this._speed.X, ref this._speed.Y);
         walking_animation(deltaTime);
+        reload(deltaTime);
         _oldState = newState;
    
     }

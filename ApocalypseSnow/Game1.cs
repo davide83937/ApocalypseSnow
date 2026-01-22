@@ -11,11 +11,16 @@ public class Game1: Game
     // Dichiariamo il nostro pinguino qui!
     private Penguin _myPenguin;
     private Texture2D pinguTexture;
+    private SpriteFont _uiFont;
+    private int width;
+    private int height;
     
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
+        width = 0;
+        height = 0;
     }
     
     protected override void Initialize()
@@ -34,6 +39,7 @@ public class Game1: Game
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
+        _uiFont = Content.Load<SpriteFont>("UIAmmo");
         base.LoadContent();
     }
     
@@ -49,6 +55,10 @@ public class Game1: Game
         if (_myPenguin != null)
         {
             _myPenguin.Draw(_spriteBatch);
+            // Disegno della UI (Munizioni)
+            string ammoText = $"Munizioni: {_myPenguin._ammo}";
+            // Posizioniamo il testo in alto a sinistra (10, 10)
+            _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(width/10, (height/1.2f)), Color.Black);
         }
 
         // 4. Invia tutto alla scheda video
@@ -59,6 +69,8 @@ public class Game1: Game
     
     protected override void Update(GameTime gameTime)
     {
+        width = GraphicsDevice.Viewport.Width;
+        height = GraphicsDevice.Viewport.Height;
         base.Update(gameTime);
     }
 }
