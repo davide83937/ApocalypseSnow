@@ -103,10 +103,13 @@ public class Penguin: DrawableGameComponent
         if (mouseState.LeftButton == ButtonState.Pressed)
         {
             isShooting = true;
+            Console.WriteLine($"Valore delta: {deltaTime}");
+            deltaTime *= 100;
             pressedTime += deltaTime;
-            if (pressedTime > 5)
+            Console.WriteLine($"Valore delta: {pressedTime}");
+            if (pressedTime > 500)
             {
-                pressedTime = 5;
+                pressedTime = 500;
             }
         }
     }
@@ -118,6 +121,7 @@ public class Penguin: DrawableGameComponent
             Ball b = new Ball(gameContext, _position, new Vector2(1,1)* pressedTime);
             gameContext.Components.Add(b);
             isShooting = false;
+            Console.WriteLine($"Valore: {_pressedTime}");
             _pressedTime = 0;
         }
     }
@@ -238,7 +242,7 @@ public class Penguin: DrawableGameComponent
         normalizeVelocity(ref this._speed.X, ref this._speed.Y);
         walking_animation(deltaTime);
         reload(deltaTime);
-        _pressedTime *= 10;
+        //_pressedTime *= 10;
         chargeShot(mouseState, _oldMouseState, ref _pressedTime, deltaTime);
         shot(mouseState, _oldMouseState, _pressedTime);
         _oldState = newState;
