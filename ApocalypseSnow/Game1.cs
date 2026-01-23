@@ -62,6 +62,14 @@ public class Game1: Game
             _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(width/10, (height/1.2f)), Color.Black);
         }
 
+        foreach (var component in Components)
+        {
+            if (component is Ball ball)
+            {
+                ball.Draw(_spriteBatch);
+            }
+        }
+
         // 4. Invia tutto alla scheda video
         _spriteBatch.End();
 

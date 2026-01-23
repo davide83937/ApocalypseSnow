@@ -2,6 +2,6 @@
 
 public struct Vector
 {
-    float _x;
-    float _y;
+    public float _x;
+    public float _y;
 }
