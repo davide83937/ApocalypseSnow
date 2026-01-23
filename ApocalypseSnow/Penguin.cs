@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace ApocalypseSnow;
@@ -8,6 +9,7 @@ using Microsoft.Xna.Framework.Input;
 
 public class Penguin: DrawableGameComponent
 {
+    private Game gameContext;
     // Dizionario per contenere tutte le texture
     private Dictionary<int, Texture2D> _textures;
     private string _currentKey; // La chiave della texture attiva
@@ -16,18 +18,22 @@ public class Penguin: DrawableGameComponent
     private Vector2 _speed;
     private Rectangle _sourceRect;
     private KeyboardState _oldState;
+    private MouseState _oldMouseState;
+    private float _pressedTime = 0.0f;
     public int _ammo;
     private float temp_time;
     private float reload_time;
     private bool isMoving = false;
     private bool isReloading = false;
+    private bool isShooting = false;
     private int _currentFrame;     // L'indice del frame attuale (0, 1 o 2)
     private float _frameSpeed = 0.1f; // Velocità dell'animazione (più basso = più veloce)
     private int _frameReload = 3;
+    public event Action<Vector2> OnSpawnBall;
     
     public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed) : base(game)
     {
-        
+        gameContext = game;
         //_texture = texture;
         _position = startPosition;
         _speed = startSpeed;
@@ -66,6 +72,9 @@ public class Penguin: DrawableGameComponent
             }
         }
     }
+
+
+    
     
     private void walking_animation(float gameTime)
     {
@@ -88,6 +97,28 @@ public class Penguin: DrawableGameComponent
         // Applichiamo il calcolo della X nel rettangolo di ritaglio
         _sourceRect.X = _currentFrame * (_texture.Width / 3);
     }
+
+    private void chargeShot(MouseState mouseState, MouseState lastMouseState, ref float pressedTime, float deltaTime)
+    {
+        if (mouseState.LeftButton == ButtonState.Pressed &&  lastMouseState.LeftButton == ButtonState.Released)
+        {
+            isShooting = true;
+            pressedTime += deltaTime;
+            if (pressedTime > 5)
+            {
+                pressedTime = 5;
+            }
+        }
+    }
+
+    private void shot(MouseState mouseState, MouseState lastMouseState, float pressedTime)
+    {
+        if (mouseState.LeftButton == ButtonState.Released && lastMouseState.LeftButton == ButtonState.Pressed)
+        {
+            Ball b = new Ball(gameContext, _position, new Vector2(1,1)* pressedTime);
+            isShooting = false;
+        }
+    }
     
     
     protected override void LoadContent()
@@ -95,6 +126,7 @@ public class Penguin: DrawableGameComponent
         load_texture(1, "Content/images/penguin_blue_walking.png");
         load_texture(2, "Content/images/penguin_blue_walking_snowball.png");
         load_texture(3, "Content/images/penguin_blue_gathering.png");
+        load_texture(4, "Content/images/penguin_blue_launch.png");
         _texture = _textures[1];
         // CALCOLO DEL RITAGLIO
         // Dividiamo la larghezza totale per 3 colonne
@@ -109,13 +141,17 @@ public class Penguin: DrawableGameComponent
     
     public void Draw(SpriteBatch spriteBatch)
     {
-        if (_ammo == 0 &&  !isReloading)
+        if (_ammo == 0 &&  !isReloading && !isShooting)
         {
             this._texture = _textures[1];
         }
-        else if (isReloading)
+        else if (isReloading && !isShooting)
         {
              this._texture = _textures[3];
+        }
+        else if(!isReloading && isShooting)
+        {
+            this._texture = _textures[4];
         }
         else
         {
@@ -129,12 +165,15 @@ public class Penguin: DrawableGameComponent
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         KeyboardState newState = Keyboard.GetState();
+        MouseState mouseState = Mouse.GetState();
         isMoving = false;
+
+        
         
         if (newState.IsKeyDown(Keys.S) && isReloading == false)
         {
             this._position.Y = uniform_rectilinear_motion(_position.Y, 100, deltaTime);
-            _sourceRect.X = 1 * (_texture.Width / 3);
+            //_sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 0 * (_texture.Height / 4);
             isMoving = true;
         }
@@ -142,7 +181,7 @@ public class Penguin: DrawableGameComponent
         if (newState.IsKeyDown(Keys.W) && isReloading == false)
         {
             this._position.Y = uniform_rectilinear_motion(_position.Y, -100, deltaTime);
-            _sourceRect.X = 1 * (_texture.Width / 3);
+            //_sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 3 * (_texture.Height / 4);
             isMoving = true;
         }
@@ -150,7 +189,7 @@ public class Penguin: DrawableGameComponent
         if (newState.IsKeyDown(Keys.D) && isReloading == false)
         {
             this._position.X = uniform_rectilinear_motion(_position.X, 100, deltaTime);
-            _sourceRect.X = 1 * (_texture.Width / 3);
+            //_sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 2 * (_texture.Height / 4);
             isMoving = true;
         }
@@ -158,7 +197,7 @@ public class Penguin: DrawableGameComponent
         if (newState.IsKeyDown(Keys.A) && isReloading == false)
         {
             this._position.X = uniform_rectilinear_motion(_position.X, -100, deltaTime);
-            _sourceRect.X = 1 * (_texture.Width / 3);
+            //_sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 1 * (_texture.Height / 4);
             isMoving = true;
         }
@@ -197,7 +236,10 @@ public class Penguin: DrawableGameComponent
         normalizeVelocity(ref this._speed.X, ref this._speed.Y);
         walking_animation(deltaTime);
         reload(deltaTime);
+        chargeShot(mouseState, _oldMouseState, ref _pressedTime, deltaTime);
+        shot(mouseState, _oldMouseState, _pressedTime);
         _oldState = newState;
-   
+        _oldMouseState = mouseState;
+
     }
 }

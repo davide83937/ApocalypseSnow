@@ -28,6 +28,7 @@ public class Game1: Game
         // 1. Crea il pinguino qui
         _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero);
     
+        
         // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()
         Components.Add(_myPenguin);
 
