@@ -238,6 +238,7 @@ public class Penguin: DrawableGameComponent
         normalizeVelocity(ref this._speed.X, ref this._speed.Y);
         walking_animation(deltaTime);
         reload(deltaTime);
+        _pressedTime *= 5;
         chargeShot(mouseState, _oldMouseState, ref _pressedTime, deltaTime);
         shot(mouseState, _oldMouseState, _pressedTime);
         _oldState = newState;
