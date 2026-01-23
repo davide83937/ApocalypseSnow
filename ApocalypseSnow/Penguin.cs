@@ -100,7 +100,7 @@ public class Penguin: DrawableGameComponent
 
     private void chargeShot(MouseState mouseState, MouseState lastMouseState, ref float pressedTime, float deltaTime)
     {
-        if (mouseState.LeftButton == ButtonState.Pressed &&  lastMouseState.LeftButton == ButtonState.Released)
+        if (mouseState.LeftButton == ButtonState.Pressed)
         {
             isShooting = true;
             pressedTime += deltaTime;
@@ -116,7 +116,9 @@ public class Penguin: DrawableGameComponent
         if (mouseState.LeftButton == ButtonState.Released && lastMouseState.LeftButton == ButtonState.Pressed)
         {
             Ball b = new Ball(gameContext, _position, new Vector2(1,1)* pressedTime);
+            gameContext.Components.Add(b);
             isShooting = false;
+            _pressedTime = 0;
         }
     }
     
@@ -126,7 +128,7 @@ public class Penguin: DrawableGameComponent
         load_texture(1, "Content/images/penguin_blue_walking.png");
         load_texture(2, "Content/images/penguin_blue_walking_snowball.png");
         load_texture(3, "Content/images/penguin_blue_gathering.png");
-        load_texture(4, "Content/images/penguin_blue_launch.png");
+        load_texture(4, "Content/images/penguin_blue_launch1.png");
         _texture = _textures[1];
         // CALCOLO DEL RITAGLIO
         // Dividiamo la larghezza totale per 3 colonne

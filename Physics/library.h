@@ -9,6 +9,7 @@ struct Vector2 {
 extern "C" {
     __declspec(dllexport) float uniform_rectilinear_motion(float position, float velocity, float deltaTime);
     __declspec(dllexport) void normalizeVelocity(float* velX, float* velY);
+    __declspec(dllexport) Vector2 parabolic_motion(float start_positionX, float start_positionY, float start_velocityX, float start_velocityY, float gameTime, float deltaTime);
 }
 
 #endif // PHYSICS_LIBRARY_H

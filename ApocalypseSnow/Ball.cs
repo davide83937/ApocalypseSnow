@@ -34,7 +34,7 @@ public class Ball:DrawableGameComponent
     
     protected override void LoadContent()
     {
-        load_texture("Content/images/ball_face.png");
+        load_texture("Content/images/ball_face1.png");
     }
 
     public void Draw(SpriteBatch spriteBatch)
