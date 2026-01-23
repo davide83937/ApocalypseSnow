@@ -18,8 +18,7 @@ void normalizeVelocity(float* velX, float* velY) {
     }
 }
 
-Vector2 parabolic_motion(float start_positionX, float start_positionY, float start_velocityX, float start_velocityY, float gameTime, float deltaTime) {
-    gameTime += deltaTime;
+Vector2 parabolic_motion(float start_positionX, float start_positionY, float start_velocityX, float start_velocityY, float gameTime) {
     float positionX = start_positionX + (start_velocityX * gameTime);
     float positionY = -0.5f * 9.81f* pow(gameTime, 2)+ start_velocityY*gameTime + start_positionY;
     Vector2 p0 = {.x = positionX, .y = positionY};
