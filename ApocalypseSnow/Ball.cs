@@ -37,7 +37,7 @@ public class Ball:DrawableGameComponent
     
     protected override void LoadContent()
     {
-        load_texture("Content/images/ball_face1.png");
+        load_texture("Content/images/Snowball1.png");
     }
 
     public void Draw(SpriteBatch spriteBatch)
@@ -49,7 +49,7 @@ public class Ball:DrawableGameComponent
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _ball_time += deltaTime;
-        var v = parabolic_motion(_start_position.X, _start_position.Y, _start_speed.X, -_start_speed.Y, _ball_time);
+        var v = parabolic_motion(_start_position.X+20, _start_position.Y, _start_speed.X, -_start_speed.Y, _ball_time);
         _position.X = v._x;
         _position.Y = v._y;
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");

@@ -100,13 +100,14 @@ public class Penguin: DrawableGameComponent
 
     private void chargeShot(MouseState mouseState, MouseState lastMouseState, ref float pressedTime, float deltaTime)
     {
-        if (mouseState.LeftButton == ButtonState.Pressed)
+        if (mouseState.LeftButton == ButtonState.Pressed && _ammo > 0)
         {
+            //Console.WriteLine($"Valore click:X = {mouseState.X}, Y = {mouseState.Y}");
             isShooting = true;
-            Console.WriteLine($"Valore delta: {deltaTime}");
+            //Console.WriteLine($"Valore delta: {deltaTime}");
             deltaTime *= 100;
             pressedTime += deltaTime;
-            Console.WriteLine($"Valore delta: {pressedTime}");
+            //Console.WriteLine($"Valore delta: {pressedTime}");
             if (pressedTime > 500)
             {
                 pressedTime = 500;
@@ -116,13 +117,20 @@ public class Penguin: DrawableGameComponent
 
     private void shot(MouseState mouseState, MouseState lastMouseState, float pressedTime)
     {
-        if (mouseState.LeftButton == ButtonState.Released && lastMouseState.LeftButton == ButtonState.Pressed)
+        if (mouseState.LeftButton == ButtonState.Released && lastMouseState.LeftButton == ButtonState.Pressed && _ammo > 0)
         {
-            Ball b = new Ball(gameContext, _position, new Vector2(1,1)* pressedTime);
+            float differenceX = _position.X - mouseState.X;
+            float differenceY = _position.Y - mouseState.Y;
+            float coX = (differenceX/100)* (-1);
+         
+             
+            Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
+            Ball b = new Ball(gameContext, _position, new Vector2(coX,differenceY/100)* pressedTime);
             gameContext.Components.Add(b);
             isShooting = false;
-            Console.WriteLine($"Valore: {_pressedTime}");
+            //Console.WriteLine($"Valore: {_pressedTime}");
             _pressedTime = 0;
+            _ammo--;
         }
     }
     

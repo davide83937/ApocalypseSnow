@@ -21,6 +21,7 @@ public class Game1: Game
         Content.RootDirectory = "Content";
         width = 0;
         height = 0;
+        IsMouseVisible = true;
     }
     
     protected override void Initialize()
