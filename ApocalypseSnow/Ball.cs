@@ -48,13 +48,13 @@ public class Ball:DrawableGameComponent
         {
             if (_position.X >= finalPosition.X) haRaggiuntoTarget = true;
             if (_position.X < (finalPosition.X+_start_position.X+20)/2) { _scale = _scale + x; }
-            else { _scale = _scale - 0.01f; }
+            else { _scale = _scale - x; }
         }
         else if (_start_speed.X < 0) // Tiro verso SINISTRA
         {
             if (_position.X <= finalPosition.X) haRaggiuntoTarget = true;
             if (_position.X > (_start_position.X+finalPosition.X+20)/2) { _scale = _scale + x; }
-            else { _scale = _scale - 0.01f; }
+            else { _scale = _scale - x; }
         }
 
         // 3. Applichiamo l'impatto se il target è raggiunto
@@ -106,7 +106,7 @@ public class Ball:DrawableGameComponent
         _position.Y = v._y;
         
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
-        //Console.WriteLine($"Scale: {_scale}");
+        Console.WriteLine($"Scale: {_scale}");
         //Console.WriteLine($"Gravity: {gravity}");
         if (_scale < 1.0f) { _scale = 1.0f; }
         if (_scale > 1.6f) { _scale = 1.6f; }
