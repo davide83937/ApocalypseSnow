@@ -37,7 +37,7 @@ public class Penguin: DrawableGameComponent
         //_texture = texture;
         _position = startPosition;
         _speed = startSpeed;
-        _ammo = 0;
+        _ammo = 100;
         
         // Creiamo il rettangolo: (X iniziale, Y iniziale, Larghezza, Altezza)
         // Partiamo da (0,0) per prendere il primo in alto a sinistra
@@ -72,9 +72,6 @@ public class Penguin: DrawableGameComponent
             }
         }
     }
-
-
-    
     
     private void walking_animation(float gameTime)
     {
@@ -138,11 +135,8 @@ public class Penguin: DrawableGameComponent
 
     private float finalPoint(Vector2 _start_speed, Vector2 _start_position)
     {
-      
-
         // Punto X finale: X0 + (VelocitàX * Tempo)
-        float x_finale = (_start_position.X + 20) + (_start_speed.X );
-
+        float x_finale = (_start_position.X + 20) + (_start_speed.X )*1.5f;
         return x_finale;
     }
     

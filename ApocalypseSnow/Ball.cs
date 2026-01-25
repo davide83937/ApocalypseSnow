@@ -14,6 +14,8 @@ public class Ball:DrawableGameComponent
     private Vector2 _start_speed;
     private float _ball_time;
     private float finalPosition;
+    private float _scale;
+    private float oldY;
     
 
     public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, float finalPosition) : base(game)
@@ -23,6 +25,8 @@ public class Ball:DrawableGameComponent
         this._start_speed = startSpeed;
         _ball_time = 0.0f;
         this.finalPosition = finalPosition;
+        this._scale = 1.0f;
+        oldY = startPosition.Y;
     }
 
     public void finalPointCalculous()
@@ -32,10 +36,14 @@ public class Ball:DrawableGameComponent
         if (_start_speed.X > 0) // Tiro verso DESTRA
         {
             if (_position.X >= finalPosition) haRaggiuntoTarget = true;
+            if (_position.X < (finalPosition+_start_position.X)/2) { _scale = _scale + 0.01f; }
+            else { _scale = _scale - 0.01f; }
         }
         else if (_start_speed.X < 0) // Tiro verso SINISTRA
         {
             if (_position.X <= finalPosition) haRaggiuntoTarget = true;
+            if (_position.X > (_start_position.X+finalPosition)/2) { _scale = _scale + 0.01f; }
+            else { _scale = _scale - 0.01f; }
         }
 
         // 3. Applichiamo l'impatto se il target è raggiunto
@@ -71,7 +79,11 @@ public class Ball:DrawableGameComponent
 
     public void Draw(SpriteBatch spriteBatch)
     {
-        spriteBatch.Draw(_texture, _position, Color.White);
+        spriteBatch.Draw(_texture, _position,null, Color.White, 0f, 
+            Vector2.Zero, 
+            _scale, 
+            SpriteEffects.None, 
+            0f);
     }
 
     public override void Update(GameTime gameTime)
@@ -82,6 +94,9 @@ public class Ball:DrawableGameComponent
         _position.X = v._x;
         _position.Y = v._y;
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
+        //Console.WriteLine($"Scale: {_scale}");
+        if (_scale < 1.0f) { _scale = 1.0f; }
+        
         
         finalPointCalculous();
        
