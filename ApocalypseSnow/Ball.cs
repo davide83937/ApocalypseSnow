@@ -13,12 +13,12 @@ public class Ball:DrawableGameComponent
     private Vector2 _position;
     private Vector2 _start_speed;
     private float _ball_time;
-    private float finalPosition;
+    private Vector2 finalPosition;
     private float _scale;
     private float oldY;
     
 
-    public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, float finalPosition) : base(game)
+    public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, Vector2 finalPosition) : base(game)
     {
         this._start_position = startPosition;
         this._position = startPosition;
@@ -32,17 +32,25 @@ public class Ball:DrawableGameComponent
     public void finalPointCalculous()
     {
         bool haRaggiuntoTarget = false;
+        float differenceY = Math.Abs(_start_position.Y-finalPosition.Y);
+        //Console.WriteLine(differenceY);
 
+        float L = 0.1f;  // massimo
+        float k = 0.0005f;   // velocità di crescita
+        float t = differenceY; // es: tempo, velocità, carica
+
+        float x = L * (1f - MathF.Exp(-k * t));
+        
         if (_start_speed.X > 0) // Tiro verso DESTRA
         {
-            if (_position.X >= finalPosition) haRaggiuntoTarget = true;
-            if (_position.X < (finalPosition+_start_position.X)/2) { _scale = _scale + 0.01f; }
+            if (_position.X >= finalPosition.X) haRaggiuntoTarget = true;
+            if (_position.X < (finalPosition.X+_start_position.X+20)/2) { _scale = _scale + x; }
             else { _scale = _scale - 0.01f; }
         }
         else if (_start_speed.X < 0) // Tiro verso SINISTRA
         {
-            if (_position.X <= finalPosition) haRaggiuntoTarget = true;
-            if (_position.X > (_start_position.X+finalPosition)/2) { _scale = _scale + 0.01f; }
+            if (_position.X <= finalPosition.X) haRaggiuntoTarget = true;
+            if (_position.X > (_start_position.X+finalPosition.X+20)/2) { _scale = _scale + x; }
             else { _scale = _scale - 0.01f; }
         }
 
@@ -94,9 +102,9 @@ public class Ball:DrawableGameComponent
         _position.X = v._x;
         _position.Y = v._y;
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
-        //Console.WriteLine($"Scale: {_scale}");
+        Console.WriteLine($"Scale: {_scale}");
         if (_scale < 1.0f) { _scale = 1.0f; }
-        
+        if (_scale > 1.6f) { _scale = 1.6f; }
         
         finalPointCalculous();
        

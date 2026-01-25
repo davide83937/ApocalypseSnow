@@ -123,7 +123,7 @@ public class Penguin: DrawableGameComponent
             Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
             Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
 
-            float finalPosition = finalPoint(startSpeed, _position);
+            Vector2 finalPosition = finalPoint(startSpeed, _position);
             Ball b = new Ball(gameContext, _position, startSpeed, finalPosition);
             gameContext.Components.Add(b);
             isShooting = false;
@@ -132,12 +132,26 @@ public class Penguin: DrawableGameComponent
             _ammo--;
         }
     }
+    
+    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern Vector parabolic_motion(float startPositionX, float startPositionY, float startVelocityX,
+        float startVelocityY, float gameTime);
 
-    private float finalPoint(Vector2 _start_speed, Vector2 _start_position)
+    private Vector2 finalPoint(Vector2 _start_speed, Vector2 _start_position)
     {
         // Punto X finale: X0 + (VelocitàX * Tempo)
-        float x_finale = (_start_position.X + 20) + (_start_speed.X )*1.5f;
-        return x_finale;
+        //float x_finale = (_start_position.X + 20) + (_start_speed.X )*1.5f;
+        Vector impatto = parabolic_motion(
+            _start_position.X + 20, 
+            _start_position.Y, 
+            _start_speed.X, 
+            -_start_speed.Y, 
+            1.5f // Il "tempo" finale desiderato
+        );
+
+        // Salviamo il punto di impatto completo (X e Y)
+        Vector2 point_finale = new Vector2(impatto._x, impatto._y);
+        return point_finale;
     }
     
     
