@@ -12,6 +12,7 @@ public class Penguin: DrawableGameComponent
     private Game gameContext;
     // Dizionario per contenere tutte le texture
     private Dictionary<int, Texture2D> _textures;
+    private List<Ball> ball_list;
     private string _currentKey; // La chiave della texture attiva
     private Texture2D _texture;
     private Vector2 _position;
@@ -34,6 +35,7 @@ public class Penguin: DrawableGameComponent
     public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed) : base(game)
     {
         gameContext = game;
+        ball_list = new List<Ball>();
         //_texture = texture;
         _position = startPosition;
         _speed = startSpeed;
@@ -98,7 +100,7 @@ public class Penguin: DrawableGameComponent
         _sourceRect.X = _currentFrame * (_texture.Width / 3);
     }
 
-    private void chargeShot(MouseState mouseState, MouseState lastMouseState, ref float pressedTime, float deltaTime)
+    private void chargeShot(MouseState mouseState, ref float pressedTime, float deltaTime)
     {
         if (mouseState.LeftButton == ButtonState.Pressed && _ammo > 0)
         {
@@ -122,10 +124,10 @@ public class Penguin: DrawableGameComponent
             float differenceX = _position.X - mouseState.X;
             float differenceY = _position.Y - mouseState.Y;
             float coX = (differenceX/100)* (-1);
-         
-             
+            
             Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
-            Ball b = new Ball(gameContext, _position, new Vector2(coX,differenceY/100)* pressedTime);
+            Ball b = new Ball(gameContext, ball_list, _position, new Vector2(coX,differenceY/100)* pressedTime);
+            ball_list.Add(b);
             gameContext.Components.Add(b);
             isShooting = false;
             //Console.WriteLine($"Valore: {_pressedTime}");
@@ -171,7 +173,6 @@ public class Penguin: DrawableGameComponent
         {
             this._texture = _textures[2];
         }
-        
         spriteBatch.Draw(_texture, _position, _sourceRect, Color.White);
     }
 
@@ -251,7 +252,7 @@ public class Penguin: DrawableGameComponent
         walking_animation(deltaTime);
         reload(deltaTime);
         //_pressedTime *= 10;
-        chargeShot(mouseState, _oldMouseState, ref _pressedTime, deltaTime);
+        chargeShot(mouseState, ref _pressedTime, deltaTime);
         shot(mouseState, _oldMouseState, _pressedTime);
         _oldState = newState;
         _oldMouseState = mouseState;

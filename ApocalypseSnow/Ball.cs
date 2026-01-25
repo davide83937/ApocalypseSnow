@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -13,7 +14,7 @@ public class Ball:DrawableGameComponent
     private Vector2 _start_speed;
     private float _ball_time;
     
-    public Ball(Game game, Vector2 startPosition, Vector2 startSpeed) : base(game)
+    public Ball(Game game, List<Ball> ball_list, Vector2 startPosition, Vector2 startSpeed) : base(game)
     {
         this._start_position = startPosition;
         this._position = startPosition;
