@@ -50,6 +50,10 @@ public class Penguin: DrawableGameComponent
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
+    
+    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern Vector parabolic_motion(float gravity, float startPositionX, float startPositionY, float startVelocityX,
+        float startVelocityY, float gameTime);
 
     private void load_texture(int key,string path)
     {
@@ -120,9 +124,8 @@ public class Penguin: DrawableGameComponent
             float differenceY = _position.Y - mouseState.Y;
             float coX = (differenceX/100)* (-1);
             
-            Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
+            //Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
             Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
-
             Vector2 finalPosition = finalPoint(startSpeed, _position);
             Ball b = new Ball(gameContext, _position, startSpeed, finalPosition);
             gameContext.Components.Add(b);
@@ -132,16 +135,12 @@ public class Penguin: DrawableGameComponent
             _ammo--;
         }
     }
-    
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern Vector parabolic_motion(float startPositionX, float startPositionY, float startVelocityX,
-        float startVelocityY, float gameTime);
 
     private Vector2 finalPoint(Vector2 _start_speed, Vector2 _start_position)
     {
         // Punto X finale: X0 + (VelocitàX * Tempo)
         //float x_finale = (_start_position.X + 20) + (_start_speed.X )*1.5f;
-        Vector impatto = parabolic_motion(
+        Vector impatto = parabolic_motion(150f,
             _start_position.X + 20, 
             _start_position.Y, 
             _start_speed.X, 

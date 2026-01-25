@@ -15,7 +15,7 @@ public class Ball:DrawableGameComponent
     private float _ball_time;
     private Vector2 finalPosition;
     private float _scale;
-    private float oldY;
+    private float gravity = 150f;
     
 
     public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, Vector2 finalPosition) : base(game)
@@ -26,8 +26,11 @@ public class Ball:DrawableGameComponent
         _ball_time = 0.0f;
         this.finalPosition = finalPosition;
         this._scale = 1.0f;
-        oldY = startPosition.Y;
+
     }
+
+
+    
 
     public void finalPointCalculous()
     {
@@ -74,7 +77,7 @@ public class Ball:DrawableGameComponent
     }
 
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern Vector parabolic_motion(float startPositionX, float startPositionY, float startVelocityX,
+    private static extern Vector parabolic_motion(float gravity, float startPositionX, float startPositionY, float startVelocityX,
         float startVelocityY, float gameTime);
     
     
@@ -82,8 +85,7 @@ public class Ball:DrawableGameComponent
     {
         load_texture("Content/images/Snowball1.png");
     }
-    
-    
+
 
     public void Draw(SpriteBatch spriteBatch)
     {
@@ -98,14 +100,16 @@ public class Ball:DrawableGameComponent
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _ball_time += deltaTime;
-        var v = parabolic_motion(_start_position.X+20, _start_position.Y, _start_speed.X, -_start_speed.Y, _ball_time);
+        
+        var v = parabolic_motion(gravity,_start_position.X+20, _start_position.Y, _start_speed.X, -_start_speed.Y, _ball_time);
         _position.X = v._x;
         _position.Y = v._y;
+        
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
-        Console.WriteLine($"Scale: {_scale}");
+        //Console.WriteLine($"Scale: {_scale}");
+        //Console.WriteLine($"Gravity: {gravity}");
         if (_scale < 1.0f) { _scale = 1.0f; }
         if (_scale > 1.6f) { _scale = 1.6f; }
-        
         finalPointCalculous();
        
     }
