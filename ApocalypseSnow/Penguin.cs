@@ -12,7 +12,6 @@ public class Penguin: DrawableGameComponent
     private Game gameContext;
     // Dizionario per contenere tutte le texture
     private Dictionary<int, Texture2D> _textures;
-    private List<Ball> ball_list;
     private string _currentKey; // La chiave della texture attiva
     private Texture2D _texture;
     private Vector2 _position;
@@ -35,7 +34,6 @@ public class Penguin: DrawableGameComponent
     public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed) : base(game)
     {
         gameContext = game;
-        ball_list = new List<Ball>();
         //_texture = texture;
         _position = startPosition;
         _speed = startSpeed;
@@ -126,14 +124,26 @@ public class Penguin: DrawableGameComponent
             float coX = (differenceX/100)* (-1);
             
             Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
-            Ball b = new Ball(gameContext, ball_list, _position, new Vector2(coX,differenceY/100)* pressedTime);
-            ball_list.Add(b);
+            Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
+
+            float finalPosition = finalPoint(startSpeed, _position);
+            Ball b = new Ball(gameContext, _position, startSpeed, finalPosition);
             gameContext.Components.Add(b);
             isShooting = false;
             //Console.WriteLine($"Valore: {_pressedTime}");
             _pressedTime = 0;
             _ammo--;
         }
+    }
+
+    private float finalPoint(Vector2 _start_speed, Vector2 _start_position)
+    {
+      
+
+        // Punto X finale: X0 + (VelocitàX * Tempo)
+        float x_finale = (_start_position.X + 20) + (_start_speed.X );
+
+        return x_finale;
     }
     
     

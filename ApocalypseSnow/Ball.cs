@@ -13,14 +13,40 @@ public class Ball:DrawableGameComponent
     private Vector2 _position;
     private Vector2 _start_speed;
     private float _ball_time;
+    private float finalPosition;
     
-    public Ball(Game game, List<Ball> ball_list, Vector2 startPosition, Vector2 startSpeed) : base(game)
+
+    public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, float finalPosition) : base(game)
     {
         this._start_position = startPosition;
         this._position = startPosition;
         this._start_speed = startSpeed;
         _ball_time = 0.0f;
+        this.finalPosition = finalPosition;
     }
+
+    public void finalPointCalculous()
+    {
+        bool haRaggiuntoTarget = false;
+
+        if (_start_speed.X > 0) // Tiro verso DESTRA
+        {
+            if (_position.X >= finalPosition) haRaggiuntoTarget = true;
+        }
+        else if (_start_speed.X < 0) // Tiro verso SINISTRA
+        {
+            if (_position.X <= finalPosition) haRaggiuntoTarget = true;
+        }
+
+        // 3. Applichiamo l'impatto se il target è raggiunto
+        if (haRaggiuntoTarget)
+        {
+            // Rimuoviamo la palla
+            Game.Components.Remove(this);
+            // ball_list.Remove(this); // Se hai passato il riferimento alla lista
+        }
+    }
+    
 
     private void load_texture(string path)
     {
@@ -40,6 +66,8 @@ public class Ball:DrawableGameComponent
     {
         load_texture("Content/images/Snowball1.png");
     }
+    
+    
 
     public void Draw(SpriteBatch spriteBatch)
     {
@@ -54,7 +82,9 @@ public class Ball:DrawableGameComponent
         _position.X = v._x;
         _position.Y = v._y;
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
-
+        
+        finalPointCalculous();
+       
     }
     
 }
