@@ -11,7 +11,7 @@ public class Penguin: DrawableGameComponent
 {
     private Game gameContext;
     // Dizionario per contenere tutte le texture
-    private Dictionary<int, Texture2D> _textures;
+    private Texture2D[] _textures;
     private string _currentKey; // La chiave della texture attiva
     private Texture2D _texture;
     private Vector2 _position;
@@ -42,7 +42,7 @@ public class Penguin: DrawableGameComponent
         // Creiamo il rettangolo: (X iniziale, Y iniziale, Larghezza, Altezza)
         // Partiamo da (0,0) per prendere il primo in alto a sinistra
         _sourceRect = new Rectangle(0, 0, 0, 0);
-        _textures = new Dictionary<int, Texture2D>();
+        _textures = new Texture2D[4];
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -55,12 +55,12 @@ public class Penguin: DrawableGameComponent
     private static extern Vector parabolic_motion(float gravity, float startPositionX, float startPositionY, float startVelocityX,
         float startVelocityY, float gameTime);
 
-    private void load_texture(int key,string path)
+    private void load_texture(int index,string path)
     {
         using (var stream = System.IO.File.OpenRead(path))
         {
             // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
-            this._textures[key] = Texture2D.FromStream(GraphicsDevice, stream);
+            this._textures[index] = Texture2D.FromStream(GraphicsDevice, stream);
         }
     }
 
@@ -156,10 +156,10 @@ public class Penguin: DrawableGameComponent
     
     protected override void LoadContent()
     {
-        load_texture(1, "Content/images/penguin_blue_walking.png");
-        load_texture(2, "Content/images/penguin_blue_walking_snowball.png");
-        load_texture(3, "Content/images/penguin_blue_gathering.png");
-        load_texture(4, "Content/images/penguin_blue_launch1.png");
+        load_texture(0, "Content/images/penguin_blue_walking.png");
+        load_texture(1, "Content/images/penguin_blue_walking_snowball.png");
+        load_texture(2, "Content/images/penguin_blue_gathering.png");
+        load_texture(3, "Content/images/penguin_blue_launch1.png");
         _texture = _textures[1];
         // CALCOLO DEL RITAGLIO
         // Dividiamo la larghezza totale per 3 colonne
@@ -176,19 +176,19 @@ public class Penguin: DrawableGameComponent
     {
         if (_ammo == 0 &&  !isReloading && !isShooting)
         {
-            this._texture = _textures[1];
+            this._texture = _textures[0];
         }
         else if (isReloading && !isShooting)
         {
-             this._texture = _textures[3];
+             this._texture = _textures[2];
         }
         else if(!isReloading && isShooting)
         {
-            this._texture = _textures[4];
+            this._texture = _textures[3];
         }
         else
         {
-            this._texture = _textures[2];
+            this._texture = _textures[1];
         }
         spriteBatch.Draw(_texture, _position, _sourceRect, Color.White);
     }
@@ -199,8 +199,6 @@ public class Penguin: DrawableGameComponent
         KeyboardState newState = Keyboard.GetState();
         MouseState mouseState = Mouse.GetState();
         isMoving = false;
-
-        
         
         if (newState.IsKeyDown(Keys.S) && isReloading == false)
         {

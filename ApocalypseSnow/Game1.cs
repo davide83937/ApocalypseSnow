@@ -14,6 +14,7 @@ public class Game1: Game
     private SpriteFont _uiFont;
     private int width;
     private int height;
+    private Texture2D _backgroundTexture;
     
     public Game1()
     {
@@ -42,7 +43,17 @@ public class Game1: Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _uiFont = Content.Load<SpriteFont>("UIAmmo");
+        load_texture("Content/images/environment.png");
         base.LoadContent();
+    }
+    
+    private void load_texture(string path)
+    {
+        using (var stream = System.IO.File.OpenRead(path))
+        {
+            // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
+            this._backgroundTexture = Texture2D.FromStream(GraphicsDevice, stream);
+        }
     }
     
     protected override void Draw(GameTime gameTime)
@@ -53,9 +64,11 @@ public class Game1: Game
         // 2. Inizia la coda di disegno
         _spriteBatch.Begin();
 
+        _spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), Color.White);
         // 3. Chiama il disegno del pinguino
         if (_myPenguin != null)
         {
+            
             _myPenguin.Draw(_spriteBatch);
             // Disegno della UI (Munizioni)
             string ammoText = $"Munizioni: {_myPenguin._ammo}";

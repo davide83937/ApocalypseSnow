@@ -106,7 +106,7 @@ public class Ball:DrawableGameComponent
         _position.Y = v._y;
         
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
-        Console.WriteLine($"Scale: {_scale}");
+        //Console.WriteLine($"Scale: {_scale}");
         //Console.WriteLine($"Gravity: {gravity}");
         if (_scale < 1.0f) { _scale = 1.0f; }
         if (_scale > 1.6f) { _scale = 1.6f; }
