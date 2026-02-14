@@ -20,16 +20,17 @@ public class Penguin: DrawableGameComponent
     private KeyboardState _oldState;
     private MouseState _oldMouseState;
     private float _pressedTime = 0.0f;
-    public int _ammo;
+    private int _ammo;
+    public int Ammo { get { return _ammo; } set { _ammo = value; } }
     private float temp_time;
     private float reload_time;
     private bool isMoving = false;
     private bool isReloading = false;
     private bool isShooting = false;
     private int _currentFrame;     // L'indice del frame attuale (0, 1 o 2)
-    private float _frameSpeed = 0.1f; // Velocità dell'animazione (più basso = più veloce)
-    private int _frameReload = 3;
-    public event Action<Vector2> OnSpawnBall;
+    private static readonly float _frameSpeed = 0.1f; // Velocità dell'animazione (più basso = più veloce)
+    private static readonly int _frameReload = 3;
+    //public event Action<Vector2> OnSpawnBall;
     
     public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed) : base(game)
     {
@@ -46,7 +47,7 @@ public class Penguin: DrawableGameComponent
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern float uniform_rectilinear_motion(float position, float velocity, float deltaTime);
+    private static extern void uniform_rectilinear_motion(ref float position, float velocity, float deltaTime);
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
@@ -202,7 +203,7 @@ public class Penguin: DrawableGameComponent
         
         if (newState.IsKeyDown(Keys.S) && isReloading == false)
         {
-            this._position.Y = uniform_rectilinear_motion(_position.Y, 100, deltaTime);
+            uniform_rectilinear_motion(ref _position.Y, 100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 0 * (_texture.Height / 4);
             isMoving = true;
@@ -210,7 +211,7 @@ public class Penguin: DrawableGameComponent
         
         if (newState.IsKeyDown(Keys.W) && isReloading == false)
         {
-            this._position.Y = uniform_rectilinear_motion(_position.Y, -100, deltaTime);
+            uniform_rectilinear_motion(ref _position.Y, -100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 3 * (_texture.Height / 4);
             isMoving = true;
@@ -218,7 +219,7 @@ public class Penguin: DrawableGameComponent
         
         if (newState.IsKeyDown(Keys.D) && isReloading == false)
         {
-            this._position.X = uniform_rectilinear_motion(_position.X, 100, deltaTime);
+            uniform_rectilinear_motion(ref _position.X, 100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 2 * (_texture.Height / 4);
             isMoving = true;
@@ -226,7 +227,7 @@ public class Penguin: DrawableGameComponent
         
         if (newState.IsKeyDown(Keys.A) && isReloading == false)
         {
-            this._position.X = uniform_rectilinear_motion(_position.X, -100, deltaTime);
+            uniform_rectilinear_motion(ref _position.X, -100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
             _sourceRect.Y = 1 * (_texture.Height / 4);
             isMoving = true;

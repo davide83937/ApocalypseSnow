@@ -3,8 +3,8 @@
 #include <cmath>
 #include <iostream>
 
-float uniform_rectilinear_motion(float position, float velocity, float deltaTime) {
-    return position + (velocity * deltaTime);
+void uniform_rectilinear_motion(float *position, float velocity, float deltaTime) {
+    *position = *position + (velocity * deltaTime);
 }
 
 void normalizeVelocity(float* velX, float* velY) {
@@ -18,9 +18,8 @@ void normalizeVelocity(float* velX, float* velY) {
     }
 }
 
-Vector2 parabolic_motion(float gravity,float start_positionX, float start_positionY, float start_velocityX, float start_velocityY, float gameTime) {
-    float positionX = start_positionX + (start_velocityX * gameTime);
-    float positionY = 0.5f * gravity * pow(gameTime, 2)+ start_velocityY*gameTime + start_positionY;
-    Vector2 p0 = {.x = positionX, .y = positionY};
-    return p0;
+void parabolic_motion(float gravity,float start_positionX, float start_positionY, float *positionX, float *positionY, float start_velocityX, float start_velocityY, float gameTime) {
+    *positionX = start_positionX + (start_velocityX * gameTime);
+    *positionY = 0.5f * gravity * pow(gameTime, 2)+ start_velocityY*gameTime + start_positionY;
+
 }

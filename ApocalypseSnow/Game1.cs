@@ -71,7 +71,7 @@ public class Game1: Game
             
             _myPenguin.Draw(_spriteBatch);
             // Disegno della UI (Munizioni)
-            string ammoText = $"Munizioni: {_myPenguin._ammo}";
+            string ammoText = $"Munizioni: {_myPenguin.Ammo}";
             // Posizioniamo il testo in alto a sinistra (10, 10)
             _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(width/10, (height/1.2f)), Color.Black);
         }
