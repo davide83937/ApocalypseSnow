@@ -53,7 +53,7 @@ public class Penguin: DrawableGameComponent
     private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern Vector parabolic_motion(float gravity, float startPositionX, float startPositionY, float startVelocityX,
+    private static extern void parabolic_motion(float gravity, float startPositionX, float startPositionY, out float positionX, out float positionT, float startVelocityX,
         float startVelocityY, float gameTime);
 
     private void load_texture(int index,string path)
@@ -141,16 +141,20 @@ public class Penguin: DrawableGameComponent
     {
         // Punto X finale: X0 + (VelocitàX * Tempo)
         //float x_finale = (_start_position.X + 20) + (_start_speed.X )*1.5f;
-        Vector impatto = parabolic_motion(150f,
+  
+        parabolic_motion(150f,
             _start_position.X + 20, 
             _start_position.Y, 
+            out float x, out float y,
             _start_speed.X, 
             -_start_speed.Y, 
             1.5f // Il "tempo" finale desiderato
         );
 
+        Vector2 impatto = new Vector2(x, y);
+        
         // Salviamo il punto di impatto completo (X e Y)
-        Vector2 point_finale = new Vector2(impatto._x, impatto._y);
+        Vector2 point_finale = new Vector2(impatto.X, impatto.Y);
         return point_finale;
     }
     

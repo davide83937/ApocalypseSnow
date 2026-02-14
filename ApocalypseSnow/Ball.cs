@@ -77,7 +77,7 @@ public class Ball:DrawableGameComponent
     }
 
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern Vector parabolic_motion(float gravity, float startPositionX, float startPositionY, float startVelocityX,
+    private static extern void parabolic_motion(float gravity, float startPositionX, float startPositionY, ref float positionX, ref float positionY, float startVelocityX,
         float startVelocityY, float gameTime);
     
     
@@ -101,9 +101,8 @@ public class Ball:DrawableGameComponent
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _ball_time += deltaTime;
         
-        var v = parabolic_motion(gravity,_start_position.X+20, _start_position.Y, _start_speed.X, -_start_speed.Y, _ball_time);
-        _position.X = v._x;
-        _position.Y = v._y;
+        parabolic_motion(gravity,_start_position.X+20, _start_position.Y, ref _position.X, ref _position.Y,_start_speed.X, -_start_speed.Y, _ball_time);
+        
         
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
         //Console.WriteLine($"Scale: {_scale}");
