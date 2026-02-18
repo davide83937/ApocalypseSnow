@@ -29,7 +29,8 @@ public class Game1: Game
     {
         // 1. Crea il pinguino qui
         IAnimation animation = new AnimationManager();
-        _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation);
+        IMovements movements = new MovementsManager();
+        _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements);
     
         
         // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()

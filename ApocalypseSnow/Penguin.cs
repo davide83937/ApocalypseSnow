@@ -10,6 +10,7 @@ public class Penguin: DrawableGameComponent
 {
     private Game gameContext;
     private IAnimation  _animationManager;
+    private IMovements  _movementsManager;
     private Vector2 _position;
     private Vector2 _speed;
     private KeyboardState _oldState;
@@ -21,19 +22,30 @@ public class Penguin: DrawableGameComponent
     private bool isMoving = false;
     private bool isReloading = false;
     private bool isShooting = false;
+    private bool isW = false;
+    private bool isS = false;
+    private bool isA = false;
+    private bool isD = false;
+    private bool isR = false;
+    private bool isWold = false;
+    private bool isSold = false;
+    private bool isAold = false;
+    private bool isDold = false;
+    private bool isRold = false;
     private static readonly int _frameReload;
 
     static Penguin()
     {
         _frameReload = 3;
     }
-    public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation) : base(game)
+    public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements) : base(game)
     {
         gameContext = game;
         _position = startPosition;
         _speed = startSpeed;
         _ammo = 100;
         _animationManager = animation;
+        _movementsManager = movements;
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -121,6 +133,68 @@ public class Penguin: DrawableGameComponent
         Vector2 point_finale = new Vector2(impatto.X, impatto.Y);
         return point_finale;
     }
+
+    public void moveOn(float deltaTime)
+    {
+        if (isW && isReloading == false)
+        {
+            uniform_rectilinear_motion(ref _position.Y, -100, deltaTime);
+            //_sourceRect.X = 1 * (_texture.Width / 3);
+            _animationManager.moveRect( 3 * (_animationManager._texture.Height / 4));
+            isMoving = true;
+        }
+        if (!isW && isWold)
+        {
+            this._speed.Y = 0;
+        }
+    }
+
+    public void moveBack(float deltaTime)
+    {
+        if (isS && isReloading == false)
+        {
+            uniform_rectilinear_motion(ref _position.Y, 100, deltaTime);
+            //_sourceRect.X = 1 * (_texture.Width / 3);
+            _animationManager.moveRect( 0 * (_animationManager._texture.Height / 4));
+            isMoving = true;
+        }
+        
+        if (!isS && isSold)
+        {
+            this._speed.Y = 0;
+        }
+    }
+    
+    public void moveRight(float deltaTime)
+    {
+        if (isD && isReloading == false)
+        {
+            uniform_rectilinear_motion(ref _position.X, 100, deltaTime);
+            //_sourceRect.X = 1 * (_texture.Width / 3);
+            _animationManager.moveRect( 2 * (_animationManager._texture.Height / 4));
+            isMoving = true;
+        }
+        if (!isD && isDold)
+        {
+            this._speed.X = 0;
+        }
+        
+    }
+    
+    public void moveLeft(float deltaTime)
+    {
+        if (isA && isReloading == false)
+        {
+            uniform_rectilinear_motion(ref _position.X, -100, deltaTime);
+            //_sourceRect.X = 1 * (_texture.Width / 3);
+            _animationManager.moveRect(1 * (_animationManager._texture.Height / 4));
+            isMoving = true;
+        }
+        if (!isA && isAold)
+        {
+            this._speed.X = 0;
+        }
+    }
     
     
     protected override void LoadContent()
@@ -142,65 +216,35 @@ public class Penguin: DrawableGameComponent
         KeyboardState newState = Keyboard.GetState();
         MouseState mouseState = Mouse.GetState();
         isMoving = false;
-        
-        if (newState.IsKeyDown(Keys.S) && isReloading == false)
-        {
-            uniform_rectilinear_motion(ref _position.Y, 100, deltaTime);
-            //_sourceRect.X = 1 * (_texture.Width / 3);
-            _animationManager.moveRect( 0 * (_animationManager._texture.Height / 4));
-            isMoving = true;
-        }
-        
-        if (newState.IsKeyDown(Keys.W) && isReloading == false)
-        {
-            uniform_rectilinear_motion(ref _position.Y, -100, deltaTime);
-            //_sourceRect.X = 1 * (_texture.Width / 3);
-            _animationManager.moveRect( 3 * (_animationManager._texture.Height / 4));
-            isMoving = true;
-        }
-        
-        if (newState.IsKeyDown(Keys.D) && isReloading == false)
-        {
-            uniform_rectilinear_motion(ref _position.X, 100, deltaTime);
-            //_sourceRect.X = 1 * (_texture.Width / 3);
-            _animationManager.moveRect( 2 * (_animationManager._texture.Height / 4));
-            isMoving = true;
-        }
-        
-        if (newState.IsKeyDown(Keys.A) && isReloading == false)
-        {
-            uniform_rectilinear_motion(ref _position.X, -100, deltaTime);
-            //_sourceRect.X = 1 * (_texture.Width / 3);
-            _animationManager.moveRect(1 * (_animationManager._texture.Height / 4));
-            isMoving = true;
-        }
-        
-        if (newState.IsKeyUp(Keys.S) && _oldState.IsKeyDown(Keys.S))
-        {
-            this._speed.Y = 0;
-        }
-        
-        if (newState.IsKeyUp(Keys.D) && _oldState.IsKeyDown(Keys.D))
-        {
-            this._speed.X = 0;
-        }
-        
-        if (newState.IsKeyUp(Keys.A) && _oldState.IsKeyDown(Keys.A))
-        {
-            this._speed.X = 0;
-        }
-        
-        if (newState.IsKeyUp(Keys.W) && _oldState.IsKeyDown(Keys.W))
-        {
-            this._speed.Y = 0;
-        }
 
-        if (newState.IsKeyDown(Keys.R))
+        if (newState.IsKeyDown(Keys.W)) { isW = true; }else { isW = false; }
+        if (newState.IsKeyDown(Keys.D)) { isD = true; }else { isD = false; }
+        if (newState.IsKeyDown(Keys.A)) { isA = true; }else { isA = false; }
+        if (newState.IsKeyDown(Keys.S)) { isS = true; }else { isS = false; }
+        if (newState.IsKeyDown(Keys.R)) { isR = true; }else { isR = false; }
+        
+        
+        
+        moveBack(deltaTime);
+        
+        moveOn(deltaTime);
+        
+        moveRight(deltaTime);
+        
+        moveLeft(deltaTime);
+        
+        
+
+        if (isR)
         {
             isReloading = true;
         }
+        else
+        {
+            isReloading = false;
+        }
         
-        if (newState.IsKeyUp(Keys.R) && _oldState.IsKeyDown(Keys.R))
+        if (!isR && isRold)
         {
             isReloading = false;
             reload_time = 0f;
@@ -212,6 +256,10 @@ public class Penguin: DrawableGameComponent
         //_pressedTime *= 10;
         chargeShot(mouseState, ref _pressedTime, deltaTime);
         shot(mouseState, _oldMouseState, _pressedTime);
+        isAold = isA;
+        isDold = isD;
+        isSold = isS;
+        isWold = isW;
         _oldState = newState;
         _oldMouseState = mouseState;
 
