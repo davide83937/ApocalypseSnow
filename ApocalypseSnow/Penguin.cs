@@ -9,11 +9,11 @@ using Microsoft.Xna.Framework.Input;
 public class Penguin: DrawableGameComponent
 {
     private Game gameContext;
-    private AnimationManager  _animationManager;
+    private IAnimation  _animationManager;
     // Dizionario per contenere tutte le texture
 
     private string _currentKey; // La chiave della texture attiva
-    private Texture2D _texture;
+    //private Texture2D _texture;
     private Vector2 _position;
     private Vector2 _speed;
     private Rectangle _sourceRect;
@@ -22,12 +22,11 @@ public class Penguin: DrawableGameComponent
     private float _pressedTime = 0.0f;
     private int _ammo;
     public int Ammo { get { return _ammo; } set { _ammo = value; } }
-    private float temp_time;
     private float reload_time;
     private bool isMoving = false;
     private bool isReloading = false;
     private bool isShooting = false;
-    private int _currentFrame;     // L'indice del frame attuale (0, 1 o 2)
+    //private int _currentFrame;     // L'indice del frame attuale (0, 1 o 2)
     //private static readonly float _frameSpeed; // Velocità dell'animazione (più basso = più veloce)
     private static readonly int _frameReload;
     //public event Action<Vector2> OnSpawnBall;
@@ -45,6 +44,7 @@ public class Penguin: DrawableGameComponent
         _speed = startSpeed;
         _ammo = 100;
         _animationManager = new AnimationManager();
+        
         // Creiamo il rettangolo: (X iniziale, Y iniziale, Larghezza, Altezza)
         // Partiamo da (0,0) per prendere il primo in alto a sinistra
         _sourceRect = new Rectangle(0, 0, 0, 0);
@@ -140,25 +140,15 @@ public class Penguin: DrawableGameComponent
     
     protected override void LoadContent()
     {
-        _animationManager.load_texture(GraphicsDevice, 0, "Content/images/penguin_blue_walking.png");
-        _animationManager.load_texture(GraphicsDevice, 1, "Content/images/penguin_blue_walking_snowball.png");
-        _animationManager.load_texture(GraphicsDevice, 2, "Content/images/penguin_blue_gathering.png");
-        _animationManager.load_texture(GraphicsDevice, 3, "Content/images/penguin_blue_launch1.png");
-        _texture = _animationManager[1];
-        // CALCOLO DEL RITAGLIO
-        // Dividiamo la larghezza totale per 3 colonne
-        int width = _texture.Width / 3; 
-        // Dividiamo l'altezza totale per 4 righe
-        int height = _texture.Height / 4;
-        _sourceRect.Width = width;
-        _sourceRect.Height = height;
+        
+        _animationManager.Load_Content(GraphicsDevice);
     }
     
     
     
     public void Draw(SpriteBatch spriteBatch)
     {
-        _animationManager.changeTexture(_sourceRect, spriteBatch, _texture, ref _ammo, isReloading, isShooting, ref _position);
+        _animationManager.Draw(spriteBatch, _position, _ammo, isReloading, isShooting);
     }
 
     public override void Update(GameTime gameTime)
@@ -172,7 +162,7 @@ public class Penguin: DrawableGameComponent
         {
             uniform_rectilinear_motion(ref _position.Y, 100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
-            _sourceRect.Y = 0 * (_texture.Height / 4);
+            _animationManager.moveRect( 0 * (_animationManager._texture.Height / 4));
             isMoving = true;
         }
         
@@ -180,7 +170,7 @@ public class Penguin: DrawableGameComponent
         {
             uniform_rectilinear_motion(ref _position.Y, -100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
-            _sourceRect.Y = 3 * (_texture.Height / 4);
+            _animationManager.moveRect( 3 * (_animationManager._texture.Height / 4));
             isMoving = true;
         }
         
@@ -188,7 +178,7 @@ public class Penguin: DrawableGameComponent
         {
             uniform_rectilinear_motion(ref _position.X, 100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
-            _sourceRect.Y = 2 * (_texture.Height / 4);
+            _animationManager.moveRect( 2 * (_animationManager._texture.Height / 4));
             isMoving = true;
         }
         
@@ -196,7 +186,7 @@ public class Penguin: DrawableGameComponent
         {
             uniform_rectilinear_motion(ref _position.X, -100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
-            _sourceRect.Y = 1 * (_texture.Height / 4);
+            _animationManager.moveRect(1 * (_animationManager._texture.Height / 4));
             isMoving = true;
         }
         
@@ -232,7 +222,7 @@ public class Penguin: DrawableGameComponent
         }
         
         normalizeVelocity(ref this._speed.X, ref this._speed.Y);
-        _animationManager.walking_animation(_texture, ref _sourceRect, ref deltaTime, ref temp_time, isReloading, isMoving, ref _currentFrame);
+        _animationManager.Update(deltaTime, isMoving, isReloading);
         reload(deltaTime);
         //_pressedTime *= 10;
         chargeShot(mouseState, ref _pressedTime, deltaTime);

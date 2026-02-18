@@ -3,16 +3,20 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace ApocalypseSnow;
 
-public class AnimationManager
+public class AnimationManager:IAnimation
 {
-    private Texture2D[] _textures;
+    public Texture2D _texture { get; set; }
+    public Texture2D[] _textures;
     private static readonly float _frameSpeed;
+    private float temp_time;
+    private int _currentFrame;
+    private Rectangle _sourceRect;
+
     public Texture2D this[int index]
     {
         get => _textures[index];
     }
-
-
+    
     static AnimationManager()
     {
         _frameSpeed = 0.1f;
@@ -21,9 +25,11 @@ public class AnimationManager
     public AnimationManager()
     {
         _textures = new Texture2D[4];
+        
+      
     }
     
-    public void load_texture(GraphicsDevice gd, int index,string path)
+    public void load_texture(GraphicsDevice gd, int index, string path)
     {
         using (var stream = System.IO.File.OpenRead(path))
         {
@@ -53,7 +59,7 @@ public class AnimationManager
         spriteBatch.Draw(_texture, _position, _sourceRect, Color.White);
     }
     
-    public void walking_animation(Texture2D _texture, ref Rectangle _sourceRect, ref float gameTime, ref float temp_time, bool isReloading, bool isMoving, ref int _currentFrame)
+    public void walking_animation(Texture2D _texture, ref Rectangle _sourceRect, ref float gameTime, bool isReloading, bool isMoving)
     {
         if (isMoving || isReloading)
         {
@@ -76,4 +82,31 @@ public class AnimationManager
     }
 
 
+    public void Load_Content(GraphicsDevice graphicsDevice)
+    {
+        load_texture(graphicsDevice, 0, "Content/images/penguin_blue_walking.png");
+        load_texture(graphicsDevice, 1, "Content/images/penguin_blue_walking_snowball.png");
+        load_texture(graphicsDevice, 2, "Content/images/penguin_blue_gathering.png");
+        load_texture(graphicsDevice, 3, "Content/images/penguin_blue_launch1.png");
+        _texture = _textures[1];
+        _sourceRect = new Rectangle(0, 0, _texture.Width / 3, _texture.Height/4);
+    }
+
+    public void Update(float gameTime, bool isMoving, bool isReloading)
+    {
+        walking_animation( _texture, ref _sourceRect, ref gameTime, isReloading, isMoving);
+
+        
+    }
+    
+
+    public void Draw(SpriteBatch spriteBatch, Vector2 position, int ammo, bool isReloading, bool isShooting)
+    {
+        changeTexture(_sourceRect, spriteBatch, _texture, ref ammo, isReloading, isShooting, ref position);
+    }
+
+    public void moveRect(int posRect)
+    {
+        _sourceRect.Y = posRect;
+    }
 }
