@@ -10,13 +10,8 @@ public class Penguin: DrawableGameComponent
 {
     private Game gameContext;
     private IAnimation  _animationManager;
-    // Dizionario per contenere tutte le texture
-
-    private string _currentKey; // La chiave della texture attiva
-    //private Texture2D _texture;
     private Vector2 _position;
     private Vector2 _speed;
-    private Rectangle _sourceRect;
     private KeyboardState _oldState;
     private MouseState _oldMouseState;
     private float _pressedTime = 0.0f;
@@ -26,29 +21,19 @@ public class Penguin: DrawableGameComponent
     private bool isMoving = false;
     private bool isReloading = false;
     private bool isShooting = false;
-    //private int _currentFrame;     // L'indice del frame attuale (0, 1 o 2)
-    //private static readonly float _frameSpeed; // Velocità dell'animazione (più basso = più veloce)
     private static readonly int _frameReload;
-    //public event Action<Vector2> OnSpawnBall;
 
     static Penguin()
     {
-        
         _frameReload = 3;
     }
-    public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed) : base(game)
+    public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation) : base(game)
     {
         gameContext = game;
-        //_texture = texture;
         _position = startPosition;
         _speed = startSpeed;
         _ammo = 100;
-        _animationManager = new AnimationManager();
-        
-        // Creiamo il rettangolo: (X iniziale, Y iniziale, Larghezza, Altezza)
-        // Partiamo da (0,0) per prendere il primo in alto a sinistra
-        _sourceRect = new Rectangle(0, 0, 0, 0);
-     
+        _animationManager = animation;
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
