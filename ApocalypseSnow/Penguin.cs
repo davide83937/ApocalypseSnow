@@ -158,7 +158,7 @@ public class Penguin: DrawableGameComponent
     
     public void Draw(SpriteBatch spriteBatch)
     {
-        _animationManager.changeTexture(_sourceRect, spriteBatch, _texture, _ammo, isReloading, isShooting, _position);
+        _animationManager.changeTexture(_sourceRect, spriteBatch, _texture, ref _ammo, isReloading, isShooting, ref _position);
     }
 
     public override void Update(GameTime gameTime)
@@ -232,7 +232,7 @@ public class Penguin: DrawableGameComponent
         }
         
         normalizeVelocity(ref this._speed.X, ref this._speed.Y);
-        _animationManager.walking_animation(_texture, ref _sourceRect, deltaTime, temp_time, isReloading, isMoving, _currentFrame);
+        _animationManager.walking_animation(_texture, ref _sourceRect, ref deltaTime, ref temp_time, isReloading, isMoving, ref _currentFrame);
         reload(deltaTime);
         //_pressedTime *= 10;
         chargeShot(mouseState, ref _pressedTime, deltaTime);

@@ -32,7 +32,7 @@ public class AnimationManager
         }
     }
 
-    public void changeTexture(Rectangle _sourceRect, SpriteBatch spriteBatch, Texture2D _texture, int _ammo, bool isReloading, bool isShooting, Vector2 _position)
+    public void changeTexture(Rectangle _sourceRect, SpriteBatch spriteBatch, Texture2D _texture, ref int _ammo, bool isReloading, bool isShooting, ref Vector2 _position)
     {
         if (_ammo == 0 &&  !isReloading && !isShooting)
         {
@@ -53,7 +53,7 @@ public class AnimationManager
         spriteBatch.Draw(_texture, _position, _sourceRect, Color.White);
     }
     
-    public void walking_animation(Texture2D _texture, ref Rectangle _sourceRect, float gameTime, float temp_time, bool isReloading, bool isMoving, int _currentFrame)
+    public void walking_animation(Texture2D _texture, ref Rectangle _sourceRect, ref float gameTime, ref float temp_time, bool isReloading, bool isMoving, ref int _currentFrame)
     {
         if (isMoving || isReloading)
         {
