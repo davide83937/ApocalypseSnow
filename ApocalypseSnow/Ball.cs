@@ -26,7 +26,6 @@ public class Ball:DrawableGameComponent
         _ball_time = 0.0f;
         this.finalPosition = finalPosition;
         this._scale = 1.0f;
-
     }
 
 
@@ -102,7 +101,6 @@ public class Ball:DrawableGameComponent
         _ball_time += deltaTime;
         
         parabolic_motion(gravity,_start_position.X+20, _start_position.Y, ref _position.X, ref _position.Y,_start_speed.X, -_start_speed.Y, _ball_time);
-        
         
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
         //Console.WriteLine($"Scale: {_scale}");

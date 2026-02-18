@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿
 using System.Runtime.InteropServices;
 
 namespace ApocalypseSnow;
@@ -10,8 +9,9 @@ using Microsoft.Xna.Framework.Input;
 public class Penguin: DrawableGameComponent
 {
     private Game gameContext;
+    private AnimationManager  _animationManager;
     // Dizionario per contenere tutte le texture
-    private Texture2D[] _textures;
+
     private string _currentKey; // La chiave della texture attiva
     private Texture2D _texture;
     private Vector2 _position;
@@ -28,10 +28,15 @@ public class Penguin: DrawableGameComponent
     private bool isReloading = false;
     private bool isShooting = false;
     private int _currentFrame;     // L'indice del frame attuale (0, 1 o 2)
-    private static readonly float _frameSpeed = 0.1f; // Velocità dell'animazione (più basso = più veloce)
-    private static readonly int _frameReload = 3;
+    //private static readonly float _frameSpeed; // Velocità dell'animazione (più basso = più veloce)
+    private static readonly int _frameReload;
     //public event Action<Vector2> OnSpawnBall;
-    
+
+    static Penguin()
+    {
+        
+        _frameReload = 3;
+    }
     public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed) : base(game)
     {
         gameContext = game;
@@ -39,11 +44,11 @@ public class Penguin: DrawableGameComponent
         _position = startPosition;
         _speed = startSpeed;
         _ammo = 100;
-        
+        _animationManager = new AnimationManager();
         // Creiamo il rettangolo: (X iniziale, Y iniziale, Larghezza, Altezza)
         // Partiamo da (0,0) per prendere il primo in alto a sinistra
         _sourceRect = new Rectangle(0, 0, 0, 0);
-        _textures = new Texture2D[4];
+     
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -53,17 +58,11 @@ public class Penguin: DrawableGameComponent
     private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void parabolic_motion(float gravity, float startPositionX, float startPositionY, out float positionX, out float positionT, float startVelocityX,
+    private static extern void parabolic_motion(float gravity, float startPositionX, float startPositionY, 
+        out float positionX, out float positionY, float startVelocityX,
         float startVelocityY, float gameTime);
 
-    private void load_texture(int index,string path)
-    {
-        using (var stream = System.IO.File.OpenRead(path))
-        {
-            // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
-            this._textures[index] = Texture2D.FromStream(GraphicsDevice, stream);
-        }
-    }
+    
 
     private void reload(float gameTime)
     {
@@ -78,27 +77,7 @@ public class Penguin: DrawableGameComponent
         }
     }
     
-    private void walking_animation(float gameTime)
-    {
-        if (isMoving || isReloading)
-        {
-            temp_time += gameTime;
-            if (temp_time > _frameSpeed)
-            {
-                _currentFrame++;
-                // Dato che la tua texture ha 3 colonne (_texture.Width / 3)
-                if (_currentFrame >= 3) 
-                    _currentFrame = 0;
-                temp_time = 0f;
-            }
-        }
-        else
-        {
-            _currentFrame = 1; // Frame di riposo (solitamente quello centrale)
-        }
-        // Applichiamo il calcolo della X nel rettangolo di ritaglio
-        _sourceRect.X = _currentFrame * (_texture.Width / 3);
-    }
+    
 
     private void chargeShot(MouseState mouseState, ref float pressedTime, float deltaTime)
     {
@@ -161,11 +140,11 @@ public class Penguin: DrawableGameComponent
     
     protected override void LoadContent()
     {
-        load_texture(0, "Content/images/penguin_blue_walking.png");
-        load_texture(1, "Content/images/penguin_blue_walking_snowball.png");
-        load_texture(2, "Content/images/penguin_blue_gathering.png");
-        load_texture(3, "Content/images/penguin_blue_launch1.png");
-        _texture = _textures[1];
+        _animationManager.load_texture(GraphicsDevice, 0, "Content/images/penguin_blue_walking.png");
+        _animationManager.load_texture(GraphicsDevice, 1, "Content/images/penguin_blue_walking_snowball.png");
+        _animationManager.load_texture(GraphicsDevice, 2, "Content/images/penguin_blue_gathering.png");
+        _animationManager.load_texture(GraphicsDevice, 3, "Content/images/penguin_blue_launch1.png");
+        _texture = _animationManager[1];
         // CALCOLO DEL RITAGLIO
         // Dividiamo la larghezza totale per 3 colonne
         int width = _texture.Width / 3; 
@@ -179,23 +158,7 @@ public class Penguin: DrawableGameComponent
     
     public void Draw(SpriteBatch spriteBatch)
     {
-        if (_ammo == 0 &&  !isReloading && !isShooting)
-        {
-            this._texture = _textures[0];
-        }
-        else if (isReloading && !isShooting)
-        {
-             this._texture = _textures[2];
-        }
-        else if(!isReloading && isShooting)
-        {
-            this._texture = _textures[3];
-        }
-        else
-        {
-            this._texture = _textures[1];
-        }
-        spriteBatch.Draw(_texture, _position, _sourceRect, Color.White);
+        _animationManager.changeTexture(_sourceRect, spriteBatch, _texture, _ammo, isReloading, isShooting, _position);
     }
 
     public override void Update(GameTime gameTime)
@@ -269,7 +232,7 @@ public class Penguin: DrawableGameComponent
         }
         
         normalizeVelocity(ref this._speed.X, ref this._speed.Y);
-        walking_animation(deltaTime);
+        _animationManager.walking_animation(_texture, ref _sourceRect, deltaTime, temp_time, isReloading, isMoving, _currentFrame);
         reload(deltaTime);
         //_pressedTime *= 10;
         chargeShot(mouseState, ref _pressedTime, deltaTime);
