@@ -10,7 +10,7 @@ public class MovementsManager:IMovements
     MouseState mouseState = Mouse.GetState();
  
     
-    public void moveOn(bool isW){
+    public void moveOn(ref bool isW){
         if (newState.IsKeyDown(Keys.W)) { isW = true; }else { isW = false; }
     }
 

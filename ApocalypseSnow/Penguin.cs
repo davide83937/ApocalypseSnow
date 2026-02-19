@@ -136,6 +136,7 @@ public class Penguin: DrawableGameComponent
 
     public void moveOn(float deltaTime)
     {
+        _movementsManager.moveOn(ref isW);
         if (isW && isReloading == false)
         {
             uniform_rectilinear_motion(ref _position.Y, -100, deltaTime);
@@ -217,7 +218,7 @@ public class Penguin: DrawableGameComponent
         MouseState mouseState = Mouse.GetState();
         isMoving = false;
 
-        if (newState.IsKeyDown(Keys.W)) { isW = true; }else { isW = false; }
+        //if (newState.IsKeyDown(Keys.W)) { isW = true; }else { isW = false; }
         if (newState.IsKeyDown(Keys.D)) { isD = true; }else { isD = false; }
         if (newState.IsKeyDown(Keys.A)) { isA = true; }else { isA = false; }
         if (newState.IsKeyDown(Keys.S)) { isS = true; }else { isS = false; }
