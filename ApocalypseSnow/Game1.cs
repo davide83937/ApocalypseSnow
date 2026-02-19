@@ -31,11 +31,12 @@ public class Game1: Game
         IAnimation animation = new AnimationManager();
         IMovements movements = new MovementsManager();
         _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements);
-        _obstacle = new Obstacle(this, new Vector2(400, 400));
+        _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
     
         
         // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()
         Components.Add(_myPenguin);
+        Components.Add(_obstacle);
 
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
         // l'Initialize e il LoadContent di tutti i componenti in lista.
@@ -82,6 +83,10 @@ public class Game1: Game
             if (component is Ball ball)
             {
                 ball.Draw(_spriteBatch);
+            }
+            else if (component is Obstacle obstacle)
+            {
+                obstacle.Draw(_spriteBatch);
             }
         }
 

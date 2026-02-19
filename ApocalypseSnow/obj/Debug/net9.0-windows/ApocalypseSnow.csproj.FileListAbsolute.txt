@@ -48,3 +48,4 @@ D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\Apoca
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\ball_shadow.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\environment.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\ostacoli.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\ostacoli1.png
