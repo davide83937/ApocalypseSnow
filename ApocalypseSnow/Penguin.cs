@@ -13,8 +13,6 @@ public class Penguin: DrawableGameComponent
     private IMovements  _movementsManager;
     private Vector2 _position;
     private Vector2 _speed;
-    private KeyboardState _oldState;
-    private MouseState _oldMouseState;
     private float _pressedTime = 0.0f;
     private int _ammo;
     public int Ammo { get { return _ammo; } set { _ammo = value; } }
@@ -27,11 +25,13 @@ public class Penguin: DrawableGameComponent
     private bool isA = false;
     private bool isD = false;
     private bool isR = false;
+    private bool isLeft = false;
     private bool isWold = false;
     private bool isSold = false;
     private bool isAold = false;
     private bool isDold = false;
     private bool isRold = false;
+    private bool isLeftOld = false;
     private static readonly int _frameReload;
 
     static Penguin()
@@ -76,9 +76,10 @@ public class Penguin: DrawableGameComponent
     
     
 
-    private void chargeShot(MouseState mouseState, ref float pressedTime, float deltaTime)
+    private void chargeShot(bool isLeft, ref float pressedTime, float deltaTime)
     {
-        if (mouseState.LeftButton == ButtonState.Pressed && _ammo > 0)
+        _movementsManager.checkPressMouse(ref isLeft);
+        if (isLeft && _ammo > 0)
         {
             //Console.WriteLine($"Valore click:X = {mouseState.X}, Y = {mouseState.Y}");
             isShooting = true;
@@ -93,10 +94,12 @@ public class Penguin: DrawableGameComponent
         }
     }
 
-    private void shot(MouseState mouseState, MouseState lastMouseState, float pressedTime)
+    private void shot( float pressedTime)
     {
-        if (mouseState.LeftButton == ButtonState.Released && lastMouseState.LeftButton == ButtonState.Pressed && _ammo > 0)
+        _movementsManager.checkPressMouse(ref isLeft);
+        if (!isLeft && isLeftOld && _ammo > 0)
         {
+            Vector2 mouseState = _movementsManager.getMousePosition();
             float differenceX = _position.X - mouseState.X;
             float differenceY = _position.Y - mouseState.Y;
             float coX = (differenceX/100)* (-1);
@@ -115,9 +118,6 @@ public class Penguin: DrawableGameComponent
 
     private Vector2 finalPoint(Vector2 _start_speed, Vector2 _start_position)
     {
-        // Punto X finale: X0 + (VelocitàX * Tempo)
-        //float x_finale = (_start_position.X + 20) + (_start_speed.X )*1.5f;
-  
         parabolic_motion(150f,
             _start_position.X + 20, 
             _start_position.Y, 
@@ -134,7 +134,7 @@ public class Penguin: DrawableGameComponent
         return point_finale;
     }
 
-    public void moveOn(float deltaTime)
+    public void moveOn(ref float deltaTime)
     {
         _movementsManager.moveOn(ref isW);
         if (isW && isReloading == false)
@@ -146,12 +146,13 @@ public class Penguin: DrawableGameComponent
         }
         if (!isW && isWold)
         {
-            this._speed.Y = 0;
+            _speed.Y = 0;
         }
     }
 
-    public void moveBack(float deltaTime)
+    public void moveBack(ref float deltaTime)
     {
+        _movementsManager.moveBack(ref isS);
         if (isS && isReloading == false)
         {
             uniform_rectilinear_motion(ref _position.Y, 100, deltaTime);
@@ -162,12 +163,13 @@ public class Penguin: DrawableGameComponent
         
         if (!isS && isSold)
         {
-            this._speed.Y = 0;
+            _speed.Y = 0;
         }
     }
     
-    public void moveRight(float deltaTime)
+    public void moveRight(ref float deltaTime)
     {
+        _movementsManager.moveRight(ref isD);
         if (isD && isReloading == false)
         {
             uniform_rectilinear_motion(ref _position.X, 100, deltaTime);
@@ -177,13 +179,14 @@ public class Penguin: DrawableGameComponent
         }
         if (!isD && isDold)
         {
-            this._speed.X = 0;
+            _speed.X = 0;
         }
         
     }
     
-    public void moveLeft(float deltaTime)
+    public void moveLeft(ref float deltaTime)
     {
+        _movementsManager.moveLeft(ref isA);
         if (isA && isReloading == false)
         {
             uniform_rectilinear_motion(ref _position.X, -100, deltaTime);
@@ -193,14 +196,20 @@ public class Penguin: DrawableGameComponent
         }
         if (!isA && isAold)
         {
-            this._speed.X = 0;
+            _speed.X = 0;
         }
+    }
+
+    public void moveReload()
+    {
+        _movementsManager.moveReload(ref isR);
+        if (isR) { isReloading = true; }else { isReloading = false; }
+        if (!isR && isRold) { isReloading = false; reload_time = 0f; }
     }
     
     
     protected override void LoadContent()
     {
-        
         _animationManager.Load_Content(GraphicsDevice);
     }
     
@@ -214,55 +223,29 @@ public class Penguin: DrawableGameComponent
     public override void Update(GameTime gameTime)
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        KeyboardState newState = Keyboard.GetState();
-        MouseState mouseState = Mouse.GetState();
+     
         isMoving = false;
-
-        //if (newState.IsKeyDown(Keys.W)) { isW = true; }else { isW = false; }
-        if (newState.IsKeyDown(Keys.D)) { isD = true; }else { isD = false; }
-        if (newState.IsKeyDown(Keys.A)) { isA = true; }else { isA = false; }
-        if (newState.IsKeyDown(Keys.S)) { isS = true; }else { isS = false; }
-        if (newState.IsKeyDown(Keys.R)) { isR = true; }else { isR = false; }
         
+        moveBack(ref deltaTime);
         
+        moveOn(ref deltaTime);
         
-        moveBack(deltaTime);
+        moveRight(ref deltaTime);
         
-        moveOn(deltaTime);
+        moveLeft(ref deltaTime);
         
-        moveRight(deltaTime);
+        moveReload();
         
-        moveLeft(deltaTime);
-        
-        
-
-        if (isR)
-        {
-            isReloading = true;
-        }
-        else
-        {
-            isReloading = false;
-        }
-        
-        if (!isR && isRold)
-        {
-            isReloading = false;
-            reload_time = 0f;
-        }
-        
-        normalizeVelocity(ref this._speed.X, ref this._speed.Y);
+        normalizeVelocity(ref _speed.X, ref _speed.Y);
         _animationManager.Update(deltaTime, isMoving, isReloading);
         reload(deltaTime);
         //_pressedTime *= 10;
-        chargeShot(mouseState, ref _pressedTime, deltaTime);
-        shot(mouseState, _oldMouseState, _pressedTime);
+        chargeShot(isLeft, ref _pressedTime, deltaTime);
+        shot(_pressedTime);
         isAold = isA;
         isDold = isD;
         isSold = isS;
         isWold = isW;
-        _oldState = newState;
-        _oldMouseState = mouseState;
-
+        isLeftOld = isLeft;
     }
 }
