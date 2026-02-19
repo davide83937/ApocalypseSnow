@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -9,51 +8,59 @@ namespace ApocalypseSnow;
 public class Ball:DrawableGameComponent
 {
     private Texture2D _texture;
-    private Vector2 _start_position;
+    private readonly Vector2 _startPosition;
     private Vector2 _position;
-    private Vector2 _start_speed;
-    private float _ball_time;
-    private Vector2 finalPosition;
+    private readonly Vector2 _startSpeed;
+    private float _ballTime;
+    private readonly Vector2 _finalPosition;
     private float _scale;
-    private float gravity = 150f;
+    private static readonly float Gravity = 150f;
+    private static readonly float L = 0.1f;  // massimo
+    private static readonly float K = 0.0003f;   // velocità di crescita
     
 
     public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, Vector2 finalPosition) : base(game)
     {
-        this._start_position = startPosition;
+        this._startPosition = startPosition;
         this._position = startPosition;
-        this._start_speed = startSpeed;
-        _ball_time = 0.0f;
-        this.finalPosition = finalPosition;
+        this._startSpeed = startSpeed;
+        _ballTime = 0.0f;
+        this._finalPosition = finalPosition;
         this._scale = 1.0f;
+        
     }
 
 
-    
-
-    public void finalPointCalculous()
+    private void FinalPointCalculous()
     {
         bool haRaggiuntoTarget = false;
-        float differenceY = Math.Abs(_start_position.Y-finalPosition.Y);
+        float differenceY = Math.Abs(_startPosition.Y-_finalPosition.Y);
         //Console.WriteLine(differenceY);
-
-        float L = 0.1f;  // massimo
-        float k = 0.0003f;   // velocità di crescita
+        
         float t = differenceY; // es: tempo, velocità, carica
 
-        float x = L * (1f - MathF.Exp(-k * t));
+        float x = L * (1f - MathF.Exp(-K * t));
         
-        if (_start_speed.X > 0) // Tiro verso DESTRA
+        switch (_startSpeed.X)
         {
-            if (_position.X >= finalPosition.X) haRaggiuntoTarget = true;
-            if (_position.X < (finalPosition.X+_start_position.X+20)/2) { _scale = _scale + x; }
-            else { _scale = _scale - x; }
-        }
-        else if (_start_speed.X < 0) // Tiro verso SINISTRA
-        {
-            if (_position.X <= finalPosition.X) haRaggiuntoTarget = true;
-            if (_position.X > (_start_position.X+finalPosition.X+20)/2) { _scale = _scale + x; }
-            else { _scale = _scale - x; }
+            // Tiro verso DESTRA
+            case > 0:
+            {
+                if (_position.X >= _finalPosition.X) haRaggiuntoTarget = true;
+                if (_position.X < (_finalPosition.X+_startPosition.X+20)/2) { _scale = _scale + x; }
+                else { _scale = _scale - x; }
+
+                break;
+            }
+            // Tiro verso SINISTRA
+            case < 0:
+            {
+                if (_position.X <= _finalPosition.X) haRaggiuntoTarget = true;
+                if (_position.X > (_startPosition.X+_finalPosition.X+20)/2) { _scale = _scale + x; }
+                else { _scale = _scale - x; }
+
+                break;
+            }
         }
 
         // 3. Applichiamo l'impatto se il target è raggiunto
@@ -68,11 +75,9 @@ public class Ball:DrawableGameComponent
 
     private void load_texture(string path)
     {
-        using (var stream = System.IO.File.OpenRead(path))
-        {
-            // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
-            this._texture = Texture2D.FromStream(GraphicsDevice, stream);
-        }
+        using var stream = System.IO.File.OpenRead(path);
+        // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
+        this._texture = Texture2D.FromStream(GraphicsDevice, stream);
     }
 
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -98,16 +103,16 @@ public class Ball:DrawableGameComponent
     public override void Update(GameTime gameTime)
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        _ball_time += deltaTime;
+        _ballTime += deltaTime;
         
-        parabolic_motion(gravity,_start_position.X+20, _start_position.Y, ref _position.X, ref _position.Y,_start_speed.X, -_start_speed.Y, _ball_time);
+        parabolic_motion(Gravity,_startPosition.X+20, _startPosition.Y, ref _position.X, ref _position.Y,_startSpeed.X, -_startSpeed.Y, _ballTime);
         
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
         //Console.WriteLine($"Scale: {_scale}");
         //Console.WriteLine($"Gravity: {gravity}");
         if (_scale < 1.0f) { _scale = 1.0f; }
         if (_scale > 1.6f) { _scale = 1.6f; }
-        finalPointCalculous();
+        FinalPointCalculous();
        
     }
     

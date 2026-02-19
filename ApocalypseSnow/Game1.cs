@@ -10,18 +10,17 @@ public class Game1: Game
     
     // Dichiariamo il nostro pinguino qui!
     private Penguin _myPenguin;
-    private Texture2D pinguTexture;
     private SpriteFont _uiFont;
-    private int width;
-    private int height;
+    private int _width;
+    private int _height;
     private Texture2D _backgroundTexture;
     
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
-        width = 0;
-        height = 0;
+        _width = 0;
+        _height = 0;
         IsMouseVisible = true;
     }
     
@@ -51,11 +50,9 @@ public class Game1: Game
     
     private void load_texture(string path)
     {
-        using (var stream = System.IO.File.OpenRead(path))
-        {
-            // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
-            this._backgroundTexture = Texture2D.FromStream(GraphicsDevice, stream);
-        }
+        using var stream = System.IO.File.OpenRead(path);
+        // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
+        this._backgroundTexture = Texture2D.FromStream(GraphicsDevice, stream);
     }
     
     protected override void Draw(GameTime gameTime)
@@ -75,7 +72,7 @@ public class Game1: Game
             // Disegno della UI (Munizioni)
             string ammoText = $"Munizioni: {_myPenguin.Ammo}";
             // Posizioniamo il testo in alto a sinistra (10, 10)
-            _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(width/10, (height/1.2f)), Color.Black);
+            _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(_width/10f, (_height/1.2f)), Color.Black);
         }
 
         foreach (var component in Components)
@@ -94,8 +91,8 @@ public class Game1: Game
     
     protected override void Update(GameTime gameTime)
     {
-        width = GraphicsDevice.Viewport.Width;
-        height = GraphicsDevice.Viewport.Height;
+        _width = GraphicsDevice.Viewport.Width;
+        _height = GraphicsDevice.Viewport.Height;
         base.Update(gameTime);
     }
 }

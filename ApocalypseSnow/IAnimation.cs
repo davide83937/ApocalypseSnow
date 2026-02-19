@@ -5,12 +5,14 @@ namespace ApocalypseSnow;
 
 public interface IAnimation
 {
-    Texture2D _texture { get; set; }
+    Texture2D Texture { get; set; }
     Texture2D this[int index] { get; }
     
+    Rectangle SourceRect { get; }
+    
     public void Load_Content(GraphicsDevice graphicsDevice);
-    void Update(float gameTime, bool isMoving, bool isReloading);
-    void Draw(SpriteBatch spriteBatch, Vector2 position, int ammo, bool isReloading, bool isShooting);
+    void Update(ref float gameTime, ref bool isMoving, ref bool isReloading);
+    void Draw(SpriteBatch spriteBatch, ref Vector2 position, ref int ammo, ref bool isReloading, ref bool isShooting);
 
-    void moveRect(int posRect);
+    void MoveRect(int posRect);
 }

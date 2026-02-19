@@ -7,48 +7,49 @@ namespace ApocalypseSnow;
 
 public class MovementsManager:IMovements
 {
-    KeyboardState newState = Keyboard.GetState();
-    MouseState mouseState = Mouse.GetState();
+    private KeyboardState _newState = Keyboard.GetState();
+    private MouseState _mouseState = Mouse.GetState();
 
 
-    public void checkPressMouse(ref bool isLeft)
+    public void CheckPressMouse(ref bool isLeft)
     {
-        mouseState = Mouse.GetState();
-        if(mouseState.LeftButton == ButtonState.Pressed){ isLeft = true;}else { isLeft = false; }
+        _mouseState = Mouse.GetState();
+        if(_mouseState.LeftButton == ButtonState.Pressed){ isLeft = true;}else { isLeft = false; }
     }
 
-    public Vector2 getMousePosition()
+    public Vector2 GetMousePosition()
     {
-        Vector2 mousePosition = new Vector2(mouseState.X, mouseState.Y);
+        Vector2 mousePosition = new Vector2(_mouseState.X, _mouseState.Y);
         return mousePosition;
     }
     
-    public void moveOn(ref bool isW){
-        newState = Keyboard.GetState();
-        if (newState.IsKeyDown(Keys.W)) { isW = true;}else { isW = false; }
+    public void moveOn(ref bool isW)
+    {
+        _newState = Keyboard.GetState();
+        isW = _newState.IsKeyDown(Keys.W);
     }
 
-    public void moveBack(ref bool isS)
+    public void MoveBack(ref bool isS)
     {
-        newState = Keyboard.GetState();
-        if (newState.IsKeyDown(Keys.S)) { isS = true; }else { isS = false; }
+        _newState = Keyboard.GetState();
+        isS = _newState.IsKeyDown(Keys.S);
     }
     
-    public void moveRight(ref bool isD)
+    public void MoveRight(ref bool isD)
     {
-        newState = Keyboard.GetState();
-        if (newState.IsKeyDown(Keys.D)) { isD = true; }else { isD = false; }
+        _newState = Keyboard.GetState();
+        isD = _newState.IsKeyDown(Keys.D);
     }
     
-    public void moveLeft(ref bool isA)
+    public void MoveLeft(ref bool isA)
     {
-        newState = Keyboard.GetState();
-        if (newState.IsKeyDown(Keys.A)) { isA = true; }else { isA = false; }
+        _newState = Keyboard.GetState();
+        isA = _newState.IsKeyDown(Keys.A);
     }
 
-    public void moveReload(ref bool isR)
+    public void MoveReload(ref bool isR)
     {
-        newState = Keyboard.GetState();
-        if (newState.IsKeyDown(Keys.R)) { isR = true; }else { isR = false; }
+        _newState = Keyboard.GetState();
+        isR = _newState.IsKeyDown(Keys.R);
     }
 }

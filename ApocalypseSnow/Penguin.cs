@@ -4,48 +4,36 @@ using System.Runtime.InteropServices;
 namespace ApocalypseSnow;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
+
 
 public class Penguin: DrawableGameComponent
 {
-    private Game gameContext;
-    private IAnimation  _animationManager;
-    private IMovements  _movementsManager;
+    private readonly Game _gameContext;
+    private readonly IAnimation  _animationManager;
+    private readonly IMovements  _movementsManager;
     private Vector2 _position;
     private Vector2 _speed;
-    private float _pressedTime = 0.0f;
+    private float _pressedTime;
+    private float _deltaTime;
     private int _ammo;
-    public int Ammo { get { return _ammo; } set { _ammo = value; } }
-    private float reload_time;
-    private bool isMoving = false;
-    private bool isReloading = false;
-    private bool isShooting = false;
-    private bool isW = false;
-    private bool isS = false;
-    private bool isA = false;
-    private bool isD = false;
-    private bool isR = false;
-    private bool isLeft = false;
-    private bool isWold = false;
-    private bool isSold = false;
-    private bool isAold = false;
-    private bool isDold = false;
-    private bool isRold = false;
-    private bool isLeftOld = false;
-    private static readonly int _frameReload;
+    public int Ammo{ get => _ammo; set => _ammo = value; }
+    private float _reloadTime;
+    private InputList _inputList;
+    private static readonly int FrameReload;
 
     static Penguin()
     {
-        _frameReload = 3;
+        FrameReload = 3;
     }
     public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements) : base(game)
     {
-        gameContext = game;
+        _gameContext = game;
         _position = startPosition;
         _speed = startSpeed;
         _ammo = 100;
         _animationManager = animation;
         _movementsManager = movements;
+        _inputList = new InputList();
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -61,150 +49,144 @@ public class Penguin: DrawableGameComponent
 
     
 
-    private void reload(float gameTime)
+    private void Reload(float gameTime)
     {
-        if (isReloading)
-        {
-            reload_time += gameTime;
-            if (reload_time > _frameReload)
-            {
-                _ammo++;
-                reload_time = 0f;
-            }
-        }
+        if (!_inputList.IsReloading) return;
+        _reloadTime += gameTime;
+        if (!(_reloadTime > FrameReload)) return;
+        _ammo++;
+        _reloadTime = 0f;
     }
     
     
 
-    private void chargeShot(bool isLeft, ref float pressedTime, float deltaTime)
+    private void ChargeShot(bool isLeft, ref float pressedTime, float deltaTime)
     {
-        _movementsManager.checkPressMouse(ref isLeft);
-        if (isLeft && _ammo > 0)
+        _movementsManager.CheckPressMouse(ref isLeft);
+        if (!isLeft || _ammo <= 0) return;
+        //Console.WriteLine($"Valore click:X = {mouseState.X}, Y = {mouseState.Y}");
+        _inputList.IsShooting = true;
+        //Console.WriteLine($"Valore delta: {deltaTime}");
+        deltaTime *= 100;
+        pressedTime += deltaTime;
+        //Console.WriteLine($"Valore delta: {pressedTime}");
+        if (pressedTime > 500)
         {
-            //Console.WriteLine($"Valore click:X = {mouseState.X}, Y = {mouseState.Y}");
-            isShooting = true;
-            //Console.WriteLine($"Valore delta: {deltaTime}");
-            deltaTime *= 100;
-            pressedTime += deltaTime;
-            //Console.WriteLine($"Valore delta: {pressedTime}");
-            if (pressedTime > 500)
-            {
-                pressedTime = 500;
-            }
+            pressedTime = 500;
         }
     }
 
-    private void shot( float pressedTime)
+    private void Shot( float pressedTime)
     {
-        _movementsManager.checkPressMouse(ref isLeft);
-        if (!isLeft && isLeftOld && _ammo > 0)
-        {
-            Vector2 mouseState = _movementsManager.getMousePosition();
-            float differenceX = _position.X - mouseState.X;
-            float differenceY = _position.Y - mouseState.Y;
-            float coX = (differenceX/100)* (-1);
+        _movementsManager.CheckPressMouse(ref _inputList.IsLeft);
+        if (_inputList is not { IsLeft: false, IsLeftOld: true } || _ammo <= 0) return;
+        Vector2 mouseState = _movementsManager.GetMousePosition();
+        float differenceX = _position.X - mouseState.X;
+        float differenceY = _position.Y - mouseState.Y;
+        float coX = (differenceX/100)* (-1);
             
-            //Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
-            Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
-            Vector2 finalPosition = finalPoint(startSpeed, _position);
-            Ball b = new Ball(gameContext, _position, startSpeed, finalPosition);
-            gameContext.Components.Add(b);
-            isShooting = false;
-            //Console.WriteLine($"Valore: {_pressedTime}");
-            _pressedTime = 0;
-            _ammo--;
-        }
+        //Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
+        Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
+        Vector2 finalPosition = FinalPoint(startSpeed, _position);
+        Ball b = new Ball(_gameContext, _position, startSpeed, finalPosition);
+        _gameContext.Components.Add(b);
+        _inputList.IsShooting = false;
+        //Console.WriteLine($"Valore: {_pressedTime}");
+        _pressedTime = 0;
+        _ammo--;
     }
 
-    private Vector2 finalPoint(Vector2 _start_speed, Vector2 _start_position)
+    private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
     {
         parabolic_motion(150f,
-            _start_position.X + 20, 
-            _start_position.Y, 
+            startPosition.X + 20, 
+            startPosition.Y, 
             out float x, out float y,
-            _start_speed.X, 
-            -_start_speed.Y, 
+            startSpeed.X, 
+            -startSpeed.Y, 
             1.5f // Il "tempo" finale desiderato
         );
 
         Vector2 impatto = new Vector2(x, y);
         
         // Salviamo il punto di impatto completo (X e Y)
-        Vector2 point_finale = new Vector2(impatto.X, impatto.Y);
-        return point_finale;
+        Vector2 pointFinale = new Vector2(impatto.X, impatto.Y);
+        return pointFinale;
     }
 
-    public void moveOn(ref float deltaTime)
+    private void MoveOn(ref float deltaTime)
     {
-        _movementsManager.moveOn(ref isW);
-        if (isW && isReloading == false)
+        _movementsManager.moveOn(ref _inputList.IsW);
+        if (_inputList is { IsW: true, IsReloading: false })
         {
             uniform_rectilinear_motion(ref _position.Y, -100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
-            _animationManager.moveRect( 3 * (_animationManager._texture.Height / 4));
-            isMoving = true;
+            _animationManager.MoveRect( 3 * (_animationManager.SourceRect.Height));
+            _inputList.IsMoving = true;
         }
-        if (!isW && isWold)
+        if (_inputList is { IsW: false, IsWold: true })
         {
             _speed.Y = 0;
         }
     }
 
-    public void moveBack(ref float deltaTime)
+    private void MoveBack(ref float deltaTime)
     {
-        _movementsManager.moveBack(ref isS);
-        if (isS && isReloading == false)
+        _movementsManager.MoveBack(ref _inputList.IsS);
+        if (_inputList is { IsS: true, IsReloading: false })
         {
             uniform_rectilinear_motion(ref _position.Y, 100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
-            _animationManager.moveRect( 0 * (_animationManager._texture.Height / 4));
-            isMoving = true;
+            _animationManager.MoveRect( 0 * (_animationManager.SourceRect.Height));
+            _inputList.IsMoving = true;
         }
         
-        if (!isS && isSold)
+        if (_inputList is { IsS: false, IsSold: true })
         {
             _speed.Y = 0;
         }
     }
-    
-    public void moveRight(ref float deltaTime)
+
+    private void MoveRight(ref float deltaTime)
     {
-        _movementsManager.moveRight(ref isD);
-        if (isD && isReloading == false)
+        _movementsManager.MoveRight(ref _inputList.IsD);
+        if (_inputList is { IsD: true, IsReloading: false })
         {
             uniform_rectilinear_motion(ref _position.X, 100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
-            _animationManager.moveRect( 2 * (_animationManager._texture.Height / 4));
-            isMoving = true;
+            _animationManager.MoveRect( 2 * (_animationManager.SourceRect.Height));
+            _inputList.IsMoving = true;
         }
-        if (!isD && isDold)
+        if (_inputList is { IsD: false, IsDold: true })
         {
             _speed.X = 0;
         }
         
     }
-    
-    public void moveLeft(ref float deltaTime)
+
+    private void MoveLeft(ref float deltaTime)
     {
-        _movementsManager.moveLeft(ref isA);
-        if (isA && isReloading == false)
+        _movementsManager.MoveLeft(ref _inputList.IsA);
+        if (_inputList is { IsA: true, IsReloading: false })
         {
             uniform_rectilinear_motion(ref _position.X, -100, deltaTime);
             //_sourceRect.X = 1 * (_texture.Width / 3);
-            _animationManager.moveRect(1 * (_animationManager._texture.Height / 4));
-            isMoving = true;
+            _animationManager.MoveRect(1 * (_animationManager.SourceRect.Height));
+            _inputList.IsMoving = true;
         }
-        if (!isA && isAold)
+        if (_inputList is { IsA: false, IsAold: true })
         {
             _speed.X = 0;
         }
     }
 
-    public void moveReload()
+    private void MoveReload()
     {
-        _movementsManager.moveReload(ref isR);
-        if (isR) { isReloading = true; }else { isReloading = false; }
-        if (!isR && isRold) { isReloading = false; reload_time = 0f; }
+        _movementsManager.MoveReload(ref _inputList.IsR);
+        _inputList.IsReloading = _inputList.IsR;
+
+        if (_inputList is not { IsR: false, IsRold: true }) return;
+        _inputList.IsReloading = false; _reloadTime = 0f;
     }
     
     
@@ -217,35 +199,35 @@ public class Penguin: DrawableGameComponent
     
     public void Draw(SpriteBatch spriteBatch)
     {
-        _animationManager.Draw(spriteBatch, _position, _ammo, isReloading, isShooting);
+        _animationManager.Draw(spriteBatch, ref _position, ref _ammo, ref _inputList.IsReloading, ref _inputList.IsShooting);
     }
 
     public override void Update(GameTime gameTime)
     {
-        float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
      
-        isMoving = false;
+        _inputList.IsMoving = false;
         
-        moveBack(ref deltaTime);
+        MoveBack(ref _deltaTime);
         
-        moveOn(ref deltaTime);
+        MoveOn(ref _deltaTime);
         
-        moveRight(ref deltaTime);
+        MoveRight(ref _deltaTime);
         
-        moveLeft(ref deltaTime);
+        MoveLeft(ref _deltaTime);
         
-        moveReload();
+        MoveReload();
         
         normalizeVelocity(ref _speed.X, ref _speed.Y);
-        _animationManager.Update(deltaTime, isMoving, isReloading);
-        reload(deltaTime);
+        _animationManager.Update(ref _deltaTime, ref _inputList.IsMoving, ref _inputList.IsReloading);
+        Reload(_deltaTime);
         //_pressedTime *= 10;
-        chargeShot(isLeft, ref _pressedTime, deltaTime);
-        shot(_pressedTime);
-        isAold = isA;
-        isDold = isD;
-        isSold = isS;
-        isWold = isW;
-        isLeftOld = isLeft;
+        ChargeShot(_inputList.IsLeft, ref _pressedTime, _deltaTime);
+        Shot(_pressedTime);
+        _inputList.IsAold = _inputList.IsA;
+        _inputList.IsDold = _inputList.IsD;
+        _inputList.IsSold = _inputList.IsS;
+        _inputList.IsWold = _inputList.IsW;
+        _inputList.IsLeftOld = _inputList.IsLeft;
     }
 }
