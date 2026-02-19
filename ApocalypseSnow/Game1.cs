@@ -10,6 +10,7 @@ public class Game1: Game
     
     // Dichiariamo il nostro pinguino qui!
     private Penguin _myPenguin;
+    private Obstacle _obstacle;
     private SpriteFont _uiFont;
     private int _width;
     private int _height;
@@ -30,6 +31,7 @@ public class Game1: Game
         IAnimation animation = new AnimationManager();
         IMovements movements = new MovementsManager();
         _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements);
+        _obstacle = new Obstacle(this, new Vector2(400, 400));
     
         
         // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()

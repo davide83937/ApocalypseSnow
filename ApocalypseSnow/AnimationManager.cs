@@ -83,8 +83,6 @@ public class AnimationManager:IAnimation
     public void Update(ref float gameTime, ref bool isMoving, ref bool isReloading)
     {
         walking_animation(ref gameTime, ref isReloading, ref isMoving);
-
-        
     }
     
 
