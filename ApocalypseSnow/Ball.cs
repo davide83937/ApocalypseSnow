@@ -87,7 +87,7 @@ public class Ball:DrawableGameComponent
     
     protected override void LoadContent()
     {
-        load_texture("Content/images/Snowball1.png");
+        load_texture("Content/images/palla1.png");
     }
 
 

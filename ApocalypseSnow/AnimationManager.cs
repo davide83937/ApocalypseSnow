@@ -75,7 +75,7 @@ public class AnimationManager:IAnimation
         load_texture(graphicsDevice, 0, "Content/images/penguin_blue_walking.png");
         load_texture(graphicsDevice, 1, "Content/images/penguin_blue_walking_snowball.png");
         load_texture(graphicsDevice, 2, "Content/images/penguin_blue_gathering.png");
-        load_texture(graphicsDevice, 3, "Content/images/penguin_blue_launch1.png");
+        load_texture(graphicsDevice, 3, "Content/images/penguin_blue_launch2.png");
         Texture = _textures[1];
         _sourceRect = new Rectangle(0, 0, Texture.Width / 3, Texture.Height/4);
     }

@@ -8,6 +8,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 public class Penguin: DrawableGameComponent
 {
+    private readonly string _tag;
     private readonly Game _gameContext;
     private readonly IAnimation  _animationManager;
     private readonly IMovements  _movementsManager;
@@ -27,6 +28,7 @@ public class Penguin: DrawableGameComponent
     }
     public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements) : base(game)
     {
+        _tag = "penguin";
         _gameContext = game;
         _position = startPosition;
         _speed = startSpeed;
@@ -74,6 +76,7 @@ public class Penguin: DrawableGameComponent
         {
             pressedTime = 500;
         }
+        
     }
 
     private void Shot( float pressedTime)
@@ -194,9 +197,13 @@ public class Penguin: DrawableGameComponent
     {
         _animationManager.Load_Content(GraphicsDevice);
     }
-    
-    
-    
+
+    public override void Initialize()
+    {
+        CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width, _animationManager.Texture.Height);
+        base.Initialize();
+    }
+
     public void Draw(SpriteBatch spriteBatch)
     {
         _animationManager.Draw(spriteBatch, ref _position, ref _ammo, ref _inputList.IsReloading, ref _inputList.IsShooting);
@@ -224,10 +231,13 @@ public class Penguin: DrawableGameComponent
         //_pressedTime *= 10;
         ChargeShot(_inputList.IsLeft, ref _pressedTime, _deltaTime);
         Shot(_pressedTime);
+        CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width, _animationManager.Texture.Height);
+        
         _inputList.IsAold = _inputList.IsA;
         _inputList.IsDold = _inputList.IsD;
         _inputList.IsSold = _inputList.IsS;
         _inputList.IsWold = _inputList.IsW;
         _inputList.IsLeftOld = _inputList.IsLeft;
+        
     }
 }

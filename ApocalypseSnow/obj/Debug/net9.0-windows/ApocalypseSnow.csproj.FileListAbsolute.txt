@@ -39,9 +39,7 @@ D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\Apoca
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\UIAmmo.xnb
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\ball.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\ball_face.png
-D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_blue_launch.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_red_launch.png
-D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_blue_launch1.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\ball_face1.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\Snowball.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\Snowball1.png
@@ -49,3 +47,9 @@ D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\Apoca
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\environment.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\ostacoli.png
 D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\ostacoli1.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\palla.jpeg
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\palla1.jpeg
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\palla.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\palla1.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_blue_launch2.png
+D:\Desktop\Universita\Magistrale\Advanced Programming Languages\PROGETTINO\ApocalypseSnow\ApocalypseSnow\bin\Debug\net9.0-windows\Content\images\penguin_blue_launch1 (2).png

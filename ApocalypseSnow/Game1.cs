@@ -30,13 +30,16 @@ public class Game1: Game
         // 1. Crea il pinguino qui
         IAnimation animation = new AnimationManager();
         IMovements movements = new MovementsManager();
+        CollisionManager collisionManager = new CollisionManager(this);
         _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements);
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
     
         
         // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()
+        Components.Add(collisionManager);
         Components.Add(_myPenguin);
         Components.Add(_obstacle);
+       
 
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
         // l'Initialize e il LoadContent di tutti i componenti in lista.
