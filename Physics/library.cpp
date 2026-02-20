@@ -25,6 +25,7 @@ void parabolic_motion(float gravity,float start_positionX, float start_positionY
 
 void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int count) {
     int found = 0;
+    std::cout << "Dentro il metodo check_collisions" << std::endl;
     for (int i = 0; i< count; i++) {
         for (int j = 0; j< count; j++) {
             if (strcmp(data[i].tag, data[j].tag) != 0) {
@@ -32,7 +33,9 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
                 int widthRight = data[j].x + data[j].width/2;
                 int heightUp = data[j].height - data[j].height/2;
                 int heightDown = data[j].height + data[j].height/2;
-                if (data[i].x >= widthLeft && data[i].x <= widthRight && data[i].y >= heightUp && data[i].y <= heightDown) {
+                std::cout << "WidthLeft è " << widthLeft << std::endl;
+                if (data[i].x >= widthLeft /*&& data[i].x <= widthRight && data[i].y >= heightUp && data[i].y <= heightDown*/) {
+                    std::cout << "Collisione rilevata" << std::endl;
                     strcpy(dataOut[found].myTag, data[i].tag);
                     strcpy(dataOut[found].otherTag, data[j].tag);
                     dataOut[found].type = 1;

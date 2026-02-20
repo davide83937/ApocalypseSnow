@@ -1,4 +1,5 @@
 ﻿
+using System;
 using System.Runtime.InteropServices;
 
 namespace ApocalypseSnow;
@@ -232,7 +233,7 @@ public class Penguin: DrawableGameComponent
         ChargeShot(_inputList.IsLeft, ref _pressedTime, _deltaTime);
         Shot(_pressedTime);
         CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width, _animationManager.Texture.Height);
-        
+        //Console.WriteLine("X = "+_position.X+", Y = "+_position.Y);
         _inputList.IsAold = _inputList.IsA;
         _inputList.IsDold = _inputList.IsD;
         _inputList.IsSold = _inputList.IsS;

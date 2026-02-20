@@ -71,11 +71,12 @@ namespace ApocalypseSnow
             CollisionRecordOut[] outputResults = new CollisionRecordOut[100];
 
             if (inputData.Length == 0) return;
-
+            //System.Console.WriteLine(inputData.Length);
             // 2. Usiamo 'fixed' per bloccare l'array in memoria
             fixed (CollisionRecordIn* pIn = inputData)
             fixed (CollisionRecordOut* pOut = outputResults)    
             {
+                //System.Console.WriteLine("Check collisioni...");
                 // 3. Passiamo l'indirizzo di memoria e il numero di elementi al C++
                 check_collisions(pIn, pOut, inputData.Length);
             }
@@ -84,6 +85,8 @@ namespace ApocalypseSnow
 
         public override void Update(GameTime gameTime)
         {
+            
+            SendToCpp();
             foreach (var elemento in _collisionRecordOuts)
             {
                 Console.WriteLine(elemento._myTag);
