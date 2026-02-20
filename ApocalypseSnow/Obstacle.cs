@@ -6,6 +6,7 @@ namespace ApocalypseSnow;
 public class Obstacle:DrawableGameComponent
 {
     private Texture2D _texture;
+    private string _tag;
     private Rectangle _sourceRect;
     private Vector2 _position;
     private int _posX;
@@ -17,6 +18,7 @@ public class Obstacle:DrawableGameComponent
         _position = position;
         _posX = posX;
         _posY = posY;
+        _tag = "obstacle";
     }
 
     private Vector2 GetPosition(int x, int y)
@@ -40,6 +42,7 @@ public class Obstacle:DrawableGameComponent
         load_texture(GraphicsDevice, "Content/images/ostacoli1.png");
         Vector2 position = GetPosition(_posX,  _posY);
         _sourceRect = new Rectangle((int)position.X, (int)position.Y, (_texture.Width / 2), _texture.Height/2);
+        CollisionManager.Instance.addObject(_tag, _posX, _posY, _texture.Width, _texture.Height);
     }
 
     public void Draw(SpriteBatch spriteBatch)

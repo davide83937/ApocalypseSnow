@@ -28,10 +28,10 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
     for (int i = 0; i< count; i++) {
         for (int j = 0; j< count; j++) {
             if (strcmp(data[i].tag, data[j].tag) != 0) {
-                int widthLeft = data[i].x - data[i].width/2;
-                int widthRight = data[i].x + data[i].width/2;
-                int heightUp = data[i].height - data[i].height/2;
-                int heightDown = data[i].height + data[i].height/2;
+                int widthLeft = data[j].x - data[j].width/2;
+                int widthRight = data[j].x + data[j].width/2;
+                int heightUp = data[j].height - data[j].height/2;
+                int heightDown = data[j].height + data[j].height/2;
                 if (data[i].x >= widthLeft && data[i].x <= widthRight && data[i].y >= heightUp && data[i].y <= heightDown) {
                     strcpy(dataOut[found].myTag, data[i].tag);
                     strcpy(dataOut[found].otherTag, data[j].tag);
