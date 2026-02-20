@@ -94,7 +94,7 @@ public class Penguin: DrawableGameComponent
         //Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
         Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
         Vector2 finalPosition = FinalPoint(startSpeed, _position);
-        string tagBall = "P" + _countBall;
+        string tagBall = "Palla" + _countBall;
         Ball b = new Ball(_gameContext, _position, startSpeed, finalPosition, tagBall);
         _gameContext.Components.Add(b);
         _inputList.IsShooting = false;
@@ -233,7 +233,7 @@ public class Penguin: DrawableGameComponent
         ChargeShot(_inputList.IsLeft, ref _pressedTime, _deltaTime);
         Shot(_pressedTime);
         CollisionManager.Instance.modifyObject(_tag, _position.X+_animationManager.Texture.Width/6, _position.Y+_animationManager.Texture.Height/6, _animationManager.Texture.Width/3, _animationManager.Texture.Height/3);
-        Console.WriteLine("X = "+_position.X+", Y = "+_position.Y);
+        //Console.WriteLine("X = "+_position.X+", Y = "+_position.Y);
         _inputList.IsAold = _inputList.IsA;
         _inputList.IsDold = _inputList.IsD;
         _inputList.IsSold = _inputList.IsS;

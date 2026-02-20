@@ -34,7 +34,7 @@ namespace ApocalypseSnow
 
         
         [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, CollisionRecordOut[] collisionRecordOut, int count);
+        private static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, [Out] CollisionRecordOut[] collisionRecordOut, int count);
         
         public void addObject(string tag, float x, float y, int w, int h)
         {
@@ -68,7 +68,7 @@ namespace ApocalypseSnow
         {
             // 1. Otteniamo l'array interno della lista (o la convertiamo in array)
             CollisionRecordIn[] inputData = _collisionRecordIns.ToArray();
-            CollisionRecordOut[] resultsBuffer = new CollisionRecordOut[100];
+            resultsBuffer = new CollisionRecordOut[100];
             
                 check_collisions(inputData, resultsBuffer, inputData.Length);
                 
@@ -82,10 +82,11 @@ namespace ApocalypseSnow
             
             foreach (var elemento in resultsBuffer)
             {
-                Console.WriteLine(elemento._myTag);
-                Console.WriteLine(elemento._otherTag); 
-                Console.WriteLine(elemento._type); 
-                Console.WriteLine("\n");
+                if (elemento._type != 0) // Stampa solo se c'è un tipo di collisione valido
+                {
+                    Console.WriteLine("Collisione tra "+elemento._myTag+ " e "+elemento._otherTag+" di tipo "+elemento._type);
+                    
+                }
             }
             
             base.Update(gameTime);
