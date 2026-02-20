@@ -117,7 +117,7 @@ public class Ball:DrawableGameComponent
         if (_scale < 1.0f) { _scale = 1.0f; }
         if (_scale > 1.6f) { _scale = 1.6f; }
         FinalPointCalculous();
-        CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height );
+        CollisionManager.Instance.modifyObject(_tag, _position.X+_texture.Width/2, _position.Y+_texture.Height/2, _texture.Width, _texture.Height );
        
     }
     

@@ -42,7 +42,7 @@ public class Obstacle:DrawableGameComponent
         load_texture(GraphicsDevice, "Content/images/ostacoli1.png");
         Vector2 position = GetPosition(_posX,  _posY);
         _sourceRect = new Rectangle((int)position.X, (int)position.Y, (_texture.Width / 2), _texture.Height/2);
-        CollisionManager.Instance.addObject(_tag, _posX, _posY, _texture.Width/2, _texture.Height/2);
+        CollisionManager.Instance.addObject(_tag, _position.X+_texture.Width/4, _position.Y+_texture.Height/4, _texture.Width/2, _texture.Height/2);
     }
 
     public void Draw(SpriteBatch spriteBatch)

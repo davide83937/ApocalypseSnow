@@ -2,7 +2,7 @@
 
 namespace ApocalypseSnow;
 
-[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
 public struct CollisionRecordIn
 {
     [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 16)]
@@ -14,7 +14,6 @@ public struct CollisionRecordIn
 
     public CollisionRecordIn(string tag, float x, float y, int width, int height)
     {
-       
         this._tag = tag;
         this._y = y;
         this._x = x;

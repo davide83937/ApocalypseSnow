@@ -9,6 +9,7 @@ namespace ApocalypseSnow
     {
         private static CollisionManager _instance;
         private List<CollisionRecordIn> _collisionRecordIns;
+        private CollisionRecordOut[] resultsBuffer;
      
 
         public static CollisionManager Instance
@@ -78,15 +79,15 @@ namespace ApocalypseSnow
         {
             
             SendToCpp();
-            /*
-            foreach (var elemento in _collisionRecordOuts)
+            
+            foreach (var elemento in resultsBuffer)
             {
                 Console.WriteLine(elemento._myTag);
                 Console.WriteLine(elemento._otherTag); 
                 Console.WriteLine(elemento._type); 
                 Console.WriteLine("\n");
             }
-            */
+            
             base.Update(gameTime);
         }
     }
