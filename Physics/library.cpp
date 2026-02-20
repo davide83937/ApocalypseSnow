@@ -29,8 +29,8 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
     for (int i = 0; i< count; i++) {
         for (int j = 0; j< count; j++) {
             if (strcmp(data[i].tag, data[j].tag) != 0) {
-                int widthLeft = data[j].x - (data[j].width/2);
-                int widthRight = data[j].x + data[j].width/2;
+                float widthLeft = data[j].x - (data[j].width/2.0f);
+                float widthRight = data[j].x + data[j].width/2.0f;
                 int heightUp = data[j].y - data[j].height/2;
                 int heightDown = data[j].y + data[j].height/2;
                 //std::cout << "WidthLeft è " << widthLeft << std::endl;
