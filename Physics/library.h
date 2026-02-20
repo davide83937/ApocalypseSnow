@@ -4,7 +4,7 @@
 
 
 struct CollisionDataIn {
-    char tag[10];
+    char tag[16];
     float x;
     float y;
     int width;
@@ -12,8 +12,8 @@ struct CollisionDataIn {
 };
 
 struct CollisionDataOut {
-    char myTag[10];
-    char otherTag[10];
+    char myTag[16];
+    char otherTag[16];
     int type;
 };
 

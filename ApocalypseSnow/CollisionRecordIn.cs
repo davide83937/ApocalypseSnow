@@ -5,7 +5,7 @@ namespace ApocalypseSnow;
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
 public struct CollisionRecordIn
 {
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 10)]
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 16)]
     public string _tag;
     public float _x;
     public float _y;
@@ -25,9 +25,9 @@ public struct CollisionRecordIn
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
 public struct CollisionRecordOut
     {
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 10)]
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 16)]
         public string _myTag;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 10)]
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 16)]
         public string _otherTag;
         public int _type;
     
