@@ -81,6 +81,7 @@ namespace ApocalypseSnow
                 check_collisions(pIn, pOut, inputData.Length);
             }
             // Dopo il blocco 'fixed', il GC è libero di spostare di nuovo l'array
+           
         }
 
         public override void Update(GameTime gameTime)

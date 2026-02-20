@@ -232,8 +232,8 @@ public class Penguin: DrawableGameComponent
         //_pressedTime *= 10;
         ChargeShot(_inputList.IsLeft, ref _pressedTime, _deltaTime);
         Shot(_pressedTime);
-        CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width, _animationManager.Texture.Height);
-        //Console.WriteLine("X = "+_position.X+", Y = "+_position.Y);
+        CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width/3, _animationManager.Texture.Height/3);
+        Console.WriteLine("X = "+_position.X+", Y = "+_position.Y);
         _inputList.IsAold = _inputList.IsA;
         _inputList.IsDold = _inputList.IsD;
         _inputList.IsSold = _inputList.IsS;

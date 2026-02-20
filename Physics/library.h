@@ -5,8 +5,8 @@
 
 struct CollisionDataIn {
     char tag[10];
-    int x;
-    int y;
+    float x;
+    float y;
     int width;
     int height;
 };
