@@ -9,6 +9,7 @@ using Microsoft.Xna.Framework.Graphics;
 public class Penguin: DrawableGameComponent
 {
     private readonly string _tag;
+    private int _countBall;
     private readonly Game _gameContext;
     private readonly IAnimation  _animationManager;
     private readonly IMovements  _movementsManager;
@@ -36,6 +37,7 @@ public class Penguin: DrawableGameComponent
         _animationManager = animation;
         _movementsManager = movements;
         _inputList = new InputList();
+        _countBall = 0;
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -91,12 +93,14 @@ public class Penguin: DrawableGameComponent
         //Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
         Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
         Vector2 finalPosition = FinalPoint(startSpeed, _position);
-        Ball b = new Ball(_gameContext, _position, startSpeed, finalPosition);
+        string tagBall = "P" + _countBall;
+        Ball b = new Ball(_gameContext, _position, startSpeed, finalPosition, tagBall);
         _gameContext.Components.Add(b);
         _inputList.IsShooting = false;
         //Console.WriteLine($"Valore: {_pressedTime}");
         _pressedTime = 0;
         _ammo--;
+        _countBall++;
     }
 
     private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
@@ -196,13 +200,9 @@ public class Penguin: DrawableGameComponent
     protected override void LoadContent()
     {
         _animationManager.Load_Content(GraphicsDevice);
-    }
-
-    public override void Initialize()
-    {
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width, _animationManager.Texture.Height);
-        base.Initialize();
     }
+    
 
     public void Draw(SpriteBatch spriteBatch)
     {

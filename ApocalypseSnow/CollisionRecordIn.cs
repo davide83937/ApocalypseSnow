@@ -17,3 +17,19 @@ public struct CollisionRecordIn
         this._height = height;
     }
 }
+
+public struct CollisionRecordOut
+    {
+        public string _myTag;
+        public string _otherTag;
+        public int _type;
+    
+
+    public CollisionRecordOut(string myTag, string otherTag, int type)
+        {
+            this._myTag = myTag;
+            this._otherTag = otherTag;
+            this._type = type;
+        
+    }
+}

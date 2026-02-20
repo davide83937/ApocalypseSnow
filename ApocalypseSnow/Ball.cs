@@ -8,6 +8,7 @@ namespace ApocalypseSnow;
 public class Ball:DrawableGameComponent
 {
     private Texture2D _texture;
+    private string _tag;
     private readonly Vector2 _startPosition;
     private Vector2 _position;
     private readonly Vector2 _startSpeed;
@@ -19,13 +20,14 @@ public class Ball:DrawableGameComponent
     private static readonly float K = 0.0003f;   // velocità di crescita
     
 
-    public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, Vector2 finalPosition) : base(game)
+    public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, Vector2 finalPosition, string tag) : base(game)
     {
         this._startPosition = startPosition;
         this._position = startPosition;
         this._startSpeed = startSpeed;
         _ballTime = 0.0f;
         this._finalPosition = finalPosition;
+        _tag = tag;
         this._scale = 1.0f;
         
     }
@@ -68,6 +70,7 @@ public class Ball:DrawableGameComponent
         {
             // Rimuoviamo la palla
             Game.Components.Remove(this);
+            CollisionManager.Instance.removeObject(_tag);
             // ball_list.Remove(this); // Se hai passato il riferimento alla lista
         }
     }
@@ -88,6 +91,7 @@ public class Ball:DrawableGameComponent
     protected override void LoadContent()
     {
         load_texture("Content/images/palla1.png");
+        CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height );
     }
 
 
@@ -113,6 +117,7 @@ public class Ball:DrawableGameComponent
         if (_scale < 1.0f) { _scale = 1.0f; }
         if (_scale > 1.6f) { _scale = 1.6f; }
         FinalPointCalculous();
+        CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height );
        
     }
     
