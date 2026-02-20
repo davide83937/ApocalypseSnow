@@ -9,8 +9,7 @@ namespace ApocalypseSnow
     {
         private static CollisionManager _instance;
         private List<CollisionRecordIn> _collisionRecordIns;
-        private List<CollisionRecordOut> _collisionRecordOuts;
-        
+     
 
         public static CollisionManager Instance
         {
@@ -29,12 +28,12 @@ namespace ApocalypseSnow
                 throw new Exception("Puoi creare solo una istanza di CollisionManager!");
             _instance = this;
             _collisionRecordIns = [];
-            _collisionRecordOuts = [];
+          
         }
 
         
         [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static unsafe extern void check_collisions(CollisionRecordIn *collisionRecordIn, CollisionRecordOut* collisionRecordOut, int count);
+        private static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, CollisionRecordOut[] collisionRecordOut, int count);
         
         public void addObject(string tag, float x, float y, int w, int h)
         {
@@ -64,30 +63,22 @@ namespace ApocalypseSnow
             _collisionRecordIns.RemoveAll(r => r._tag == tag);
         }
         
-        public unsafe void SendToCpp()
+        public void SendToCpp()
         {
             // 1. Otteniamo l'array interno della lista (o la convertiamo in array)
-            CollisionRecordIn[] inputData = _collisionRecordIns.ToArray(); 
-            CollisionRecordOut[] outputResults = new CollisionRecordOut[100];
-
-            if (inputData.Length == 0) return;
-            //System.Console.WriteLine(inputData.Length);
-            // 2. Usiamo 'fixed' per bloccare l'array in memoria
-            fixed (CollisionRecordIn* pIn = inputData)
-            fixed (CollisionRecordOut* pOut = outputResults)    
-            {
-                //System.Console.WriteLine("Check collisioni...");
-                // 3. Passiamo l'indirizzo di memoria e il numero di elementi al C++
-                check_collisions(pIn, pOut, inputData.Length);
-            }
-            // Dopo il blocco 'fixed', il GC è libero di spostare di nuovo l'array
-           
+            CollisionRecordIn[] inputData = _collisionRecordIns.ToArray();
+            CollisionRecordOut[] resultsBuffer = new CollisionRecordOut[100];
+            
+                check_collisions(inputData, resultsBuffer, inputData.Length);
+                
+            
         }
 
         public override void Update(GameTime gameTime)
         {
             
             SendToCpp();
+            /*
             foreach (var elemento in _collisionRecordOuts)
             {
                 Console.WriteLine(elemento._myTag);
@@ -95,6 +86,7 @@ namespace ApocalypseSnow
                 Console.WriteLine(elemento._type); 
                 Console.WriteLine("\n");
             }
+            */
             base.Update(gameTime);
         }
     }
