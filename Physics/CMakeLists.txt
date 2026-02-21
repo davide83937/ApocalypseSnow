@@ -4,4 +4,7 @@ project(Physics)
 set(CMAKE_CXX_STANDARD 20)
 
 add_library(PhysicsDll SHARED library.cpp library.h)
-target_link_libraries(PhysicsDll PRIVATE "-static")
+set_target_properties(PhysicsDll PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../Shared
+        OUTPUT_NAME "libPhysicsDll"
+)

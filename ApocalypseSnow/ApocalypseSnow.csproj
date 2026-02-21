@@ -1,33 +1,33 @@
 <Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <OutputType>WinExe</OutputType>
-        <TargetFramework>net9.0-windows</TargetFramework>
-        <RollForward>Major</RollForward>
-        <PublishReadyToRun>false</PublishReadyToRun>
-        <TieredCompilation>false</TieredCompilation>
-        <UseWindowsForms>true</UseWindowsForms>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    </PropertyGroup>
-    <PropertyGroup>
-        <ApplicationManifest>app.manifest</ApplicationManifest>
-        <ApplicationIcon>Icon.ico</ApplicationIcon>
-    </PropertyGroup>
-    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-      <PlatformTarget>x64</PlatformTarget>
-    </PropertyGroup>
-    <ItemGroup>
-        <PackageReference Include="MonoGame.Framework.WindowsDX" Version="3.8.*"/>
-        <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*"/>
-    </ItemGroup>
-    <ItemGroup>
-        <None Update="Content\images\**\*.*">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
-    <ItemGroup>
-      <Content Include="..\Physics\cmake-build-debug\libPhysicsDll.dll">
-        <Link>libPhysicsDll.dll</Link>
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
-    </ItemGroup>
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net9.0-windows</TargetFramework>
+		<RollForward>Major</RollForward>
+		<PublishReadyToRun>false</PublishReadyToRun>
+		<TieredCompilation>false</TieredCompilation>
+		<UseWindowsForms>true</UseWindowsForms>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+	<PropertyGroup>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<ApplicationIcon>Icon.ico</ApplicationIcon>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+		<PlatformTarget>x64</PlatformTarget>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="MonoGame.Framework.WindowsDX" Version="3.8.*"/>
+		<PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*"/>
+	</ItemGroup>
+	<ItemGroup>
+		<None Update="Content\images\**\*.*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="..\Shared\libPhysicsDll.dll">
+			<Link>libPhysicsDll.dll</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 </Project>
