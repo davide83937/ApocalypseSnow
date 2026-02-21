@@ -1,10 +1,12 @@
 # ===============================
 # Common
 # ===============================
+Shared/*.h
 Shared/*.dll
 Shared/*.lib
 Shared/*.pdb
 Shared/*.exp
+
 
 # ===============================
 # Visual Studio
