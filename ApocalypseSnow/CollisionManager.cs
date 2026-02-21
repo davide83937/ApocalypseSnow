@@ -10,6 +10,7 @@ namespace ApocalypseSnow
         private static CollisionManager _instance;
         private List<CollisionRecordIn> _collisionRecordIns;
         private CollisionRecordOut[] resultsBuffer;
+        private int i = 0;
      
 
         public static CollisionManager Instance
@@ -85,7 +86,8 @@ namespace ApocalypseSnow
                 if (elemento._type != 0) // Stampa solo se c'è un tipo di collisione valido
                 {
                     Console.WriteLine("Collisione tra "+elemento._myTag+ " e "+elemento._otherTag+" di tipo "+elemento._type);
-                    
+                    //Console.WriteLine(i);
+                    i++;
                 }
             }
             

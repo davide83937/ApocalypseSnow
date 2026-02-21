@@ -18,6 +18,8 @@ public class Ball:DrawableGameComponent
     private static readonly float Gravity = 150f;
     private static readonly float L = 0.1f;  // massimo
     private static readonly float K = 0.0003f;   // velocità di crescita
+    private int _halfTextureFractionWidth;
+    private int _halfTextureFractionHeight;
     
 
     public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, Vector2 finalPosition, string tag) : base(game)
@@ -42,6 +44,7 @@ public class Ball:DrawableGameComponent
         float t = differenceY; // es: tempo, velocità, carica
 
         float x = L * (1f - MathF.Exp(-K * t));
+        int f = (int)((_finalPosition.X+_startPosition.X+20)/2);
         
         switch (_startSpeed.X)
         {
@@ -49,7 +52,7 @@ public class Ball:DrawableGameComponent
             case > 0:
             {
                 if (_position.X >= _finalPosition.X) haRaggiuntoTarget = true;
-                if (_position.X < (_finalPosition.X+_startPosition.X+20)/2) { _scale = _scale + x; }
+                if (_position.X < f) { _scale = _scale + x; }
                 else { _scale = _scale - x; }
 
                 break;
@@ -58,7 +61,7 @@ public class Ball:DrawableGameComponent
             case < 0:
             {
                 if (_position.X <= _finalPosition.X) haRaggiuntoTarget = true;
-                if (_position.X > (_startPosition.X+_finalPosition.X+20)/2) { _scale = _scale + x; }
+                if (_position.X > f) { _scale = _scale + x; }
                 else { _scale = _scale - x; }
 
                 break;
@@ -92,6 +95,8 @@ public class Ball:DrawableGameComponent
     {
         load_texture("Content/images/palla1.png");
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height );
+        _halfTextureFractionWidth  = _texture.Width / 2;
+        _halfTextureFractionHeight = _texture.Height / 2;
     }
 
 
@@ -117,7 +122,10 @@ public class Ball:DrawableGameComponent
         if (_scale < 1.0f) { _scale = 1.0f; }
         if (_scale > 1.6f) { _scale = 1.6f; }
         FinalPointCalculous();
-        CollisionManager.Instance.modifyObject(_tag, _position.X+_texture.Width/2, _position.Y+_texture.Height/2, _texture.Width, _texture.Height );
+        int posCollX = (int)_position.X + _halfTextureFractionWidth;
+        int posCollY = (int)_position.Y + _halfTextureFractionHeight;
+        //Console.WriteLine($"posCollX: {posCollX}, posCollY: {posCollY}");
+        CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _texture.Width, _texture.Height );
        
     }
     

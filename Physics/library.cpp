@@ -27,17 +27,25 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
     int found = 0;
     //std::cout << "Dentro il metodo check_collisions" << std::endl;
     for (int i = 0; i< count; i++) {
-        for (int j = 0; j< count; j++) {
+        int widthI = (data[i].width/2);
+        int heightI = (data[i].height/2);
+        int widthLeftI = data[i].x - widthI;
+        int widthRightI = data[i].x + widthI;
+        int heightUpI = data[i].y + heightI;
+        int heightDownI = data[i].y - heightI;
+        for (int j = i+1; j< count; j++) {
             if (strcmp(data[i].tag, data[j].tag) != 0) {
-                int widthLeft = data[j].x - (data[j].width/2);
-                int widthRight = data[j].x + data[j].width/2;
-                int heightUp = data[j].y + data[j].height/2;
-                int heightDown = data[j].y - data[j].height/2;
+                int width = (data[j].width/2);
+                int height = (data[j].height/2);
+                int widthLeft = data[j].x - width;
+                int widthRight = data[j].x + width;
+                int heightUp = data[j].y + height;
+                int heightDown = data[j].y - height;
                 //std::cout << "WidthLeft è " << widthLeft << std::endl;
                 //std::cout << "WidthRight è " << widthRight << std::endl;
                 //std::cout << "heightUp è " << heightUp << std::endl;
                 //std::cout << "heightDown è " << heightDown << std::endl;
-                if (widthLeft != 0 && data[i].x >= widthLeft && data[i].x <= widthRight && data[i].y <= heightUp && data[i].y >= heightDown) {
+                if (widthRightI >= widthLeft && widthLeftI <= widthRight && heightDownI <= heightUp && heightUpI >= heightDown) {
                     //std::cout << "Collisione rilevata" << std::endl;
                     //std::cout << "data[i]: " << data[i].x<< std::endl;
                     //std::cout << "WidthLeft è " << widthLeft << std::endl;

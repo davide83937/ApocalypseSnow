@@ -23,6 +23,11 @@ public class Penguin: DrawableGameComponent
     private float _reloadTime;
     private InputList _inputList;
     private static readonly int FrameReload;
+    private int _textureFractionWidth;
+    private int _textureFractionHeight;
+    private int _halfTextureFractionWidth;
+    private int _halfTextureFractionHeight;
+    
 
     static Penguin()
     {
@@ -52,8 +57,6 @@ public class Penguin: DrawableGameComponent
         out float positionX, out float positionY, float startVelocityX,
         float startVelocityY, float gameTime);
 
-    
-
     private void Reload(float gameTime)
     {
         if (!_inputList.IsReloading) return;
@@ -62,24 +65,18 @@ public class Penguin: DrawableGameComponent
         _ammo++;
         _reloadTime = 0f;
     }
-    
-    
 
     private void ChargeShot(bool isLeft, ref float pressedTime, float deltaTime)
     {
         _movementsManager.CheckPressMouse(ref isLeft);
         if (!isLeft || _ammo <= 0) return;
-        //Console.WriteLine($"Valore click:X = {mouseState.X}, Y = {mouseState.Y}");
         _inputList.IsShooting = true;
-        //Console.WriteLine($"Valore delta: {deltaTime}");
         deltaTime *= 100;
         pressedTime += deltaTime;
-        //Console.WriteLine($"Valore delta: {pressedTime}");
         if (pressedTime > 500)
         {
             pressedTime = 500;
         }
-        
     }
 
     private void Shot( float pressedTime)
@@ -90,7 +87,6 @@ public class Penguin: DrawableGameComponent
         float differenceX = _position.X - mouseState.X;
         float differenceY = _position.Y - mouseState.Y;
         float coX = (differenceX/100)* (-1);
-            
         //Console.WriteLine("La differenza e': X = "+differenceX+",  Y = "+differenceY);
         Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
         Vector2 finalPosition = FinalPoint(startSpeed, _position);
@@ -202,6 +198,10 @@ public class Penguin: DrawableGameComponent
     {
         _animationManager.Load_Content(GraphicsDevice);
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width, _animationManager.Texture.Height);
+        _textureFractionWidth = _animationManager.Texture.Width / 3;
+        _textureFractionHeight = _animationManager.Texture.Height / 3;
+        _halfTextureFractionWidth = _textureFractionWidth / 2;
+        _halfTextureFractionHeight = _textureFractionHeight / 2;
     }
     
 
@@ -232,7 +232,11 @@ public class Penguin: DrawableGameComponent
         //_pressedTime *= 10;
         ChargeShot(_inputList.IsLeft, ref _pressedTime, _deltaTime);
         Shot(_pressedTime);
-        CollisionManager.Instance.modifyObject(_tag, _position.X+_animationManager.Texture.Width/6, _position.Y+_animationManager.Texture.Height/6, _animationManager.Texture.Width/3, _animationManager.Texture.Height/3);
+        //int textureFractionWidth = _animationManager.Texture.Width / 3;
+        //int textureFractionHeight = _animationManager.Texture.Height / 3;
+        int posCollX = (int)_position.X + _halfTextureFractionWidth;
+        int posCollY = (int)_position.Y + _halfTextureFractionHeight;
+        CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _textureFractionWidth, _textureFractionHeight);
         //Console.WriteLine("X = "+_position.X+", Y = "+_position.Y);
         _inputList.IsAold = _inputList.IsA;
         _inputList.IsDold = _inputList.IsD;
