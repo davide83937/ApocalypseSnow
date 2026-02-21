@@ -9,13 +9,7 @@ public class MovementsManager:IMovements
 {
     private KeyboardState _newState = Keyboard.GetState();
     private MouseState _mouseState = Mouse.GetState();
-
-
-    public void CheckPressMouse(ref bool isLeft)
-    {
-        _mouseState = Mouse.GetState();
-        if(_mouseState.LeftButton == ButtonState.Pressed){ isLeft = true;}else { isLeft = false; }
-    }
+    
 
     public Vector2 GetMousePosition()
     {
@@ -23,33 +17,21 @@ public class MovementsManager:IMovements
         return mousePosition;
     }
     
-    public void moveOn(ref bool isW)
+    public void UpdateInput(ref StateStruct inputList)
     {
+        inputList.Update();
         _newState = Keyboard.GetState();
-        isW = _newState.IsKeyDown(Keys.W);
-    }
+        _mouseState = Mouse.GetState();
 
-    public void MoveBack(ref bool isS)
-    {
-        _newState = Keyboard.GetState();
-        isS = _newState.IsKeyDown(Keys.S);
+        if (_newState.IsKeyDown(Keys.W)) inputList.Current |= StateList.Up;
+        if (_newState.IsKeyDown(Keys.S)) inputList.Current |= StateList.Down;
+        if (_newState.IsKeyDown(Keys.A)) inputList.Current |= StateList.Left;
+        if (_newState.IsKeyDown(Keys.D)) inputList.Current |= StateList.Right;
+        if (_newState.IsKeyDown(Keys.R)) inputList.Current |= StateList.Reload;
+        if (_mouseState.LeftButton == ButtonState.Pressed) inputList.Current |= StateList.Shoot;
+    
+        // Calcolo automatico di IsMoving
+        if (_newState.GetPressedKeys().Length > 0) inputList.Current |= StateList.Moving;
     }
     
-    public void MoveRight(ref bool isD)
-    {
-        _newState = Keyboard.GetState();
-        isD = _newState.IsKeyDown(Keys.D);
-    }
-    
-    public void MoveLeft(ref bool isA)
-    {
-        _newState = Keyboard.GetState();
-        isA = _newState.IsKeyDown(Keys.A);
-    }
-
-    public void MoveReload(ref bool isR)
-    {
-        _newState = Keyboard.GetState();
-        isR = _newState.IsKeyDown(Keys.R);
-    }
 }

@@ -26,7 +26,7 @@ public class AnimationManager:IAnimation
         _textures[index] = Texture2D.FromStream(gd, stream);
     }
 
-    private void ChangeTexture(SpriteBatch spriteBatch, ref int ammo, ref bool isReloading, ref bool isShooting, ref Vector2 position)
+    private void ChangeTexture(SpriteBatch spriteBatch, int ammo, bool isReloading, bool isShooting, ref Vector2 position)
     {
         if (ammo == 0 &&  !isReloading && !isShooting)
         {
@@ -80,15 +80,17 @@ public class AnimationManager:IAnimation
         _sourceRect = new Rectangle(0, 0, Texture.Width / 3, Texture.Height/4);
     }
 
-    public void Update(ref float gameTime, ref bool isMoving, ref bool isReloading)
+   
+
+    public void Update(float gameTime, bool isMoving, bool isReloading)
     {
         walking_animation(ref gameTime, ref isReloading, ref isMoving);
     }
     
 
-    public void Draw(SpriteBatch spriteBatch, ref Vector2 position, ref int ammo, ref bool isReloading, ref bool isShooting)
+    public void Draw(SpriteBatch spriteBatch, ref Vector2 position, int ammo, bool isReloading, bool isShooting)
     {
-        ChangeTexture(spriteBatch, ref ammo, ref isReloading, ref isShooting, ref position);
+        ChangeTexture(spriteBatch, ammo, isReloading, isShooting, ref position);
     }
 
     public void MoveRect(int posRect)
