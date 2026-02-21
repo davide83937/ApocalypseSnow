@@ -86,7 +86,7 @@ namespace ApocalypseSnow
                 if (elemento._type != 0) // Stampa solo se c'è un tipo di collisione valido
                 {
                     Console.WriteLine("Collisione tra "+elemento._myTag+ " e "+elemento._otherTag+" di tipo "+elemento._type);
-                    Console.WriteLine(i);
+                    //Console.WriteLine(i);
                     i++;
                 }
             }
