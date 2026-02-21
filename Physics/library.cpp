@@ -3,6 +3,11 @@
 #include <cmath>
 #include <iostream>
 
+
+const char* PhysicsBuildInfo() {
+    return "PhysicsDLL build: " __DATE__ " " __TIME__;
+}
+
 void uniform_rectilinear_motion(float *position, float velocity, float deltaTime) {
     *position = *position + (velocity * deltaTime);
 }
