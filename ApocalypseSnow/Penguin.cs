@@ -23,6 +23,7 @@ public class Penguin: DrawableGameComponent
     private float _reloadTime;
     //private InputList _inputList;
     private StateStruct _stateStruct;
+    private ShotStruct _shotStruct;
     private static readonly int FrameReload;
     private int _textureFractionWidth;
     private int _textureFractionHeight;
@@ -35,7 +36,7 @@ public class Penguin: DrawableGameComponent
     {
         FrameReload = 3;
     }
-    public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements) : base(game)
+    public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements, NetworkManager networkManager) : base(game)
     {
         _tag = "penguin";
         _gameContext = game;
@@ -46,6 +47,7 @@ public class Penguin: DrawableGameComponent
         _movementsManager = movements;
         //_inputList = new InputList();
         _stateStruct = new StateStruct();
+        _shotStruct = new ShotStruct();
         _countBall = 0;
         _networkManager = new NetworkManager("127.0.0.1", 8080);
     }
@@ -96,33 +98,32 @@ public class Penguin: DrawableGameComponent
         // 2. Verifichiamo se ci sono munizioni
         if (!_stateStruct.JustReleased(StateList.Shoot) || _ammo <= 0) return;
 
-        // Il calcolo della traiettoria rimane lo stesso, ma usiamo nomi più chiari
+ 
         Vector2 mousePosition = _movementsManager.GetMousePosition();
-        _stateStruct.mouseX = (int)mousePosition.X;
-        _stateStruct.mouseY = (int)mousePosition.Y;
+        _shotStruct.mouseX = (int)mousePosition.X;
+        _shotStruct.mouseY = (int)mousePosition.Y;
+        
         float differenceX = _position.X - mousePosition.X;
         float differenceY = _position.Y - mousePosition.Y;
     
-        // Calcolo velocità iniziale basato sul tempo di pressione (caricamento)
+  
         float coX = (differenceX / 100) * (-1);
         Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
     
-        // Calcolo punto di impatto finale
+  
         Vector2 finalPosition = FinalPoint(startSpeed, _position);
     
-        // Creazione della palla e aggiunta ai componenti del gioco
+
         string tagBall = "Palla" + _countBall;
         Ball b = new Ball(_gameContext, _position, startSpeed, finalPosition, tagBall);
         _gameContext.Components.Add(b);
+        //_networkManager.SendShot(_shotStruct);-------------------------------------------------------------------------
 
-        // Reset degli stati: ora che il colpo è partito, azzeriamo il caricamento
         _pressedTime = 0;
         _ammo--;
         _countBall++;
     
-        // Nota: IsShooting nella tua vecchia struct era un booleano. 
-        // Se lo usi per l'animazione, ora puoi semplicemente controllare 
-        // se InputAction.Shoot è premuto nel metodo Draw o Update.
+   
     }
 
     private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
@@ -138,7 +139,7 @@ public class Penguin: DrawableGameComponent
 
         Vector2 impatto = new Vector2(x, y);
         
-        // Salviamo il punto di impatto completo (X e Y)
+        
         Vector2 pointFinale = new Vector2(impatto.X, impatto.Y);
         return pointFinale;
     }
@@ -146,14 +147,14 @@ public class Penguin: DrawableGameComponent
     
     private void MoveOn(float deltaTime)
     {
-        // Sostituisce _inputList.IsW
+        
         if (_stateStruct.IsPressed(StateList.Up) && !_stateStruct.IsPressed(StateList.Reload))
         {
             uniform_rectilinear_motion(ref _position.Y, -100, deltaTime);
             _animationManager.MoveRect(3 * _animationManager.SourceRect.Height);
         }
     
-        // Gestione rilascio tasto (Sostituisce IsWold)
+      
         if (_stateStruct.JustReleased(StateList.Moving))
         {
             _speed.Y = 0;
@@ -164,13 +165,11 @@ public class Penguin: DrawableGameComponent
 
     private void MoveBack(float deltaTime)
     {
-        // Sostituisce _inputList.IsS
         if (_stateStruct.IsPressed(StateList.Down) && !_stateStruct.IsPressed(StateList.Reload))
         {
             uniform_rectilinear_motion(ref _position.Y, 100, deltaTime);
             _animationManager.MoveRect(0 * _animationManager.SourceRect.Height);
         }
-    
         if (_stateStruct.JustReleased(StateList.Down))
         {
             _speed.Y = 0;
@@ -180,13 +179,11 @@ public class Penguin: DrawableGameComponent
 
     private void MoveRight(float deltaTime)
     {
-        // Sostituisce _inputList.IsD
         if (_stateStruct.IsPressed(StateList.Right) && !_stateStruct.IsPressed(StateList.Reload))
         {
             uniform_rectilinear_motion(ref _position.X, 100, deltaTime);
             _animationManager.MoveRect(2 * _animationManager.SourceRect.Height);
         }
-    
         if (_stateStruct.JustReleased(StateList.Right))
         {
             _speed.X = 0;
@@ -197,7 +194,6 @@ public class Penguin: DrawableGameComponent
     
     private void MoveLeft(float deltaTime)
     {
-        // Sostituisce _inputList.IsA
         if (_stateStruct.IsPressed(StateList.Left) && !_stateStruct.IsPressed(StateList.Reload))
         {
             uniform_rectilinear_motion(ref _position.X, -100, deltaTime);
@@ -268,12 +264,12 @@ public class Penguin: DrawableGameComponent
         ChargeShot(ref _pressedTime, _deltaTime);
         Shot(_pressedTime);
         
-        _networkManager.SendState(_stateStruct);
+        //_networkManager.SendState(_stateStruct);-----------------------------------------------------------------------------------
         
         int posCollX = (int)_position.X + _halfTextureFractionWidth;
         int posCollY = (int)_position.Y + _halfTextureFractionHeight;
         CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _textureFractionWidth, _textureFractionHeight);
-        _stateStruct.resetMouse();
+        
     }
     
 }

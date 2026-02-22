@@ -2,22 +2,20 @@
 
 public struct StateStruct
 {
+    public MessageType Type;
     public StateList Current;
     public StateList Old;
-    public int? mouseX;
-    public int? mouseY;
 
+
+    public StateStruct()
+    {
+        Type = MessageType.State;
+    }
 
     public void Update()
     {
         Old = Current;
         Current = StateList.None;
-    }
-
-    public void resetMouse()
-    {
-        mouseX = null;
-        mouseY = null;
     }
     
     public bool IsPressed(StateList action)
