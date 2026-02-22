@@ -81,11 +81,11 @@ namespace ApocalypseSnow
 
             foreach (var elemento in resultsBuffer)
             {
-                if (elemento._type > 0){
-                    //Console.WriteLine("Collisione tra " + elemento._myTag + " e " + elemento._otherTag + " di tipo " + elemento._type);
-                //Console.WriteLine(i);
-                i++;
-                sendCollision(elemento);
+                if (elemento._type > 0){ 
+                    //Console.WriteLine("Collisione tra " + elemento._myTag + " e " + elemento._otherTag + " di tipo " + elemento._type);  
+                    //Console.WriteLine(i);
+                    i++;
+                    sendCollision(elemento);
                 }
             }
             

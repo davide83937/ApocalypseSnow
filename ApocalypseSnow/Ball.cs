@@ -2,6 +2,9 @@
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using SharpDX;
+using Color = Microsoft.Xna.Framework.Color;
+using Vector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace ApocalypseSnow;
 
@@ -95,6 +98,7 @@ public class Ball:DrawableGameComponent
     {
         load_texture("Content/images/palla1.png");
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height );
+        CollisionManager.Instance.sendCollisionEvent += OnColliderEnter;
         _halfTextureFractionWidth  = _texture.Width / 2;
         _halfTextureFractionHeight = _texture.Height / 2;
     }
@@ -107,6 +111,32 @@ public class Ball:DrawableGameComponent
             _scale, 
             SpriteEffects.None, 
             0f);
+    }
+
+    void OnColliderEnter(object context, CollisionRecordOut collisionRecordOut)
+    {
+        if (_tag == collisionRecordOut._myTag || _tag == collisionRecordOut._otherTag)
+        {
+            string myTag = "";
+            string otherTag = "";
+            if (_tag == collisionRecordOut._myTag)
+            {
+                myTag = collisionRecordOut._myTag;
+                otherTag = collisionRecordOut._otherTag;
+            }
+            else if (_tag == collisionRecordOut._otherTag)
+            {
+                myTag = collisionRecordOut._otherTag;
+                otherTag = collisionRecordOut._myTag;
+            }
+
+            if (otherTag != "penguin")
+            {
+                Console.WriteLine("Collisione");
+                Game.Components.Remove(this);
+                CollisionManager.Instance.removeObject(_tag);
+            }
+        }
     }
 
     public override void Update(GameTime gameTime)

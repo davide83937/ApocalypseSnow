@@ -50,6 +50,24 @@ public class Penguin: DrawableGameComponent
         _shotStruct = new ShotStruct();
         _countBall = 0;
         _networkManager = new NetworkManager("127.0.0.1", 8080);
+        this.DrawOrder = 100;
+    }
+    
+    public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements) : base(game)
+    {
+        _tag = "penguin";
+        _gameContext = game;
+        _position = startPosition;
+        _speed = startSpeed;
+        _ammo = 100;
+        _animationManager = animation;
+        _movementsManager = movements;
+        //_inputList = new InputList();
+        _stateStruct = new StateStruct();
+        _shotStruct = new ShotStruct();
+        _countBall = 0;
+        //_networkManager = new NetworkManager("127.0.0.1", 8080);
+        
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -147,14 +165,9 @@ public class Penguin: DrawableGameComponent
         
         if (_stateStruct.IsPressed(StateList.Up) && !_stateStruct.IsPressed(StateList.Reload))
         {
-            uniform_rectilinear_motion(ref _position.Y, -100, deltaTime);
+            _speed.Y = 100;
+            uniform_rectilinear_motion(ref _position.Y, -_speed.Y, deltaTime);
             _animationManager.MoveRect(3 * _animationManager.SourceRect.Height);
-        }
-    
-      
-        if (_stateStruct.JustReleased(StateList.Moving))
-        {
-            _speed.Y = 0;
         }
     }
     
@@ -164,12 +177,9 @@ public class Penguin: DrawableGameComponent
     {
         if (_stateStruct.IsPressed(StateList.Down) && !_stateStruct.IsPressed(StateList.Reload))
         {
-            uniform_rectilinear_motion(ref _position.Y, 100, deltaTime);
+            _speed.Y = 100;
+            uniform_rectilinear_motion(ref _position.Y, _speed.Y, deltaTime);
             _animationManager.MoveRect(0 * _animationManager.SourceRect.Height);
-        }
-        if (_stateStruct.JustReleased(StateList.Down))
-        {
-            _speed.Y = 0;
         }
     }
     
@@ -178,12 +188,9 @@ public class Penguin: DrawableGameComponent
     {
         if (_stateStruct.IsPressed(StateList.Right) && !_stateStruct.IsPressed(StateList.Reload))
         {
-            uniform_rectilinear_motion(ref _position.X, 100, deltaTime);
+            _speed.X = 100;
+            uniform_rectilinear_motion(ref _position.X, _speed.X, deltaTime);
             _animationManager.MoveRect(2 * _animationManager.SourceRect.Height);
-        }
-        if (_stateStruct.JustReleased(StateList.Right))
-        {
-            _speed.X = 0;
         }
     }
     
@@ -192,30 +199,27 @@ public class Penguin: DrawableGameComponent
     {
         if (_stateStruct.IsPressed(StateList.Left) && !_stateStruct.IsPressed(StateList.Reload))
         {
-            uniform_rectilinear_motion(ref _position.X, -100, deltaTime);
+            _speed.X = 100;
+            uniform_rectilinear_motion(ref _position.X, -_speed.X, deltaTime);
             _animationManager.MoveRect(1 * _animationManager.SourceRect.Height);
-        }
-    
-        if (_stateStruct.JustReleased(StateList.Left))
-        {
-            _speed.X = 0;
         }
     }
     
     private void MoveReload()
     {
-      
         if (_stateStruct.JustReleased(StateList.Reload))
         {
             _reloadTime = 0f;
         }
     }
-    
-    
+
+   
+
     protected override void LoadContent()
     {
         _animationManager.Load_Content(GraphicsDevice);
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width, _animationManager.Texture.Height);
+        CollisionManager.Instance.sendCollisionEvent += OnColliderEnter;
         _textureFractionWidth = _animationManager.Texture.Width / 3;
         _textureFractionHeight = _animationManager.Texture.Height / 3;
         _halfTextureFractionWidth = _textureFractionWidth / 2;
@@ -251,20 +255,29 @@ public class Penguin: DrawableGameComponent
                 otherTag = collisionRecordOut._myTag;
             }
 
-            switch (collisionRecordOut._type)
+            if (otherTag == "obstacle")
             {
-                case 1: //TOP
-                    Console.WriteLine("Collisione");
-                    if (_speed.Y>0)
-                    {
-                        
-                        _speed.Y = 0;
-                        
-                    }
-                    break;
+                switch (collisionRecordOut._type)
+                {
+                    case 1: //TOP
+                        //Console.WriteLine("Collisione 1 - TOP");
+                        _position.Y -= 5;
+                        break;
+                    case 2:
+                        //Console.WriteLine("Collisione 2 - BOTTOM");
+                        _position.Y += 5;
+                        break;
+                    case 3:
+                        //Console.WriteLine("Collisione 3 - LEFT");
+                        _position.X += 5;
+                        break;
+                    case 4:
+                        //Console.WriteLine("Collisione 4 - RIGHT");
+                        _position.X -= 5;
+                        break;
+                }
             }
         }
-
     }
  
     
@@ -281,6 +294,9 @@ public class Penguin: DrawableGameComponent
         MoveReload();
         normalizeVelocity(ref _speed.X, ref _speed.Y);
 
+        //Console.WriteLine(_speed.X);
+        //Console.WriteLine(_speed.Y);
+        
         _animationManager.Update(
             _deltaTime, 
             _stateStruct.IsPressed(StateList.Moving), 
@@ -292,9 +308,9 @@ public class Penguin: DrawableGameComponent
         Shot(_pressedTime);
         
         //_networkManager.SendState(_stateStruct);------------------------------------------------------------------------------------
-        
-        int posCollX = (int)_position.X + _halfTextureFractionWidth;
-        int posCollY = (int)_position.Y + _halfTextureFractionHeight;
+
+        int posCollX = (int)_position.X+ _halfTextureFractionWidth;
+        int posCollY = (int)_position.Y+ _halfTextureFractionHeight;
         CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _textureFractionWidth, _textureFractionHeight);
         
     }

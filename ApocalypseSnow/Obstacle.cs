@@ -23,6 +23,7 @@ public class Obstacle:DrawableGameComponent
         _posX = posX;
         _posY = posY;
         _tag = "obstacle";
+        this.DrawOrder = 2;
     }
 
     private Vector2 GetPosition(int x, int y)
@@ -51,8 +52,8 @@ public class Obstacle:DrawableGameComponent
         _halfTextureFractionHeight = _textureFractionHeight / 2;
         int posCollX = (int)_position.X + _halfTextureFractionWidth;
         int posCollY = (int)_position.Y + _halfTextureFractionHeight;
-        _sourceRect = new Rectangle((int)position.X, (int)position.Y, _textureFractionWidth, _textureFractionHeight);
-        CollisionManager.Instance.addObject(_tag, posCollX, posCollY, _textureFractionWidth, _textureFractionHeight);
+        _sourceRect = new Rectangle((int)position.X, (int)position.Y+44, _textureFractionWidth, _textureFractionHeight);
+        CollisionManager.Instance.addObject(_tag, posCollX, posCollY, _halfTextureFractionWidth+60, _halfTextureFractionHeight-60);
     }
 
     public void Draw(SpriteBatch spriteBatch)

@@ -33,10 +33,10 @@ public class Game1: Game
         IMovements movements = new MovementsManager();
         CollisionManager collisionManager = new CollisionManager(this);
         //CONNESSIONE ------------------------------------------------------
-        NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
+        //NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
         //networkManager.Connect();
-        _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements, networkManager);// <-MANCAVA ULTIMO PARAMETRO
-        collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
+        _myPenguin = new Penguin(this, new Vector2(100, 400), Vector2.Zero, animation, movements);// <-MANCAVA ULTIMO PARAMETRO
+        //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
 
 
@@ -48,8 +48,9 @@ public class Game1: Game
         
         // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()
         Components.Add(collisionManager);
-        Components.Add(_myPenguin);
+        //Components.Add(_myPenguin);
         Components.Add(_obstacle);
+        Components.Add(_myPenguin);
        
 
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
