@@ -29,6 +29,24 @@ extern "C" {
         int type;
     };
 
+    struct CollisionOrder {
+        char myTag[16];
+        char otherTag[16];
+        short traceLeft;
+        short traceRight;
+        short traceUp;
+        short traceDown;
+    };
+
+    // Aggiungi questo in library.h
+    enum CollisionSide {
+        COLLISION_NONE = 0,
+        COLLISION_TOP = 1,    // Impatto dal lato superiore dell'ostacolo
+        COLLISION_BOTTOM = 2, // Impatto dal lato inferiore
+        COLLISION_LEFT = 3,   // Impatto dal lato sinistro
+        COLLISION_RIGHT = 4   // Impatto dal lato destro
+    };
+
     PHYSICS_API const char* PhysicsBuildInfo();
     PHYSICS_API void uniform_rectilinear_motion(float *position, float velocity, float deltaTime);
     PHYSICS_API void normalizeVelocity(float* velX, float* velY);
@@ -44,6 +62,8 @@ extern "C" {
         struct CollisionDataOut* dataOut,
         int count
     );
+
+    //PHYSICS_API void check_collisions2(CollisionDataIn* data, CollisionDataOut2* dataOut, int count);
 
 #ifdef __cplusplus
 }

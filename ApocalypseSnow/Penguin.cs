@@ -188,7 +188,6 @@ public class Penguin: DrawableGameComponent
     }
     
     
-    
     private void MoveLeft(float deltaTime)
     {
         if (_stateStruct.IsPressed(StateList.Left) && !_stateStruct.IsPressed(StateList.Reload))
@@ -233,6 +232,40 @@ public class Penguin: DrawableGameComponent
             _stateStruct.IsPressed(StateList.Reload), 
             _stateStruct.IsPressed(StateList.Shoot)
         );
+    }
+
+    public void OnColliderEnter(object context, CollisionRecordOut collisionRecordOut)
+    {
+        Console.WriteLine("Dentro Collisione");
+        if (_tag == collisionRecordOut._myTag || _tag == collisionRecordOut._otherTag)
+        {
+            string myTag = "";
+            string otherTag = "";
+            if (_tag == collisionRecordOut._myTag)
+            {
+                myTag = collisionRecordOut._myTag;
+                otherTag = collisionRecordOut._otherTag;
+            }
+            else if (_tag == collisionRecordOut._otherTag)
+            {
+                myTag = collisionRecordOut._otherTag;
+                otherTag = collisionRecordOut._myTag;
+            }
+
+            switch (collisionRecordOut._type)
+            {
+                case 1: //TOP
+                    Console.WriteLine("Collisione");
+                    if (_speed.Y>0)
+                    {
+                        
+                        _speed.Y = 0;
+                        
+                    }
+                    break;
+            }
+        }
+
     }
  
     

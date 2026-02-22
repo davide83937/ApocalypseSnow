@@ -10,6 +10,7 @@ namespace ApocalypseSnow
         private static CollisionManager _instance;
         private List<CollisionRecordIn> _collisionRecordIns;
         private CollisionRecordOut[] resultsBuffer;
+        public event EventHandler<CollisionRecordOut> sendCollisionEvent;
         private int i = 0;
      
 
@@ -72,26 +73,28 @@ namespace ApocalypseSnow
             resultsBuffer = new CollisionRecordOut[100];
             
                 check_collisions(inputData, resultsBuffer, inputData.Length);
-                
-            
         }
 
         public override void Update(GameTime gameTime)
         {
-            
             SendToCpp();
-            
+
             foreach (var elemento in resultsBuffer)
             {
-                if (elemento._type != 0) // Stampa solo se c'è un tipo di collisione valido
-                {
-                    //Console.WriteLine("Collisione tra "+elemento._myTag+ " e "+elemento._otherTag+" di tipo "+elemento._type);
-                    //Console.WriteLine(i);
-                    i++;
+                if (elemento._type > 0){
+                    //Console.WriteLine("Collisione tra " + elemento._myTag + " e " + elemento._otherTag + " di tipo " + elemento._type);
+                //Console.WriteLine(i);
+                i++;
+                sendCollision(elemento);
                 }
             }
             
             base.Update(gameTime);
+        }
+
+        protected virtual void sendCollision(CollisionRecordOut collisionRecordOut)
+        {
+            sendCollisionEvent?.Invoke(this, collisionRecordOut);
         }
     }
 }

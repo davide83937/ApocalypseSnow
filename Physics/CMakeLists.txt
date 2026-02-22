@@ -11,7 +11,7 @@ target_compile_definitions(PhysicsDll PRIVATE PHYSICS_BUILD_DLL)
 
 set_target_properties(PhysicsDll PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../Shared
-        OUTPUT_NAME "libPhysicsDll"
+        OUTPUT_NAME "PhysicsDll"
 )
 
 #Copia l'header nella cartella Shared dopo il build

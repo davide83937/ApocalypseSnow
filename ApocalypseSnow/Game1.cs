@@ -34,14 +34,14 @@ public class Game1: Game
         CollisionManager collisionManager = new CollisionManager(this);
         //CONNESSIONE ------------------------------------------------------
         NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
-        networkManager.Connect();
+        //networkManager.Connect();
         _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements, networkManager);// <-MANCAVA ULTIMO PARAMETRO
-        
+        //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
 
 
-        Console.ReadLine("Inserisci il tuo nome");
-        string playerName = Console.ReadLine();
+        //Console.ReadLine("Inserisci il tuo nome");
+        string playerName = "Davide";
         JoinStruct joinStruct = new JoinStruct(playerName);
         //networkManager.SendJoin(joinStruct);--------------------------------------------------------------------------
     
