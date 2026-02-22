@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace ApocalypseSnow;
@@ -33,6 +34,13 @@ public class Game1: Game
         CollisionManager collisionManager = new CollisionManager(this);
         _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements);
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
+
+        //NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);----------------------------------------
+        //networkManager.Connect();-------------------------------------------------------------------------------------
+        Console.ReadLine("Inserisci il tuo nome");
+        string playerName = Console.ReadLine();
+        JoinStruct joinStruct = new JoinStruct(playerName);
+        //networkManager.SendJoin(joinStruct);--------------------------------------------------------------------------
     
         
         // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()
