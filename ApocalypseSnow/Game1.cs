@@ -1,5 +1,4 @@
-﻿using System;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace ApocalypseSnow;
@@ -28,30 +27,18 @@ public class Game1: Game
     
     protected override void Initialize()
     {
-       
-        
         // 1. Crea il pinguino qui
         IAnimation animation = new AnimationManager();
         IMovements movements = new MovementsManager();
         CollisionManager collisionManager = new CollisionManager(this);
-        //NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);----------------------------------------------
-        //networkManager.Connect();----------------------------------------------------------------------------------
-        Console.WriteLine("Scrivi il tuo nome...");
-        string playerName = Console.ReadLine();
-        JoinStruct joinStruct = new JoinStruct(playerName);
-        //networkManager.SendJoin(joinStruct);------------------------------------------------------------------------
-        
-        _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements, networkManager);
+        _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements);
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
-
     
         
         // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()
         Components.Add(collisionManager);
         Components.Add(_myPenguin);
         Components.Add(_obstacle);
-        
-        
        
 
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
