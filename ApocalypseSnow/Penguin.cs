@@ -236,7 +236,6 @@ public class Penguin: DrawableGameComponent
 
     public void OnColliderEnter(object context, CollisionRecordOut collisionRecordOut)
     {
-        Console.WriteLine("Dentro Collisione");
         if (_tag == collisionRecordOut._myTag || _tag == collisionRecordOut._otherTag)
         {
             string myTag = "";
