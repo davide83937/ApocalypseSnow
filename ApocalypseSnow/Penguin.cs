@@ -122,6 +122,10 @@ public class Penguin: DrawableGameComponent
         
         float differenceX = _position.X - mousePosition.X;
         float differenceY = _position.Y - mousePosition.Y;
+        if (differenceY > 0)
+        {
+            differenceY *= 2;
+        }
     
   
         float coX = (differenceX / 100) * (-1);
@@ -311,7 +315,7 @@ public class Penguin: DrawableGameComponent
 
         int posCollX = (int)_position.X+ _halfTextureFractionWidth;
         int posCollY = (int)_position.Y+ _halfTextureFractionHeight;
-        CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _textureFractionWidth, _textureFractionHeight);
+        CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY-60, _textureFractionWidth, _halfTextureFractionHeight);
         
     }
     

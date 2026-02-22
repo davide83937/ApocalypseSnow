@@ -52,13 +52,13 @@ public class Obstacle:DrawableGameComponent
         _halfTextureFractionHeight = _textureFractionHeight / 2;
         int posCollX = (int)_position.X + _halfTextureFractionWidth;
         int posCollY = (int)_position.Y + _halfTextureFractionHeight;
-        _sourceRect = new Rectangle((int)position.X, (int)position.Y+44, _textureFractionWidth, _textureFractionHeight);
-        CollisionManager.Instance.addObject(_tag, posCollX, posCollY, _halfTextureFractionWidth+60, _halfTextureFractionHeight-60);
+        _sourceRect = new Rectangle((int)position.X, (int)position.Y, _textureFractionWidth, _textureFractionHeight);
+        CollisionManager.Instance.addObject(_tag, posCollX, posCollY, _halfTextureFractionWidth+60, _halfTextureFractionHeight);
     }
 
     public void Draw(SpriteBatch spriteBatch)
     {
-        
+        Texture2D texture = _texture;
         spriteBatch.Draw(_texture, _position, _sourceRect, Color.White);
     }
 }

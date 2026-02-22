@@ -132,7 +132,7 @@ public class Ball:DrawableGameComponent
 
             if (otherTag != "penguin")
             {
-                Console.WriteLine("Collisione");
+                //Console.WriteLine("Collisione");
                 Game.Components.Remove(this);
                 CollisionManager.Instance.removeObject(_tag);
             }
@@ -147,15 +147,17 @@ public class Ball:DrawableGameComponent
         parabolic_motion(Gravity,_startPosition.X+20, _startPosition.Y, ref _position.X, ref _position.Y,_startSpeed.X, -_startSpeed.Y, _ballTime);
         
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
-        //Console.WriteLine($"Scale: {_scale}");
+        Console.WriteLine($"Scale: {_scale}");
         //Console.WriteLine($"Gravity: {gravity}");
         if (_scale < 1.0f) { _scale = 1.0f; }
         if (_scale > 1.6f) { _scale = 1.6f; }
-        FinalPointCalculous();
-        int posCollX = (int)_position.X + _halfTextureFractionWidth;
-        int posCollY = (int)_position.Y + _halfTextureFractionHeight;
+
+        int posCollX = (int)_position.X+ _halfTextureFractionWidth;
+        int posCollY = (int)_position.Y+ _halfTextureFractionHeight;
         //Console.WriteLine($"posCollX: {posCollX}, posCollY: {posCollY}");
         CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _texture.Width, _texture.Height );
+        FinalPointCalculous();
+       
        
     }
     
