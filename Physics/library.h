@@ -1,9 +1,12 @@
 #ifndef PHYSICS_LIBRARY_H
 #define PHYSICS_LIBRARY_H
 
-// Macro export (Windows only, minimale)
 #ifdef _WIN32
-    #define PHYSICS_API __declspec(dllexport)
+    #ifdef PHYSICS_BUILD_DLL
+        #define PHYSICS_API __declspec(dllexport)
+    #else
+        #define PHYSICS_API __declspec(dllimport)
+    #endif
 #else
     #define PHYSICS_API
 #endif
@@ -26,7 +29,6 @@ extern "C" {
         int type;
     };
 
-    // --- API ---
     PHYSICS_API const char* PhysicsBuildInfo();
     PHYSICS_API void uniform_rectilinear_motion(float *position, float velocity, float deltaTime);
     PHYSICS_API void normalizeVelocity(float* velX, float* velY);

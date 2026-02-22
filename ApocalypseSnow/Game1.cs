@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System;
 
 namespace ApocalypseSnow;
 
@@ -27,6 +28,9 @@ public class Game1: Game
     
     protected override void Initialize()
     {
+        // Versione DLL
+        System.Diagnostics.Debug.WriteLine(PhysicsWrapper.BuildInfo);
+
         // 1. Crea il pinguino qui
         IAnimation animation = new AnimationManager();
         IMovements movements = new MovementsManager();
