@@ -264,7 +264,7 @@ public class Penguin: DrawableGameComponent
         ChargeShot(ref _pressedTime, _deltaTime);
         Shot(_pressedTime);
         
-        //_networkManager.SendState(_stateStruct);-----------------------------------------------------------------------------------
+        //_networkManager.SendState(_stateStruct);------------------------------------------------------------------------------------
         
         int posCollX = (int)_position.X + _halfTextureFractionWidth;
         int posCollY = (int)_position.Y + _halfTextureFractionHeight;
