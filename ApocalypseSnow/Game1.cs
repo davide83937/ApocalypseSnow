@@ -32,11 +32,14 @@ public class Game1: Game
         IAnimation animation = new AnimationManager();
         IMovements movements = new MovementsManager();
         CollisionManager collisionManager = new CollisionManager(this);
-        _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements);
+        //CONNESSIONE ------------------------------------------------------
+        NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
+        networkManager.Connect();
+        _myPenguin = new Penguin(this, new Vector2(100, 100), Vector2.Zero, animation, movements, networkManager);// <-MANCAVA ULTIMO PARAMETRO
+        
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
 
-        //NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);----------------------------------------
-        //networkManager.Connect();-------------------------------------------------------------------------------------
+
         Console.ReadLine("Inserisci il tuo nome");
         string playerName = Console.ReadLine();
         JoinStruct joinStruct = new JoinStruct(playerName);

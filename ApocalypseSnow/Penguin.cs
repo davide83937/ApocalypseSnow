@@ -97,8 +97,7 @@ public class Penguin: DrawableGameComponent
         // 1. Verifichiamo se il tasto di sparo è stato rilasciato in questo frame (JustReleased)
         // 2. Verifichiamo se ci sono munizioni
         if (!_stateStruct.JustReleased(StateList.Shoot) || _ammo <= 0) return;
-
- 
+        
         Vector2 mousePosition = _movementsManager.GetMousePosition();
         _shotStruct.mouseX = (int)mousePosition.X;
         _shotStruct.mouseY = (int)mousePosition.Y;
@@ -109,11 +108,9 @@ public class Penguin: DrawableGameComponent
   
         float coX = (differenceX / 100) * (-1);
         Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
-    
-  
+        
         Vector2 finalPosition = FinalPoint(startSpeed, _position);
-    
-
+        
         string tagBall = "Palla" + _countBall;
         Ball b = new Ball(_gameContext, _position, startSpeed, finalPosition, tagBall);
         _gameContext.Components.Add(b);
@@ -205,8 +202,6 @@ public class Penguin: DrawableGameComponent
             _speed.X = 0;
         }
     }
-
-   
     
     private void MoveReload()
     {
