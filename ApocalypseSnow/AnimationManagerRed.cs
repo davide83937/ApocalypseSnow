@@ -1,12 +1,12 @@
-﻿using Microsoft.Xna.Framework;
+﻿namespace ApocalypseSnow;
+
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace ApocalypseSnow;
-
-public class AnimationManager:IAnimation
+public class AnimationManagerRed:IAnimation
 {
     public string _ballTag  { get; set; }
-    public Texture2D Texture { get; set; }
+     public Texture2D Texture { get; set; }
     private readonly Texture2D[] _textures = new Texture2D[5];
     private static readonly float FrameSpeed;
     private float _tempTime;
@@ -15,16 +15,16 @@ public class AnimationManager:IAnimation
     public Rectangle SourceRect{ get => _sourceRect;}
     public Texture2D this[int index] => _textures[index];
 
-    static AnimationManager()
+    static AnimationManagerRed()
     {
         FrameSpeed = 0.1f;
     }
 
-    public AnimationManager()
+    public AnimationManagerRed()
     {
-        _ballTag = "Ball";
+        _ballTag = "RedBall";
     }
-    
+
     private void load_texture(GraphicsDevice gd, int index, string path)
     {
         using var stream = System.IO.File.OpenRead(path);
@@ -82,11 +82,12 @@ public class AnimationManager:IAnimation
 
     public void Load_Content(GraphicsDevice graphicsDevice)
     {
-        load_texture(graphicsDevice, 0, "Content/images/penguin_blue_walking.png");
-        load_texture(graphicsDevice, 1, "Content/images/penguin_blue_walking_snowball.png");
-        load_texture(graphicsDevice, 2, "Content/images/penguin_blue_gathering.png");
-        load_texture(graphicsDevice, 3, "Content/images/penguin_blue_launch.png");
-        load_texture(graphicsDevice, 4, "Content/images/penguin_blue_freezed3.png");
+        load_texture(graphicsDevice, 0, "Content/images/penguin_red_walking.png");
+        load_texture(graphicsDevice, 1, "Content/images/penguin_red_walking_snowball.png");
+        load_texture(graphicsDevice, 2, "Content/images/penguin_red_gathering.png");
+        load_texture(graphicsDevice, 3, "Content/images/penguin_red_launch.png");
+        load_texture(graphicsDevice, 4, "Content/images/penguin_red_freezed3.png");
+        
         Texture = _textures[1];
         _sourceRect = new Rectangle(0, 0, Texture.Width / 3, Texture.Height/4);
     }

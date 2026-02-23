@@ -84,7 +84,7 @@ namespace ApocalypseSnow
                 if (elemento._type > 0){ 
                     //Console.WriteLine("Collisione tra " + elemento._myTag + " e " + elemento._otherTag + " di tipo " + elemento._type);  
                     //Console.WriteLine(i);
-                    i++;
+                    //i++;
                     sendCollision(elemento);
                 }
             }

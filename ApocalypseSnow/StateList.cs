@@ -11,4 +11,5 @@ public enum StateList
     Reload = 1 << 4,   //  Sostituisce IsR
     Shoot = 1 << 5,    // Sostituisce IsLeft
     Moving = 1 << 6,    // Sostituisce IsMoving
+    Freezing = 1 << 7,
 }

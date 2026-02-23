@@ -11,7 +11,9 @@ public class Game1: Game
     
     // Dichiariamo il nostro pinguino qui!
     private Penguin _myPenguin;
+    private Penguin _redPenguin;
     private Obstacle _obstacle;
+    private Obstacle _obstacle1;
     private SpriteFont _uiFont;
     private int _width;
     private int _height;
@@ -30,29 +32,30 @@ public class Game1: Game
     {
         // 1. Crea il pinguino qui
         IAnimation animation = new AnimationManager();
+        IAnimation animationRed = new AnimationManagerRed();
         IMovements movements = new MovementsManager();
+        IMovements movementsRed = new MovementsManagerRed();
         CollisionManager collisionManager = new CollisionManager(this);
         //CONNESSIONE ------------------------------------------------------
         //NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
         //networkManager.Connect();
-        _myPenguin = new Penguin(this, new Vector2(100, 400), Vector2.Zero, animation, movements);// <-MANCAVA ULTIMO PARAMETRO
+        _myPenguin = new Penguin(this,"penguin", new Vector2(100, 400), Vector2.Zero, animation, movements);// <-MANCAVA ULTIMO PARAMETRO
+        _redPenguin = new Penguin(this,"penguinRed", new Vector2(150, 25), Vector2.Zero, animationRed, movementsRed);
         //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
-
-
+        _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
+        
         //Console.ReadLine("Inserisci il tuo nome");
         string playerName = "Davide";
         JoinStruct joinStruct = new JoinStruct(playerName);
         //networkManager.SendJoin(joinStruct);--------------------------------------------------------------------------
-    
         
-        // 2. Aggiungilo ai componenti PRIMA di chiamare base.Initialize()
         Components.Add(collisionManager);
         //Components.Add(_myPenguin);
         Components.Add(_obstacle);
+        //Components.Add(_obstacle1);
         Components.Add(_myPenguin);
-       
-
+        Components.Add(_redPenguin);
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
         // l'Initialize e il LoadContent di tutti i componenti in lista.
         base.Initialize();
@@ -85,7 +88,6 @@ public class Game1: Game
         // 3. Chiama il disegno del pinguino
         if (_myPenguin != null)
         {
-            
             _myPenguin.Draw(_spriteBatch);
             // Disegno della UI (Munizioni)
             string ammoText = $"Munizioni: {_myPenguin.Ammo}";
@@ -102,6 +104,10 @@ public class Game1: Game
             else if (component is Obstacle obstacle)
             {
                 obstacle.Draw(_spriteBatch);
+            }
+            else if (component is Penguin penguin && penguin != _myPenguin)
+            {
+                penguin.Draw(_spriteBatch);
             }
         }
 

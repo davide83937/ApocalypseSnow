@@ -30,6 +30,8 @@ public class Penguin: DrawableGameComponent
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
     private NetworkManager  _networkManager;
+    private bool isFreezing = false;
+    private float timeFreezing = 0;
     
 
     static Penguin()
@@ -53,9 +55,9 @@ public class Penguin: DrawableGameComponent
         this.DrawOrder = 100;
     }
     
-    public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements) : base(game)
+    public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements) : base(game)
     {
-        _tag = "penguin";
+        _tag = tag;
         _gameContext = game;
         _position = startPosition;
         _speed = startSpeed;
@@ -134,7 +136,7 @@ public class Penguin: DrawableGameComponent
         
         Vector2 finalPosition = FinalPoint(startSpeed, _position);
         
-        string tagBall = "Palla" + _countBall;
+        string tagBall =_animationManager._ballTag+ _countBall;
         Ball b = new Ball(_gameContext, _position, startSpeed, finalPosition, tagBall);
         _gameContext.Components.Add(b);
         //_networkManager.SendShot(_shotStruct);-------------------------------------------------------------------------
@@ -148,13 +150,13 @@ public class Penguin: DrawableGameComponent
 
     private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
     {
-        parabolic_motion(150f,
-            startPosition.X + 20, 
+        parabolic_motion(100f,
+            startPosition.X + 48, 
             startPosition.Y, 
             out float x, out float y,
             startSpeed.X, 
             -startSpeed.Y, 
-            1.5f // Il "tempo" finale desiderato
+            0.5f // Il "tempo" finale desiderato
         );
 
         Vector2 impatto = new Vector2(x, y);
@@ -167,7 +169,6 @@ public class Penguin: DrawableGameComponent
     
     private void MoveOn(float deltaTime)
     {
-        
         if (_stateStruct.IsPressed(StateList.Up) && !_stateStruct.IsPressed(StateList.Reload))
         {
             _speed.Y = 100;
@@ -239,7 +240,8 @@ public class Penguin: DrawableGameComponent
             ref _position, 
             _ammo, 
             _stateStruct.IsPressed(StateList.Reload), 
-            _stateStruct.IsPressed(StateList.Shoot)
+            _stateStruct.IsPressed(StateList.Shoot),
+            _stateStruct.IsPressed(StateList.Freezing)
         );
     }
 
@@ -258,6 +260,11 @@ public class Penguin: DrawableGameComponent
             {
                 myTag = collisionRecordOut._otherTag;
                 otherTag = collisionRecordOut._myTag;
+            }
+
+            if (myTag=="penguinRed" && otherTag.StartsWith("Ball"))
+            {
+                isFreezing = true;
             }
 
             if (otherTag == "obstacle")
@@ -290,7 +297,7 @@ public class Penguin: DrawableGameComponent
     {
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         
-        _movementsManager.UpdateInput(ref _stateStruct);
+        _movementsManager.UpdateInput(ref _stateStruct, isFreezing);
         
         MoveBack(_deltaTime);
         MoveOn(_deltaTime);
@@ -301,6 +308,12 @@ public class Penguin: DrawableGameComponent
 
         //Console.WriteLine(_speed.X);
         //Console.WriteLine(_speed.Y);
+        if (isFreezing)
+        {
+            timeFreezing += _deltaTime;
+            if (timeFreezing >= 3)
+            {isFreezing = false; timeFreezing = 0;}
+        }
         
         _animationManager.Update(
             _deltaTime, 

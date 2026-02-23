@@ -2,7 +2,6 @@
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using SharpDX;
 using Color = Microsoft.Xna.Framework.Color;
 using Vector2 = Microsoft.Xna.Framework.Vector2;
 
@@ -10,8 +9,6 @@ namespace ApocalypseSnow;
 
 public class Ball:DrawableGameComponent
 {
-    // In Ball.cs
-    private Vector2 _groundPosition; // Aggiungi questa variabile di istanza
     private float _height;           // Aggiungi questa variabile per l'altezza
     private Texture2D _texture;
     private string _tag;
@@ -23,7 +20,7 @@ public class Ball:DrawableGameComponent
     private float _scale;
     private static readonly float Gravity = 150f;
     private static readonly float L = 0.1f;  // massimo
-    private static readonly float K = 0.0003f;   // velocità di crescita
+    private static readonly float K = 0.0005f;   // velocità di crescita
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
   
@@ -39,8 +36,6 @@ public class Ball:DrawableGameComponent
         this._finalPosition = finalPosition;
         _tag = tag;
         this._scale = 1.0f;
-
-        
     }
 
 
@@ -51,7 +46,6 @@ public class Ball:DrawableGameComponent
         //Console.WriteLine(differenceY);
         
         float t = differenceY; // es: tempo, velocità, carica
-
         float x = L * (1f - MathF.Exp(-K * t));
         int f = (int)((_finalPosition.X+_startPosition.X+48)/2);
         
@@ -137,9 +131,9 @@ public class Ball:DrawableGameComponent
                 otherTag = collisionRecordOut._myTag;
             }
 
-            if (otherTag != "penguin")
+            if (otherTag != "penguin" && _scale< 1.15f)
             {
-                //Console.WriteLine("Collisione");
+                Console.WriteLine("Collisione con "+otherTag);
                 Game.Components.Remove(this);
                 CollisionManager.Instance.removeObject(_tag);
             }
@@ -150,13 +144,13 @@ public class Ball:DrawableGameComponent
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _ballTime += deltaTime;
-        parabolic_motion(Gravity,_startPosition.X+20, _startPosition.Y, ref _position.X, ref _position.Y,_startSpeed.X, -_startSpeed.Y, _ballTime);
+        parabolic_motion(100,_startPosition.X+48, _startPosition.Y, ref _position.X, ref _position.Y,_startSpeed.X, -_startSpeed.Y, _ballTime);
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
         //Console.WriteLine($"Scale: {_scale}");
         //Console.WriteLine($"Gravity: {gravity}");
         if (_scale < 1.0f) { _scale = 1.0f; }
-        if (_scale > 1.6f) { _scale = 1.6f; }
-        Console.WriteLine($"Scale: {_scale}");
+        if (_scale > 1.4f) { _scale = 1.4f; }
+        //Console.WriteLine($"Scale: {_scale}");
         int posCollX = (int)_position.X+ _halfTextureFractionWidth;
         int posCollY = (int)_position.Y+ _halfTextureFractionHeight;
         //Console.WriteLine($"posCollX: {posCollX}, posCollY: {posCollY}");
