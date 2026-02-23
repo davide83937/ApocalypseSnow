@@ -98,13 +98,15 @@ public class Penguin: DrawableGameComponent
     {
         if (!_stateStruct.IsPressed(StateList.Shoot) || _ammo <= 0) return;
         
-        deltaTime *= 100;
+        deltaTime *= 100000;
         pressedTime += deltaTime;
         
-        if (pressedTime > 500)
+        if (pressedTime > 200000)
         {
-            pressedTime = 500;
+            pressedTime = 200000;
         }
+        //Console.WriteLine(pressedTime);
+     
     }
 
     
@@ -120,15 +122,14 @@ public class Penguin: DrawableGameComponent
         _shotStruct.mouseX = (int)mousePosition.X;
         _shotStruct.mouseY = (int)mousePosition.Y;
         
-        float differenceX = _position.X - mousePosition.X;
+        float differenceX = _position.X+48 - mousePosition.X;
         float differenceY = _position.Y - mousePosition.Y;
-        if (differenceY > 0)
-        {
-            differenceY *= 2;
-        }
+        
+        normalizeVelocity(ref differenceX, ref differenceY);
+        
     
   
-        float coX = (differenceX / 100) * (-1);
+        float coX = (differenceX / 150) * (-1);
         Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
         
         Vector2 finalPosition = FinalPoint(startSpeed, _position);
