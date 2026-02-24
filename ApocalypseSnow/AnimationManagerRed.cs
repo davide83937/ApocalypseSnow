@@ -85,7 +85,7 @@ public class AnimationManagerRed:IAnimation
         load_texture(graphicsDevice, 0, "Content/images/penguin_red_walking.png");
         load_texture(graphicsDevice, 1, "Content/images/penguin_red_walking_snowball.png");
         load_texture(graphicsDevice, 2, "Content/images/penguin_red_gathering.png");
-        load_texture(graphicsDevice, 3, "Content/images/penguin_red_launch.png");
+        load_texture(graphicsDevice, 3, "Content/images/penguin_red_launch2.png");
         load_texture(graphicsDevice, 4, "Content/images/penguin_red_freezed3.png");
         
         Texture = _textures[1];

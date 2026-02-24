@@ -137,7 +137,7 @@ public class Penguin: DrawableGameComponent
         Vector2 finalPosition = FinalPoint(startSpeed, _position);
         
         string tagBall =_animationManager._ballTag+ _countBall;
-        Ball b = new Ball(_gameContext, _position, startSpeed, finalPosition, tagBall);
+        Ball b = new Ball(_gameContext, _tag,_position, startSpeed, finalPosition, tagBall);
         _gameContext.Components.Add(b);
         //_networkManager.SendShot(_shotStruct);-------------------------------------------------------------------------
 
@@ -262,6 +262,8 @@ public class Penguin: DrawableGameComponent
                 otherTag = collisionRecordOut._myTag;
             }
 
+            
+            
             if (myTag=="penguinRed" && otherTag.StartsWith("Ball"))
             {
                 isFreezing = true;

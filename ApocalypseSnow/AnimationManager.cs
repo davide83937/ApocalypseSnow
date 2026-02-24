@@ -65,7 +65,6 @@ public class AnimationManager:IAnimation
             if (_tempTime > FrameSpeed)
             {
                 _currentFrame++;
-                // Dato che la tua texture ha 3 colonne (_texture.Width / 3)
                 if (_currentFrame >= 3) 
                     _currentFrame = 0;
                 _tempTime = 0f;

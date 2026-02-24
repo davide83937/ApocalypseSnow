@@ -23,11 +23,12 @@ public class Ball:DrawableGameComponent
     private static readonly float K = 0.0005f;   // velocità di crescita
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
+    private string tagPenguin;
   
     
     
 
-    public Ball(Game game, Vector2 startPosition, Vector2 startSpeed, Vector2 finalPosition, string tag) : base(game)
+    public Ball(Game game,string tagPenguin, Vector2 startPosition, Vector2 startSpeed, Vector2 finalPosition, string tag) : base(game)
     {
         this._startPosition = startPosition;
         this._position = startPosition;
@@ -36,6 +37,7 @@ public class Ball:DrawableGameComponent
         this._finalPosition = finalPosition;
         _tag = tag;
         this._scale = 1.0f;
+        this.tagPenguin = tagPenguin;
     }
 
 
@@ -131,12 +133,14 @@ public class Ball:DrawableGameComponent
                 otherTag = collisionRecordOut._myTag;
             }
 
-            if (otherTag != "penguin" && _scale< 1.15f)
-            {
-                Console.WriteLine("Collisione con "+otherTag);
-                Game.Components.Remove(this);
-                CollisionManager.Instance.removeObject(_tag);
-            }
+          
+                if (otherTag != tagPenguin && _scale < 1.15f)
+                {
+                    Console.WriteLine(tagPenguin);
+                    Console.WriteLine("Collisione con " + otherTag);
+                    Game.Components.Remove(this);
+                    CollisionManager.Instance.removeObject(_tag);
+                }
         }
     }
     

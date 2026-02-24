@@ -40,7 +40,7 @@ public class Game1: Game
         //NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
         //networkManager.Connect();
         _myPenguin = new Penguin(this,"penguin", new Vector2(100, 400), Vector2.Zero, animation, movements);// <-MANCAVA ULTIMO PARAMETRO
-        _redPenguin = new Penguin(this,"penguinRed", new Vector2(150, 25), Vector2.Zero, animationRed, movementsRed);
+        _redPenguin = new Penguin(this,"penguinRed", new Vector2(550, 25), Vector2.Zero, animationRed, movementsRed);
         //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
         _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
