@@ -174,6 +174,21 @@ public class Penguin: DrawableGameComponent
     {
         eggDeleteEvent?.Invoke(this, tagEgg);
     }
+
+    private void resetTakingTimer()
+    {
+        if (_stateStruct.JustReleased(StateList.TakingEgg))
+        {
+            timeTakingEgg = 0;
+        }
+    }
+    private void resetPuttingTimer()
+    {
+        if (_stateStruct.JustReleased(StateList.PuttingEgg))
+        {
+            timePuttingEgg = 0;
+        }
+    }
     
     private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
     {
@@ -374,6 +389,8 @@ public class Penguin: DrawableGameComponent
         MoveReload();
         normalizeVelocity(ref _speed.X, ref _speed.Y);
         putEgg();
+        resetTakingTimer();
+        resetPuttingTimer();
 
         //Console.WriteLine(_speed.X);
         //Console.WriteLine(_speed.Y);

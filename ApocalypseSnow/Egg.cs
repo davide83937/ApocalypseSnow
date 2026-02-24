@@ -62,16 +62,12 @@ public class Egg:DrawableGameComponent
                 myTag = collisionRecordOut._otherTag;
                 otherTag = collisionRecordOut._myTag;
             }
-
             if (otherTag == "obstacle" || otherTag.StartsWith("egg"))
             {
                 int numero = myTag[myTag.Length - 1] - '0';
-             
                 _position.Y += numero;
                 CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height);
             }
-            
-            
         }
     }
 }
