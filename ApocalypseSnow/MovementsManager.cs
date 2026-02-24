@@ -7,6 +7,7 @@ public class MovementsManager:IMovements
 {
     private KeyboardState _newState = Keyboard.GetState();
     private MouseState _mouseState = Mouse.GetState();
+    private bool movementKeyPressed = false;
     
     public Vector2 GetMousePosition()
     {
@@ -19,14 +20,18 @@ public class MovementsManager:IMovements
         inputList.Update();
         _newState = Keyboard.GetState();
         _mouseState = Mouse.GetState();
+        
         if (_newState.IsKeyDown(Keys.W)) inputList.Current |= StateList.Up;
         if (_newState.IsKeyDown(Keys.S)) inputList.Current |= StateList.Down;
         if (_newState.IsKeyDown(Keys.A)) inputList.Current |= StateList.Left;
         if (_newState.IsKeyDown(Keys.D)) inputList.Current |= StateList.Right;
-        if (_newState.IsKeyDown(Keys.R)) inputList.Current |= StateList.Reload;
-        if (_mouseState.LeftButton == ButtonState.Pressed) inputList.Current |= StateList.Shoot;
+        if (_newState.IsKeyDown(Keys.R) && !isFreezing) inputList.Current |= StateList.Reload;
+        if (_mouseState.LeftButton == ButtonState.Pressed&& !isFreezing) inputList.Current |= StateList.Shoot;
         // Calcolo automatico di IsMoving
-        if (_newState.GetPressedKeys().Length > 0) inputList.Current |= StateList.Moving;
+        movementKeyPressed =
+            _newState.IsKeyDown(Keys.W) || _newState.IsKeyDown(Keys.S) ||
+            _newState.IsKeyDown(Keys.A) || _newState.IsKeyDown(Keys.D);
+        if (movementKeyPressed && !isFreezing) inputList.Current |= StateList.Moving;
         if (isFreezing) inputList.Current |= StateList.Freezing;
     }
 }

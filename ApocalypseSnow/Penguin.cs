@@ -169,7 +169,7 @@ public class Penguin: DrawableGameComponent
     
     private void MoveOn(float deltaTime)
     {
-        if (_stateStruct.IsPressed(StateList.Up) && !_stateStruct.IsPressed(StateList.Reload))
+        if (_stateStruct.IsPressed(StateList.Up) && !_stateStruct.IsPressed(StateList.Reload) && !_stateStruct.IsPressed(StateList.Freezing))
         {
             _speed.Y = 100;
             uniform_rectilinear_motion(ref _position.Y, -_speed.Y, deltaTime);
@@ -181,7 +181,7 @@ public class Penguin: DrawableGameComponent
 
     private void MoveBack(float deltaTime)
     {
-        if (_stateStruct.IsPressed(StateList.Down) && !_stateStruct.IsPressed(StateList.Reload))
+        if (_stateStruct.IsPressed(StateList.Down) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
             _speed.Y = 100;
             uniform_rectilinear_motion(ref _position.Y, _speed.Y, deltaTime);
@@ -192,7 +192,7 @@ public class Penguin: DrawableGameComponent
 
     private void MoveRight(float deltaTime)
     {
-        if (_stateStruct.IsPressed(StateList.Right) && !_stateStruct.IsPressed(StateList.Reload))
+        if (_stateStruct.IsPressed(StateList.Right) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
             _speed.X = 100;
             uniform_rectilinear_motion(ref _position.X, _speed.X, deltaTime);
@@ -203,7 +203,7 @@ public class Penguin: DrawableGameComponent
     
     private void MoveLeft(float deltaTime)
     {
-        if (_stateStruct.IsPressed(StateList.Left) && !_stateStruct.IsPressed(StateList.Reload))
+        if (_stateStruct.IsPressed(StateList.Left) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
             _speed.X = 100;
             uniform_rectilinear_motion(ref _position.X, -_speed.X, deltaTime);
@@ -213,14 +213,12 @@ public class Penguin: DrawableGameComponent
     
     private void MoveReload()
     {
-        if (_stateStruct.JustReleased(StateList.Reload))
+        if (_stateStruct.JustReleased(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
             _reloadTime = 0f;
         }
     }
-
-   
-
+    
     protected override void LoadContent()
     {
         _animationManager.Load_Content(GraphicsDevice);
@@ -265,6 +263,10 @@ public class Penguin: DrawableGameComponent
             
             
             if (myTag=="penguinRed" && otherTag.StartsWith("Ball"))
+            {
+                isFreezing = true;
+            }
+            if (myTag=="penguin" && otherTag.StartsWith("RedBall"))
             {
                 isFreezing = true;
             }
