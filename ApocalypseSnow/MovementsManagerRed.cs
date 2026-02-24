@@ -23,10 +23,13 @@ public class MovementsManagerRed:IMovements
         if (_newState.IsKeyDown(Keys.Down)) inputList.Current |= StateList.Down;
         if (_newState.IsKeyDown(Keys.Left)) inputList.Current |= StateList.Left;
         if (_newState.IsKeyDown(Keys.Right)) inputList.Current |= StateList.Right;
-        if (_newState.IsKeyDown(Keys.F)&& !isFreezing) inputList.Current |= StateList.Reload;
-        if (_newState.IsKeyDown(Keys.T)&& !isFreezing) inputList.Current |= StateList.TakingEgg;
         if(isWithEgg) inputList.Current |= StateList.WithEgg;
-        if (_mouseState.RightButton == ButtonState.Pressed&& !isFreezing) inputList.Current |= StateList.Shoot;
+        if (_newState.IsKeyDown(Keys.F)&& !isFreezing && !isWithEgg) inputList.Current |= StateList.Reload;
+        if (_newState.IsKeyDown(Keys.T)&& !isFreezing) inputList.Current |= StateList.TakingEgg;
+       
+        if (_newState.IsKeyDown(Keys.M) && !isFreezing && isWithEgg) inputList.Current |= StateList.PuttingEgg;
+        
+        if (_mouseState.RightButton == ButtonState.Pressed&& !isFreezing&& !isWithEgg) inputList.Current |= StateList.Shoot;
         // Calcolo automatico di IsMoving
         movementKeyPressed = 
             _newState.IsKeyDown(Keys.Up) || _newState.IsKeyDown(Keys.Down) || 

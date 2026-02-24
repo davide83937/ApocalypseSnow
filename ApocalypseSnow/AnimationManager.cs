@@ -63,7 +63,7 @@ public class AnimationManager:IAnimation
 
     private void walking_animation(ref float gameTime, ref bool isReloading, ref bool isMoving, bool isWithEgg)
     {
-        if (isMoving || isReloading || isWithEgg)
+        if (isMoving || isReloading)
         {
             _tempTime += gameTime;
             if (_tempTime > FrameSpeed)

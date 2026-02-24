@@ -34,9 +34,12 @@ public class Penguin: DrawableGameComponent
     private bool isWithEgg = false;
     private float timeFreezing = 0;
     private float timeTakingEgg = 0;
+    private float timePuttingEgg = 0;
     public string _myEgg;
     public event EventHandler<string> eggTakenEvent;
+    public event EventHandler<string> eggDeleteEvent;
     public event EventHandler eggPutEvent;
+    
     
 
     static Penguin()
@@ -159,12 +162,17 @@ public class Penguin: DrawableGameComponent
     
     private void putEgg()
     {
-        if (_stateStruct.IsPressed(StateList.WithEgg)&&_stateStruct.JustPressed(StateList.TakingEgg))
+        if ((_stateStruct.IsPressed(StateList.WithEgg)&&_stateStruct.JustPressed(StateList.TakingEgg))
+            || (_stateStruct.JustReleased(StateList.WithEgg)&&_stateStruct.JustPressed(StateList.Freezing)))
         {
             eggPutEvent?.Invoke(this, EventArgs.Empty);
             isWithEgg = false;
-            
         }
+    }
+
+    private void deleteEgg(string tagEgg)
+    {
+        eggDeleteEvent?.Invoke(this, tagEgg);
     }
     
     private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
@@ -294,13 +302,37 @@ public class Penguin: DrawableGameComponent
             {
                 isFreezing = true;
                 timeTakingEgg = 0;
+                timePuttingEgg = 0;
                 isWithEgg = false;
+                
             }
             if (myTag=="penguin" && otherTag.StartsWith("RedBall"))
             {
                 isFreezing = true;
                 timeTakingEgg = 0;
+                timePuttingEgg = 0;
                 isWithEgg = false;
+                
+            }
+            if (myTag=="penguin" && otherTag=="blueP" && _stateStruct.IsPressed(StateList.WithEgg)&& _stateStruct.IsPressed(StateList.PuttingEgg))
+            {
+                timePuttingEgg += _deltaTime;
+                if (timePuttingEgg > 1)
+                {
+                    deleteEgg(_myEgg);
+                    timePuttingEgg = 0;
+                    isWithEgg = false;
+                }
+            }
+            if (myTag=="penguinRed" && otherTag=="redP" && _stateStruct.IsPressed(StateList.WithEgg)&& _stateStruct.IsPressed(StateList.PuttingEgg))
+            {
+                timePuttingEgg += _deltaTime;
+                if (timePuttingEgg > 1)
+                {
+                    deleteEgg(_myEgg);
+                    timePuttingEgg = 0;
+                    isWithEgg = false;
+                }
             }
 
             if (otherTag == "obstacle")

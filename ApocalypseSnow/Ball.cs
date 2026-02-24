@@ -131,10 +131,10 @@ public class Ball:DrawableGameComponent
                 myTag = collisionRecordOut._otherTag;
                 otherTag = collisionRecordOut._myTag;
             }
-            if (otherTag != tagPenguin && _scale < 1.15f)
+            if (otherTag != tagPenguin && !otherTag.EndsWith("P") && _scale < 1.15f)
             {
-                Console.WriteLine(tagPenguin);
-                Console.WriteLine("Collisione con " + otherTag);
+                //Console.WriteLine(tagPenguin);
+                //Console.WriteLine("Collisione con " + otherTag);
                 Game.Components.Remove(this);
                 CollisionManager.Instance.removeObject(_tag);
             }

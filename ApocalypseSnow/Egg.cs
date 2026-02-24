@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using SharpDX;
 using Color = Microsoft.Xna.Framework.Color;
@@ -11,6 +12,7 @@ public class Egg:DrawableGameComponent
     public Texture2D _texture;
     public string _tag;
     public Vector2 _position;
+    
 
     public Egg(Game game, Vector2 startPosition, string tag) : base(game)
     {
@@ -42,6 +44,8 @@ public class Egg:DrawableGameComponent
             0f);
     }
     
+  
+    
     void OnColliderEnter(object context, CollisionRecordOut collisionRecordOut)
     {
         if (_tag == collisionRecordOut._myTag || _tag == collisionRecordOut._otherTag)
@@ -59,11 +63,14 @@ public class Egg:DrawableGameComponent
                 otherTag = collisionRecordOut._myTag;
             }
 
-            if (otherTag == "obstacle")
+            if (otherTag == "obstacle" || otherTag.StartsWith("egg"))
             {
-                _position.Y -= 5;
+                int numero = myTag[myTag.Length - 1] - '0';
+             
+                _position.Y += numero;
                 CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height);
             }
+            
             
         }
     }

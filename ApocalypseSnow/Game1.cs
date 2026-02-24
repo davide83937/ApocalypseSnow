@@ -13,6 +13,8 @@ public class Game1: Game
     // Dichiariamo il nostro pinguino qui!
     private Penguin _myPenguin;
     private Penguin _redPenguin;
+    private int _myPenguinScore = 0;
+    private int _redPenguinScore = 0;
     private Obstacle _obstacle;
     private Obstacle _obstacle1;
     private BasePlatform _bluePlatform;
@@ -22,6 +24,7 @@ public class Game1: Game
     private int _height;
     private Texture2D _backgroundTexture;
     private List<Egg>  _eggs;
+    private Random random;
     
     public Game1()
     {
@@ -68,19 +71,26 @@ public class Game1: Game
         Components.Add(_redPlatform);
         Components.Add(_myPenguin);
         Components.Add(_redPenguin);
-        for(int i = 0; i < 1; i++)
+        random = new Random();
+        
+        
+        for(int i = 0; i < 3; i++)
         {
-            Egg egg = new Egg(this, new Vector2(500,350), "egg"+i);
+            int x = random.Next(0, 700);
+            int y = random.Next(0, 300);
+            Egg egg = new Egg(this, new Vector2(x,y), "egg"+i);
             _eggs.Add(egg);
             Components.Add(egg);
         }
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
         // l'Initialize e il LoadContent di tutti i componenti in lista.
-        base.Initialize();
         _myPenguin.eggTakenEvent += removeEgg;
         _redPenguin.eggTakenEvent += removeEgg;
         _myPenguin.eggPutEvent += addEgg;
         _redPenguin.eggPutEvent += addEgg;
+        _myPenguin.eggDeleteEvent += removeEggCompletaly;
+        _redPenguin.eggDeleteEvent += removeEggCompletaly           ;
+        base.Initialize();
     }
     
     protected override void LoadContent()
@@ -90,7 +100,7 @@ public class Game1: Game
         load_texture("Content/images/environment.png");
         base.LoadContent();
     }
-
+    
     private void removeEgg(object sender, string tagEgg)
     {
         foreach (Egg egg in _eggs)
@@ -99,6 +109,47 @@ public class Game1: Game
             {
                 CollisionManager.Instance.removeObject(egg._tag);
                 Components.Remove(egg);
+            }
+        }
+    }
+    
+    private void removeEggCompletaly(object sender, string tagEgg)
+    {
+        Egg eggToRemove = null;
+
+        // 1. Cerchiamo l'uovo senza rimuoverlo subito
+        foreach (Egg egg in _eggs)
+        {
+            if (egg._tag == tagEgg)
+            {
+                eggToRemove = egg;
+                break; // Una volta trovato, usciamo dal ciclo
+            }
+        }
+
+        // 2. Eseguiamo la rimozione fuori dal ciclo foreach
+        if (eggToRemove != null)
+        {
+            // Rimuoviamo dalla logica delle collisioni
+            CollisionManager.Instance.removeObject(eggToRemove._tag);
+        
+            // Rimuoviamo dai componenti di MonoGame
+            Components.Remove(eggToRemove);
+        
+            // Rimuoviamo dalla nostra lista privata (ORA è SICURO)
+            _eggs.Remove(eggToRemove);
+
+            // 3. Aggiorniamo il punteggio
+            if (sender is Penguin penguin)
+            {
+                if (penguin._tag == "penguin")
+                {
+                    _myPenguinScore++;
+                }
+                else
+                {
+                    _redPenguinScore++;
+                }
             }
         }
     }
@@ -112,8 +163,9 @@ public class Game1: Game
                 if (egg._tag ==penguin._myEgg)
                 {
                     Components.Add(egg);
-                    egg._position = penguin._position;
-                    CollisionManager.Instance.addObject(egg._tag, penguin._position.X, penguin._position.Y, egg._texture.Width,
+                    egg._position.X = penguin._position.X+48;
+                    egg._position.Y = penguin._position.Y+100;
+                    CollisionManager.Instance.addObject(egg._tag, egg._position.X, egg._position.Y, egg._texture.Width,
                         egg._texture.Height);
                 }
             }
@@ -137,22 +189,23 @@ public class Game1: Game
 
         _spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), Color.White);
         // 3. Chiama il disegno del pinguino
-        if (_myPenguin != null)
-        {
-            _myPenguin.Draw(_spriteBatch);
-            // Disegno della UI (Munizioni)
-            string ammoText = $"Munizioni: {_myPenguin.Ammo}";
-            // Posizioniamo il testo in alto a sinistra (10, 10)
-            _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(_width/10f, (_height/1.2f)), Color.Black);
-        }
-
+        // 2. SECONDO STRATO: Ambiente (Ostacoli e Uova)
+        // Cicliamo prima solo gli oggetti che devono stare "sotto"
         foreach (var component in Components)
         {
-            if (component is Ball ball)
+            if (component is BasePlatform plat)
             {
-                ball.Draw(_spriteBatch);
+                plat.Draw(_spriteBatch);
             }
             else if (component is Obstacle obstacle)
+            {
+                obstacle.Draw(_spriteBatch);
+            }
+        }
+        
+        foreach (var component in Components)
+        {
+            if (component is Obstacle obstacle)
             {
                 obstacle.Draw(_spriteBatch);
             }
@@ -160,14 +213,38 @@ public class Game1: Game
             {
                 egg.Draw(_spriteBatch);
             }
-            else if (component is Penguin penguin && penguin != _myPenguin)
+        }
+
+        // 3. TERZO STRATO: Entità dinamiche (Pinguini e Palle)
+        // Disegniamo i pinguini e i proiettili sopra le piattaforme
+        foreach (var component in Components)
+        {
+            if (component is Penguin penguin)
             {
                 penguin.Draw(_spriteBatch);
             }
-            else if (component is BasePlatform plat)
+            else if (component is Ball ball)
             {
-                plat.Draw(_spriteBatch);
+                ball.Draw(_spriteBatch);
             }
+        }
+
+        // 4. QUARTO STRATO: UI (Le scritte)
+        // Sempre per ultime, così nulla può coprirle
+        if (_myPenguin != null && _redPenguin != null)
+        {
+            // Testo Munizioni (in basso a sinistra come lo avevi)
+            string ammoText = $"Munizioni: {_myPenguin.Ammo}";
+            _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(_width / 10f, _height * 0.85f), Color.Black);
+
+            // Punteggio Player Blu (in alto a sinistra)
+            string blueScoreText = $"Punteggio Blu: {_myPenguinScore}";
+            _spriteBatch.DrawString(_uiFont, blueScoreText, new Vector2(20, 20), Color.Blue);
+
+            // Punteggio Player Rosso (in alto a destra)
+            string redScoreText = $"Punteggio Rosso: {_redPenguinScore}";
+            Vector2 redScoreSize = _uiFont.MeasureString(redScoreText); // Misuriamo la scritta per allinearla a destra
+            _spriteBatch.DrawString(_uiFont, redScoreText, new Vector2(_width - redScoreSize.X - 20, 20), Color.Red);
         }
         // 4. Invia tutto alla scheda video
         _spriteBatch.End();
@@ -179,6 +256,17 @@ public class Game1: Game
     {
         _width = GraphicsDevice.Viewport.Width;
         _height = GraphicsDevice.Viewport.Height;
+        if (_eggs.Count == 0)
+        {
+            if (_myPenguinScore > _redPenguinScore)
+            {
+                Console.WriteLine("Pinguino BLU ha vinto!!!!!!!!!!!");
+            }
+            else
+            {
+                Console.WriteLine("Pinguino ROSSO ha vinto!!!!!!!!!!");
+            }
+        }
         base.Update(gameTime);
     }
 }

@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace ApocalypseSnow;
@@ -28,15 +29,17 @@ public class BasePlatform:DrawableGameComponent
     {
         load_texture(_path);
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height );
+        //Console.WriteLine($"{_texture.Width}, {_texture.Height}");
         base.LoadContent();
     }
     
     public void Draw(SpriteBatch spriteBatch)
     {
-        spriteBatch.Draw(_texture, _position,null, Color.White, 0f, 
+        spriteBatch.Draw(_texture, _position,null, Color.White*0.7f, 0f, 
             Vector2.Zero, 
-            0.5f, 
+            1f, 
             SpriteEffects.None, 
             0f);
+        //Console.WriteLine($"{_texture.Width}, {_texture.Height}");
     }
 }
