@@ -31,7 +31,6 @@ namespace ApocalypseSnow
                 throw new Exception("Puoi creare solo una istanza di CollisionManager!");
             _instance = this;
             _collisionRecordIns = [];
-          
         }
 
         

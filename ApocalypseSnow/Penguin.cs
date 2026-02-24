@@ -9,12 +9,12 @@ using Microsoft.Xna.Framework.Graphics;
 
 public class Penguin: DrawableGameComponent
 {
-    private readonly string _tag;
+    public readonly string _tag;
     private int _countBall;
     private readonly Game _gameContext;
     private readonly IAnimation  _animationManager;
     private readonly IMovements  _movementsManager;
-    private Vector2 _position;
+    public Vector2 _position;
     private Vector2 _speed;
     private float _pressedTime;
     private float _deltaTime;
@@ -31,7 +31,12 @@ public class Penguin: DrawableGameComponent
     private int _halfTextureFractionHeight;
     private NetworkManager  _networkManager;
     private bool isFreezing = false;
+    private bool isWithEgg = false;
     private float timeFreezing = 0;
+    private float timeTakingEgg = 0;
+    public string _myEgg;
+    public event EventHandler<string> eggTakenEvent;
+    public event EventHandler eggPutEvent;
     
 
     static Penguin()
@@ -53,6 +58,7 @@ public class Penguin: DrawableGameComponent
         _countBall = 0;
         _networkManager = new NetworkManager("127.0.0.1", 8080);
         this.DrawOrder = 100;
+        
     }
     
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements) : base(game)
@@ -144,10 +150,23 @@ public class Penguin: DrawableGameComponent
         _pressedTime = 0;
         _ammo--;
         _countBall++;
-    
-   
     }
 
+    protected virtual void eggTakenEventFunction(string tagEgg)
+    {
+        eggTakenEvent?.Invoke(this, tagEgg);
+    }
+    
+    private void putEgg()
+    {
+        if (_stateStruct.IsPressed(StateList.WithEgg)&&_stateStruct.JustPressed(StateList.TakingEgg))
+        {
+            eggPutEvent?.Invoke(this, EventArgs.Empty);
+            isWithEgg = false;
+            
+        }
+    }
+    
     private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
     {
         parabolic_motion(100f,
@@ -158,14 +177,12 @@ public class Penguin: DrawableGameComponent
             -startSpeed.Y, 
             0.5f // Il "tempo" finale desiderato
         );
-
-        Vector2 impatto = new Vector2(x, y);
         
-        
-        Vector2 pointFinale = new Vector2(impatto.X, impatto.Y);
+        Vector2 pointFinale = new Vector2(x, y);
         return pointFinale;
     }
 
+    
     
     private void MoveOn(float deltaTime)
     {
@@ -239,7 +256,8 @@ public class Penguin: DrawableGameComponent
             _ammo, 
             _stateStruct.IsPressed(StateList.Reload), 
             _stateStruct.IsPressed(StateList.Shoot),
-            _stateStruct.IsPressed(StateList.Freezing)
+            _stateStruct.IsPressed(StateList.Freezing),
+            _stateStruct.IsPressed(StateList.WithEgg)
         );
     }
 
@@ -260,15 +278,29 @@ public class Penguin: DrawableGameComponent
                 otherTag = collisionRecordOut._myTag;
             }
 
-            
+            if (otherTag.StartsWith("egg") && _stateStruct.IsPressed(StateList.TakingEgg))
+            {
+                timeTakingEgg += _deltaTime;
+                if (timeTakingEgg > 1)
+                {
+                    isWithEgg = true;
+                    timeTakingEgg = 0;
+                    _myEgg = otherTag;
+                    eggTakenEventFunction(otherTag);
+                }
+            }
             
             if (myTag=="penguinRed" && otherTag.StartsWith("Ball"))
             {
                 isFreezing = true;
+                timeTakingEgg = 0;
+                isWithEgg = false;
             }
             if (myTag=="penguin" && otherTag.StartsWith("RedBall"))
             {
                 isFreezing = true;
+                timeTakingEgg = 0;
+                isWithEgg = false;
             }
 
             if (otherTag == "obstacle")
@@ -301,7 +333,7 @@ public class Penguin: DrawableGameComponent
     {
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         
-        _movementsManager.UpdateInput(ref _stateStruct, isFreezing);
+        _movementsManager.UpdateInput(ref _stateStruct, isFreezing, isWithEgg);
         
         MoveBack(_deltaTime);
         MoveOn(_deltaTime);
@@ -309,6 +341,7 @@ public class Penguin: DrawableGameComponent
         MoveLeft(_deltaTime);
         MoveReload();
         normalizeVelocity(ref _speed.X, ref _speed.Y);
+        putEgg();
 
         //Console.WriteLine(_speed.X);
         //Console.WriteLine(_speed.Y);
@@ -322,7 +355,8 @@ public class Penguin: DrawableGameComponent
         _animationManager.Update(
             _deltaTime, 
             _stateStruct.IsPressed(StateList.Moving), 
-            _stateStruct.IsPressed(StateList.Reload)
+            _stateStruct.IsPressed(StateList.Reload),
+            _stateStruct.IsPressed(StateList.WithEgg)
         );
         
         Reload(_deltaTime);

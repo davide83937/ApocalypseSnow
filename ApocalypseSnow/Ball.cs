@@ -9,7 +9,6 @@ namespace ApocalypseSnow;
 
 public class Ball:DrawableGameComponent
 {
-    private float _height;           // Aggiungi questa variabile per l'altezza
     private Texture2D _texture;
     private string _tag;
     private readonly Vector2 _startPosition;

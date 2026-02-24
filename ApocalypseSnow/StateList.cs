@@ -12,4 +12,7 @@ public enum StateList
     Shoot = 1 << 5,    // Sostituisce IsLeft
     Moving = 1 << 6,    // Sostituisce IsMoving
     Freezing = 1 << 7,
+    TakingEgg = 1 << 8,
+    WithEgg = 1 << 9,
+    PuttingEgg = 1 << 10,
 }

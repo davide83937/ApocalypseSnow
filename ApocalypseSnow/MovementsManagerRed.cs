@@ -14,7 +14,7 @@ public class MovementsManagerRed:IMovements
         return mousePosition;
     }
     
-    public void UpdateInput(ref StateStruct inputList, bool isFreezing)
+    public void UpdateInput(ref StateStruct inputList, bool isFreezing, bool  isWithEgg)
     {
         inputList.Update();
         _newState = Keyboard.GetState();
@@ -24,6 +24,8 @@ public class MovementsManagerRed:IMovements
         if (_newState.IsKeyDown(Keys.Left)) inputList.Current |= StateList.Left;
         if (_newState.IsKeyDown(Keys.Right)) inputList.Current |= StateList.Right;
         if (_newState.IsKeyDown(Keys.F)&& !isFreezing) inputList.Current |= StateList.Reload;
+        if (_newState.IsKeyDown(Keys.T)&& !isFreezing) inputList.Current |= StateList.TakingEgg;
+        if(isWithEgg) inputList.Current |= StateList.WithEgg;
         if (_mouseState.RightButton == ButtonState.Pressed&& !isFreezing) inputList.Current |= StateList.Shoot;
         // Calcolo automatico di IsMoving
         movementKeyPressed = 

@@ -7,7 +7,7 @@ public class AnimationManager:IAnimation
 {
     public string _ballTag  { get; set; }
     public Texture2D Texture { get; set; }
-    private readonly Texture2D[] _textures = new Texture2D[5];
+    private readonly Texture2D[] _textures = new Texture2D[6];
     private static readonly float FrameSpeed;
     private float _tempTime;
     private int _currentFrame;
@@ -32,7 +32,7 @@ public class AnimationManager:IAnimation
         _textures[index] = Texture2D.FromStream(gd, stream);
     }
 
-    private void ChangeTexture(SpriteBatch spriteBatch, int ammo, bool isReloading, bool isShooting, bool isFreezing, ref Vector2 position)
+    private void ChangeTexture(SpriteBatch spriteBatch, int ammo, bool isReloading, bool isShooting, bool isFreezing,bool isWithEgg, ref Vector2 position)
     {
         if (ammo == 0 &&  !isReloading && !isShooting)
         {
@@ -50,6 +50,10 @@ public class AnimationManager:IAnimation
         {
             Texture = _textures[4];
         }
+        else if(isWithEgg)
+        {
+            Texture = _textures[5];
+        }
         else
         {
             Texture = _textures[1];
@@ -57,9 +61,9 @@ public class AnimationManager:IAnimation
         spriteBatch.Draw(Texture, position, _sourceRect, Color.White);
     }
 
-    private void walking_animation(ref float gameTime, ref bool isReloading, ref bool isMoving)
+    private void walking_animation(ref float gameTime, ref bool isReloading, ref bool isMoving, bool isWithEgg)
     {
-        if (isMoving || isReloading)
+        if (isMoving || isReloading || isWithEgg)
         {
             _tempTime += gameTime;
             if (_tempTime > FrameSpeed)
@@ -86,21 +90,23 @@ public class AnimationManager:IAnimation
         load_texture(graphicsDevice, 2, "Content/images/penguin_blue_gathering.png");
         load_texture(graphicsDevice, 3, "Content/images/penguin_blue_launch.png");
         load_texture(graphicsDevice, 4, "Content/images/penguin_blue_freezed3.png");
+        load_texture(graphicsDevice, 5, "Content/images/penguin_blue_walking_egg.png");
         Texture = _textures[1];
         _sourceRect = new Rectangle(0, 0, Texture.Width / 3, Texture.Height/4);
     }
 
    
 
-    public void Update(float gameTime, bool isMoving, bool isReloading)
+    public void Update(float gameTime, bool isMoving, bool isReloading, bool isWithEgg)
     {
-        walking_animation(ref gameTime, ref isReloading, ref isMoving);
+        walking_animation(ref gameTime, ref isReloading, ref isMoving, isWithEgg);
     }
-    
 
-    public void Draw(SpriteBatch spriteBatch, ref Vector2 position, int ammo, bool isReloading, bool isShooting, bool isFreezing)
+
+
+    public void Draw(SpriteBatch spriteBatch, ref Vector2 position, int ammo, bool isReloading, bool isShooting, bool isFreezing, bool isWithEgg)
     {
-        ChangeTexture(spriteBatch, ammo, isReloading, isShooting, isFreezing, ref position);
+        ChangeTexture(spriteBatch, ammo, isReloading, isShooting, isFreezing, isWithEgg, ref position);
     }
 
     public void MoveRect(int posRect)

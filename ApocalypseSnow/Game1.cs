@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -14,10 +15,13 @@ public class Game1: Game
     private Penguin _redPenguin;
     private Obstacle _obstacle;
     private Obstacle _obstacle1;
+    private BasePlatform _bluePlatform;
+    private BasePlatform _redPlatform;
     private SpriteFont _uiFont;
     private int _width;
     private int _height;
     private Texture2D _backgroundTexture;
+    private List<Egg>  _eggs;
     
     public Game1()
     {
@@ -36,15 +40,21 @@ public class Game1: Game
         IMovements movements = new MovementsManager();
         IMovements movementsRed = new MovementsManagerRed();
         CollisionManager collisionManager = new CollisionManager(this);
+        
         //CONNESSIONE ------------------------------------------------------
         //NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
         //networkManager.Connect();
-        _myPenguin = new Penguin(this,"penguin", new Vector2(100, 400), Vector2.Zero, animation, movements);// <-MANCAVA ULTIMO PARAMETRO
-        _redPenguin = new Penguin(this,"penguinRed", new Vector2(550, 25), Vector2.Zero, animationRed, movementsRed);
+        string bluePathPlatform = "Content/images/green_logo.png";
+        string redPathPlatform = "Content/images/red_logo.png";
+ 
+        _bluePlatform = new BasePlatform(this, new Vector2(100, 300), "blueP", bluePathPlatform);
+        _redPlatform =  new BasePlatform(this, new Vector2(550, 25), "redP", redPathPlatform);
+        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, animation, movements);// <-MANCAVA ULTIMO PARAMETRO
+        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, animationRed, movementsRed);
         //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
         _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
-        
+        _eggs = new List<Egg>();
         //Console.ReadLine("Inserisci il tuo nome");
         string playerName = "Davide";
         JoinStruct joinStruct = new JoinStruct(playerName);
@@ -54,11 +64,23 @@ public class Game1: Game
         //Components.Add(_myPenguin);
         Components.Add(_obstacle);
         //Components.Add(_obstacle1);
+        Components.Add(_bluePlatform);
+        Components.Add(_redPlatform);
         Components.Add(_myPenguin);
         Components.Add(_redPenguin);
+        for(int i = 0; i < 1; i++)
+        {
+            Egg egg = new Egg(this, new Vector2(500,350), "egg"+i);
+            _eggs.Add(egg);
+            Components.Add(egg);
+        }
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
         // l'Initialize e il LoadContent di tutti i componenti in lista.
         base.Initialize();
+        _myPenguin.eggTakenEvent += removeEgg;
+        _redPenguin.eggTakenEvent += removeEgg;
+        _myPenguin.eggPutEvent += addEgg;
+        _redPenguin.eggPutEvent += addEgg;
     }
     
     protected override void LoadContent()
@@ -67,6 +89,35 @@ public class Game1: Game
         _uiFont = Content.Load<SpriteFont>("UIAmmo");
         load_texture("Content/images/environment.png");
         base.LoadContent();
+    }
+
+    private void removeEgg(object sender, string tagEgg)
+    {
+        foreach (Egg egg in _eggs)
+        {
+            if (egg._tag == tagEgg)
+            {
+                CollisionManager.Instance.removeObject(egg._tag);
+                Components.Remove(egg);
+            }
+        }
+    }
+
+    private void addEgg(object sender, EventArgs e)
+    {
+        foreach (Egg egg in _eggs)
+        {
+            if (sender is Penguin penguin)
+            {
+                if (egg._tag ==penguin._myEgg)
+                {
+                    Components.Add(egg);
+                    egg._position = penguin._position;
+                    CollisionManager.Instance.addObject(egg._tag, penguin._position.X, penguin._position.Y, egg._texture.Width,
+                        egg._texture.Height);
+                }
+            }
+        }
     }
     
     private void load_texture(string path)
@@ -105,12 +156,19 @@ public class Game1: Game
             {
                 obstacle.Draw(_spriteBatch);
             }
+            else if (component is Egg egg)
+            {
+                egg.Draw(_spriteBatch);
+            }
             else if (component is Penguin penguin && penguin != _myPenguin)
             {
                 penguin.Draw(_spriteBatch);
             }
+            else if (component is BasePlatform plat)
+            {
+                plat.Draw(_spriteBatch);
+            }
         }
-
         // 4. Invia tutto alla scheda video
         _spriteBatch.End();
 
