@@ -14,6 +14,8 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     private readonly Game _gameContext;
     private readonly IAnimation  _animationManager;
     private readonly IMovements  _movementsManager;
+
+    private PenguinColliderHandler _penguinColliderHandler;
     //public Vector2 _position;
     private Vector2 _speed;
     private float _pressedTime;
@@ -36,9 +38,9 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     private float timeTakingEgg = 0;
     private float timePuttingEgg = 0;
     public string _myEgg;
-    public event EventHandler<string> eggTakenEvent;
-    public event EventHandler<string> eggDeleteEvent;
-    public event EventHandler eggPutEvent;
+    //public event EventHandler<string> eggTakenEvent;
+    //public event EventHandler<string> eggDeleteEvent;
+    //public event EventHandler eggPutEvent;
     
     static Penguin()
     {
@@ -77,8 +79,9 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _stateStruct = new StateStruct();
         _shotStruct = new ShotStruct();
         _countBall = 0;
+        _penguinColliderHandler = new PenguinColliderHandler(_tag);
         //_networkManager = new NetworkManager("127.0.0.1", 8080);
-        
+
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -151,25 +154,9 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _countBall++;
     }
 
-    protected virtual void eggTakenEventFunction(string tagEgg)
-    {
-        eggTakenEvent?.Invoke(this, tagEgg);
-    }
+   
     
-    private void putEgg()
-    {
-        if ((_stateStruct.IsPressed(StateList.WithEgg)&&_stateStruct.JustPressed(StateList.TakingEgg))
-            || (_stateStruct.JustReleased(StateList.WithEgg)&&_stateStruct.JustPressed(StateList.Freezing)))
-        {
-            eggPutEvent?.Invoke(this, EventArgs.Empty);
-            isWithEgg = false;
-        }
-    }
-
-    private void deleteEgg(string tagEgg)
-    {
-        eggDeleteEvent?.Invoke(this, tagEgg);
-    }
+    
 
     private void resetTakingTimer()
     {
@@ -292,16 +279,19 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         switch (otherTag)
         {
             case string t when t.StartsWith("egg"):
-                HandleEggPickup(t);
+                _penguinColliderHandler.HandleEggPickup(t, _stateStruct, 
+                    ref isWithEgg, ref timeTakingEgg, 
+                    _deltaTime, ref _myEgg);
                 break;
-            case string t when IsEnemyBall(t):
-                HandleHitByBall();
+            case string t when _penguinColliderHandler.IsEnemyBall(t):
+                _penguinColliderHandler.HandleHitByBall(ref isWithEgg, ref timeTakingEgg, ref timePuttingEgg, ref isFreezing);
                 break;
             case "blueP" or "redP":
-                HandleEggDelivery(otherTag);
+                _penguinColliderHandler.HandleEggDelivery(otherTag, ref isWithEgg, ref timePuttingEgg,
+                    _stateStruct, _deltaTime, _myEgg);
                 break;
             case "obstacle":
-                HandleObstacleCollision(collisionRecordOut._type);
+                _penguinColliderHandler.HandleObstacleCollision(collisionRecordOut._type, ref _position);
                 break;
         }
     }
@@ -318,7 +308,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
                 isWithEgg = true;
                 timeTakingEgg = 0;
                 _myEgg = eggTag;
-                eggTakenEventFunction(eggTag);
+                //eggTakenEventFunction(eggTag);
             }
         }
     }
@@ -350,7 +340,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
             Console.WriteLine(timePuttingEgg);
             if (timePuttingEgg > 1)
             {
-                deleteEgg(_myEgg);
+                //deleteEgg(_myEgg);
                 timePuttingEgg = 0;
                 isWithEgg = false;
             }
@@ -381,7 +371,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         MoveLeft(_deltaTime);
         MoveReload();
         normalizeVelocity(ref _speed.X, ref _speed.Y);
-        putEgg();
+        _penguinColliderHandler.putEgg(_stateStruct, ref isWithEgg);
         resetTakingTimer();
         resetPuttingTimer();
 

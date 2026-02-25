@@ -1,0 +1,103 @@
+﻿using System;
+using SharpDX;
+
+namespace ApocalypseSnow;
+
+public class PenguinColliderHandler
+{
+    private string _tag;
+    public event EventHandler<string> eggTakenEvent;
+    public event EventHandler<string> eggDeleteEvent;
+    public event EventHandler eggPutEvent;
+
+    public PenguinColliderHandler(string myTag)
+    {
+        _tag = myTag;
+        Console.WriteLine(_tag);
+    }
+    
+    
+    public void HandleEggPickup(string eggTag, StateStruct stateStruct, ref bool isWithEgg, ref float timeTakingEgg, 
+        float deltaTime, ref string myEgg)
+    {
+        if (stateStruct.IsPressed(StateList.TakingEgg) && !stateStruct.IsPressed(StateList.WithEgg))
+        {
+            timeTakingEgg += deltaTime;
+            //Console.WriteLine(t);
+            if (timeTakingEgg > 1)
+            {
+                isWithEgg = true;
+                timeTakingEgg = 0;
+                myEgg = eggTag;
+                eggTakenEventFunction(eggTag);
+            }
+        }
+    }
+ 
+    public void HandleHitByBall(ref bool isWithEgg, ref float timeTakingEgg, ref float timePuttingEgg, ref bool isFreezing)
+    {
+        isFreezing = true;
+        timeTakingEgg = 0;
+        timePuttingEgg = 0;
+        isWithEgg = false;
+    }
+    
+    public bool IsEnemyBall(string otherTag)
+    {
+        // Determina se la palla colpita è nemica in base al tag del pinguino corrente
+        return (_tag == "penguinRed" && otherTag.StartsWith("Ball")) ||
+               (_tag == "penguin" && otherTag.StartsWith("RedBall"));
+    }
+    
+    public void HandleEggDelivery(string platformTag, ref bool isWithEgg, ref float timePuttingEgg,
+        StateStruct stateStruct, float deltaTime, string myEgg)
+    {
+        // Verifica se il pinguino sta consegnando l'uovo alla piattaforma corretta
+        bool isCorrectPlatform = (_tag == "penguin" && platformTag == "blueP") || 
+                                 (_tag == "penguinRed" && platformTag == "redP");
+
+        if (isCorrectPlatform && stateStruct.IsPressed(StateList.WithEgg) && stateStruct.IsPressed(StateList.PuttingEgg))
+        {
+            timePuttingEgg += deltaTime;
+            Console.WriteLine(timePuttingEgg);
+            if (timePuttingEgg > 1)
+            {
+                deleteEgg(myEgg);
+                timePuttingEgg = 0;
+                isWithEgg = false;
+            }
+        }
+    }
+    
+    public void HandleObstacleCollision(int collisionType, ref Vector2 position)
+    {
+        const float bounceDistance = 5f;
+        switch (collisionType)
+        {
+            case 1: position.Y -= bounceDistance; break; // TOP
+            case 2: position.Y += bounceDistance; break; // BOTTOM
+            case 3: position.X += bounceDistance; break; // LEFT
+            case 4: position.X -= bounceDistance; break; // RIGHT
+        }
+    }
+    
+    public virtual void eggTakenEventFunction(string tagEgg)
+    {
+        eggTakenEvent?.Invoke(this, tagEgg);
+    }
+    
+    public void putEgg(StateStruct stateStruct, ref bool isWithEgg)
+    {
+        if ((stateStruct.IsPressed(StateList.WithEgg)&&stateStruct.JustPressed(StateList.TakingEgg))
+            || (stateStruct.JustReleased(StateList.WithEgg)&&stateStruct.JustPressed(StateList.Freezing)))
+        {
+            eggPutEvent?.Invoke(this, EventArgs.Empty);
+            isWithEgg = false;
+        }
+    }
+
+    public void deleteEgg(string tagEgg)
+    {
+        eggDeleteEvent?.Invoke(this, tagEgg);
+    }
+}
