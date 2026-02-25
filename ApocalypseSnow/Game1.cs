@@ -142,10 +142,10 @@ public class Game1: Game
 
             // 3. Aggiorniamo il punteggio
             Penguin penguin = null;
-            if (sender == _myPenguin._penguinColliderHandler)
-            {
-                penguin = _myPenguin;
-                if (penguin._tag == "penguin")
+            if (sender == _myPenguin._penguinColliderHandler) penguin = _myPenguin;
+            else if (sender == _redPenguin._penguinColliderHandler) penguin = _redPenguin;
+
+            if (penguin._tag == "penguin")
                 {
                     _myPenguinScore++;
                 }
@@ -153,7 +153,7 @@ public class Game1: Game
                 {
                     _redPenguinScore++;
                 }
-            }
+            
         
         }
     }

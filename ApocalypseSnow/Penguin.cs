@@ -39,7 +39,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _shotStruct = new ShotStruct();
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
-        _penguinInputHandler = new PenguinInputHandler();
+        _penguinInputHandler = new PenguinInputHandler(_tag);
         _networkManager = new NetworkManager("127.0.0.1", 8080);
     }
     
@@ -54,7 +54,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _shotStruct = new ShotStruct();
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
-        _penguinInputHandler = new PenguinInputHandler();
+        _penguinInputHandler = new PenguinInputHandler(_tag);
         //_networkManager = new NetworkManager("127.0.0.1", 8080);
 
     }

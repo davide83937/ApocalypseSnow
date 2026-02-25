@@ -14,15 +14,22 @@ public class AnimationManager
     private Rectangle _sourceRect;
     public Rectangle SourceRect{ get => _sourceRect;}
     public Texture2D this[int index] => _textures[index];
+    private string partialPath;
 
     static AnimationManager()
     {
         FrameSpeed = 0.1f;
     }
 
-    public AnimationManager()
+    public AnimationManager(string tag)
     {
         _ballTag = "Ball";
+        partialPath = "blue";
+        if (tag.EndsWith("Red"))
+        {
+            _ballTag = "RedBall";
+            partialPath = "red";
+        }
     }
     
     private void load_texture(GraphicsDevice gd, int index, string path)
@@ -85,12 +92,12 @@ public class AnimationManager
 
     public void Load_Content(GraphicsDevice graphicsDevice)
     {
-        load_texture(graphicsDevice, 0, "Content/images/penguin_blue_walking.png");
-        load_texture(graphicsDevice, 1, "Content/images/penguin_blue_walking_snowball.png");
-        load_texture(graphicsDevice, 2, "Content/images/penguin_blue_gathering.png");
-        load_texture(graphicsDevice, 3, "Content/images/penguin_blue_launch.png");
-        load_texture(graphicsDevice, 4, "Content/images/penguin_blue_freezed3.png");
-        load_texture(graphicsDevice, 5, "Content/images/penguin_blue_walking_egg.png");
+        load_texture(graphicsDevice, 0, $"Content/images/penguin_{partialPath}_walking.png");
+        load_texture(graphicsDevice, 1, $"Content/images/penguin_{partialPath}_walking_snowball.png");
+        load_texture(graphicsDevice, 2, $"Content/images/penguin_{partialPath}_gathering.png");
+        load_texture(graphicsDevice, 3, $"Content/images/penguin_{partialPath}_launch.png");
+        load_texture(graphicsDevice, 4, $"Content/images/penguin_{partialPath}_freezed.png");
+        load_texture(graphicsDevice, 5, $"Content/images/penguin_{partialPath}_walking_egg.png");
         Texture = _textures[1];
         _sourceRect = new Rectangle(0, 0, Texture.Width / 3, Texture.Height/4);
     }

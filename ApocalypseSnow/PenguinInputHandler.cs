@@ -13,10 +13,11 @@ public class PenguinInputHandler
     private float timeFreezing = 0;
     public AnimationManager _animationManager;
     
-    public PenguinInputHandler()
+    
+    public PenguinInputHandler(string tag)
     {
         _stateStruct = new StateStruct();
-        _animationManager = new AnimationManager();
+        _animationManager = new AnimationManager(tag);
     }
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
