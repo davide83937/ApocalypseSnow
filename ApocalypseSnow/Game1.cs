@@ -86,12 +86,12 @@ public class Game1: Game
         
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
         // l'Initialize e il LoadContent di tutti i componenti in lista.
-        _myPenguin.eggTakenEvent += removeEgg;
-        _redPenguin.eggTakenEvent += removeEgg;
-        _myPenguin.eggPutEvent += addEgg;
-        _redPenguin.eggPutEvent += addEgg;
-        _myPenguin.eggDeleteEvent += removeEggCompletaly;
-        _redPenguin.eggDeleteEvent += removeEggCompletaly           ;
+        _myPenguin._penguinColliderHandler.eggTakenEvent += removeEgg;
+        _redPenguin._penguinColliderHandler.eggTakenEvent += removeEgg;
+        _myPenguin._penguinColliderHandler.eggPutEvent += addEgg;
+        _redPenguin._penguinColliderHandler.eggPutEvent += addEgg;
+        _myPenguin._penguinColliderHandler.eggDeleteEvent += removeEggCompletaly;
+        _redPenguin._penguinColliderHandler.eggDeleteEvent += removeEggCompletaly           ;
         base.Initialize();
     }
     
