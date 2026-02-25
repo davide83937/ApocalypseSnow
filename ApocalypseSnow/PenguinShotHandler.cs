@@ -1,6 +1,100 @@
-﻿namespace ApocalypseSnow;
+﻿using System.Runtime.InteropServices;
 
+namespace ApocalypseSnow;
+
+using Microsoft.Xna.Framework;
 public class PenguinShotHandler
 {
+    private readonly Game _gameContext;
+    private string _tag;
+
+    public PenguinShotHandler(Game gameContext, string tag)
+    {
+        _gameContext = gameContext;
+        _tag = tag;
+    }
     
+    
+    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
+    
+    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void parabolic_motion(float gravity, float startPositionX, float startPositionY, 
+        out float positionX, out float positionY, float startVelocityX,
+        float startVelocityY, float gameTime);
+    
+    
+    public void Reload(StateStruct stateStruct, float deltaTime, ref float reloadTime, ref int ammo, int FrameReload)
+    {
+        if (!stateStruct.IsPressed(StateList.Reload)) return;
+        reloadTime += deltaTime;
+        
+        if (reloadTime > FrameReload) 
+        {
+            ammo++;
+            reloadTime = 0f;
+        }
+    }
+    
+    public void ChargeShot(StateStruct stateStruct, ref float pressedTime, float deltaTime, int ammo)
+    {
+        if (!stateStruct.IsPressed(StateList.Shoot) || ammo <= 0) return;
+        
+        deltaTime *= 100000;
+        pressedTime += deltaTime;
+        
+        if (pressedTime > 200000)
+        {
+            pressedTime = 200000;
+        }
+        //Console.WriteLine(pressedTime);
+    }
+    
+    
+    
+    
+    private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
+    {
+        parabolic_motion(100f,
+            startPosition.X + 48, 
+            startPosition.Y, 
+            out float x, out float y,
+            startSpeed.X, 
+            -startSpeed.Y, 
+            0.5f // Il "tempo" finale desiderato
+        );
+        
+        Vector2 pointFinale = new Vector2(x, y);
+        return pointFinale;
+    }
+    
+    public void Shot(StateStruct stateStruct, Vector2 mousePosition,  
+        Vector2 position, ref float pressedTime, ref int ammo, string tagBall, ref int _countBall)
+    {
+        // 1. Verifichiamo se il tasto di sparo è stato rilasciato in questo frame (JustReleased)
+        // 2. Verifichiamo se ci sono munizioni
+        if (!stateStruct.JustReleased(StateList.Shoot) || ammo <= 0) return;
+        
+        //Vector2 mousePosition = _movementsManager.GetMousePosition();
+    
+        
+        float differenceX = position.X+48 - mousePosition.X;
+        float differenceY = position.Y - mousePosition.Y;
+        
+        normalizeVelocity(ref differenceX, ref differenceY);
+        
+        float coX = (differenceX / 150) * (-1);
+        Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
+        
+        Vector2 finalPosition = FinalPoint(startSpeed, position);
+        
+        //string tagBall =_animationManager._ballTag+ _countBall;
+        Ball b = new Ball(_gameContext, _tag, position, startSpeed, finalPosition, tagBall);
+        _gameContext.Components.Add(b);
+        //_networkManager.SendShot(_shotStruct);-------------------------------------------------------------------------
+
+        pressedTime = 0;
+        ammo--;
+        _countBall++;
+    }
 }

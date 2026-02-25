@@ -14,6 +14,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     private readonly IMovements  _movementsManager;
 
     public PenguinColliderHandler _penguinColliderHandler;
+    public PenguinShotHandler _penguinShotHandler;
     //public Vector2 _position;
     private Vector2 _speed;
     private float _pressedTime;
@@ -75,6 +76,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _shotStruct = new ShotStruct();
         _countBall = 0;
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
+        _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
         //_networkManager = new NetworkManager("127.0.0.1", 8080);
 
     }
@@ -84,72 +86,6 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
-    
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void parabolic_motion(float gravity, float startPositionX, float startPositionY, 
-        out float positionX, out float positionY, float startVelocityX,
-        float startVelocityY, float gameTime);
-
-    
-    private void Reload(float gameTime)
-    {
-        if (!_stateStruct.IsPressed(StateList.Reload)) return;
-        _reloadTime += gameTime;
-        
-        if (_reloadTime > FrameReload) 
-        {
-            _ammo++;
-            _reloadTime = 0f;
-        }
-    }
-    
-    private void ChargeShot(ref float pressedTime, float deltaTime)
-    {
-        if (!_stateStruct.IsPressed(StateList.Shoot) || _ammo <= 0) return;
-        
-        deltaTime *= 100000;
-        pressedTime += deltaTime;
-        
-        if (pressedTime > 200000)
-        {
-            pressedTime = 200000;
-        }
-        //Console.WriteLine(pressedTime);
-     
-    }
- 
-    
-    private void Shot(float pressedTime)
-    {
-        // 1. Verifichiamo se il tasto di sparo è stato rilasciato in questo frame (JustReleased)
-        // 2. Verifichiamo se ci sono munizioni
-        if (!_stateStruct.JustReleased(StateList.Shoot) || _ammo <= 0) return;
-        
-        Vector2 mousePosition = _movementsManager.GetMousePosition();
-        _shotStruct.mouseX = (int)mousePosition.X;
-        _shotStruct.mouseY = (int)mousePosition.Y;
-        
-        float differenceX = _position.X+48 - mousePosition.X;
-        float differenceY = _position.Y - mousePosition.Y;
-        
-        normalizeVelocity(ref differenceX, ref differenceY);
-        
-        float coX = (differenceX / 150) * (-1);
-        Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
-        
-        Vector2 finalPosition = FinalPoint(startSpeed, _position);
-        
-        string tagBall =_animationManager._ballTag+ _countBall;
-        Ball b = new Ball(_gameContext, _tag,_position, startSpeed, finalPosition, tagBall);
-        _gameContext.Components.Add(b);
-        //_networkManager.SendShot(_shotStruct);-------------------------------------------------------------------------
-
-        _pressedTime = 0;
-        _ammo--;
-        _countBall++;
-    }
-
-   
     
     
 
@@ -167,22 +103,6 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
             timePuttingEgg = 0;
         }
     }
-    
-    private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
-    {
-        parabolic_motion(100f,
-            startPosition.X + 48, 
-            startPosition.Y, 
-            out float x, out float y,
-            startSpeed.X, 
-            -startSpeed.Y, 
-            0.5f // Il "tempo" finale desiderato
-        );
-        
-        Vector2 pointFinale = new Vector2(x, y);
-        return pointFinale;
-    }
-
     
     
     private void MoveOn(float deltaTime)
@@ -324,9 +244,14 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
             _stateStruct.IsPressed(StateList.WithEgg)
         );
         
-        Reload(_deltaTime);
-        ChargeShot(ref _pressedTime, _deltaTime);
-        Shot(_pressedTime);
+        _penguinShotHandler.Reload(_stateStruct, _deltaTime, ref _reloadTime, ref _ammo, FrameReload);
+        _penguinShotHandler.ChargeShot(_stateStruct, ref _pressedTime, _deltaTime, _ammo);
+        Vector2 MousePosition = _movementsManager.GetMousePosition();
+        _shotStruct.mouseX = (int)MousePosition.X;
+        _shotStruct.mouseY = (int)MousePosition.Y;
+        string tagBall =_animationManager._ballTag+ _countBall;
+        _penguinShotHandler.Shot(_stateStruct, MousePosition,  
+            _position, ref _pressedTime, ref _ammo, tagBall, ref _countBall);
         
         //_networkManager.SendState(_stateStruct);------------------------------------------------------------------------------------
 
