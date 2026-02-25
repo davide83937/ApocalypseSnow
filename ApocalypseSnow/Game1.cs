@@ -38,8 +38,7 @@ public class Game1: Game
     protected override void Initialize()
     {
         // 1. Crea il pinguino qui
-        IAnimation animation = new AnimationManager();
-        IAnimation animationRed = new AnimationManagerRed();
+        
         IMovements movements = new MovementsManager();
         IMovements movementsRed = new MovementsManagerRed();
         CollisionManager collisionManager = new CollisionManager(this);
@@ -52,8 +51,8 @@ public class Game1: Game
  
         _bluePlatform = new BasePlatform(this, new Vector2(100, 300), "blueP", bluePathPlatform);
         _redPlatform =  new BasePlatform(this, new Vector2(550, 25), "redP", redPathPlatform);
-        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, animation, movements);// <-MANCAVA ULTIMO PARAMETRO
-        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, animationRed, movementsRed);
+        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements);// <-MANCAVA ULTIMO PARAMETRO
+        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed);
         //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
         _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);

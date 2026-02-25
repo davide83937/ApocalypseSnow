@@ -8,54 +8,53 @@ using Microsoft.Xna.Framework.Graphics;
 public class Penguin: CollisionExtensions//, DrawableGameComponent
 {
     private readonly Game _gameContext;
-    private readonly IAnimation  _animationManager;
+    //private readonly IAnimation  _animationManager;
     private readonly IMovements  _movementsManager;
     public PenguinColliderHandler _penguinColliderHandler;
     public PenguinShotHandler _penguinShotHandler;
+    public PenguinInputHandler _penguinInputHandler;
     private Vector2 _speed;
     private float _pressedTime;
     private float _deltaTime;
     private float _reloadTime;
-    private StateStruct _stateStruct;
+    //private StateStruct _stateStruct;
     private ShotStruct _shotStruct;
     private int _textureFractionWidth;
     private int _textureFractionHeight;
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
     private NetworkManager  _networkManager;
-    private bool isFreezing = false;
-    private bool isWithEgg = false;
-    private float timeFreezing = 0;
-    private float timeTakingEgg = 0;
-    private float timePuttingEgg = 0;
+
     public string _myEgg;
     
     
-    public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, IAnimation animation,
+    public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed,
         IMovements movements, NetworkManager networkManager) : base(game, tag, startPosition)
     {
         _gameContext = game;
         _speed = startSpeed;
-        _animationManager = animation;
+        //_animationManager = animation;
         _movementsManager = movements;
-        _stateStruct = new StateStruct();
+        //_stateStruct = new StateStruct();
         _shotStruct = new ShotStruct();
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
+        _penguinInputHandler = new PenguinInputHandler();
         _networkManager = new NetworkManager("127.0.0.1", 8080);
     }
     
-    public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, 
+    public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, 
         IMovements movements) : base(game, tag, startPosition)
     {
         _gameContext = game;
         _speed = startSpeed;
-        _animationManager = animation;
+        //_animationManager = animation;
         _movementsManager = movements;
-        _stateStruct = new StateStruct();
+        //_stateStruct = new StateStruct();
         _shotStruct = new ShotStruct();
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
+        _penguinInputHandler = new PenguinInputHandler();
         //_networkManager = new NetworkManager("127.0.0.1", 8080);
 
     }
@@ -70,80 +69,30 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
 
     private void resetTakingTimer()
     {
-        if (_stateStruct.JustReleased(StateList.TakingEgg))
+        if (_penguinInputHandler.isTakingEggJustReleased())
         {
-            timeTakingEgg = 0;
+            _penguinColliderHandler.resetTakingTimer();
         }
     }
+    
     private void resetPuttingTimer()
     {
-        if (_stateStruct.JustReleased(StateList.PuttingEgg))
+        if (_penguinInputHandler.isPuttingEggJustReleased())
         {
-            timePuttingEgg = 0;
+            _penguinColliderHandler.resetPuttingTimer();
         }
     }
     
-    
-    private void MoveOn(float deltaTime)
-    {
-        if (_stateStruct.IsPressed(StateList.Up) && !_stateStruct.IsPressed(StateList.Reload) && !_stateStruct.IsPressed(StateList.Freezing))
-        {
-            _speed.Y = 100;
-            uniform_rectilinear_motion(ref _position.Y, -_speed.Y, deltaTime);
-            _animationManager.MoveRect(3 * _animationManager.SourceRect.Height);
-        }
-    }
-    
-  
-
-    private void MoveBack(float deltaTime)
-    {
-        if (_stateStruct.IsPressed(StateList.Down) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
-        {
-            _speed.Y = 100;
-            uniform_rectilinear_motion(ref _position.Y, _speed.Y, deltaTime);
-            _animationManager.MoveRect(0 * _animationManager.SourceRect.Height);
-        }
-    }
-    
-
-    private void MoveRight(float deltaTime)
-    {
-        if (_stateStruct.IsPressed(StateList.Right) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
-        {
-            _speed.X = 100;
-            uniform_rectilinear_motion(ref _position.X, _speed.X, deltaTime);
-            _animationManager.MoveRect(2 * _animationManager.SourceRect.Height);
-        }
-    }
-    
-    
-    private void MoveLeft(float deltaTime)
-    {
-        if (_stateStruct.IsPressed(StateList.Left) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
-        {
-            _speed.X = 100;
-            uniform_rectilinear_motion(ref _position.X, -_speed.X, deltaTime);
-            _animationManager.MoveRect(1 * _animationManager.SourceRect.Height);
-        }
-    }
-    
-    private void MoveReload()
-    {
-        if (_stateStruct.JustReleased(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
-        {
-            _reloadTime = 0f;
-        }
-    }
     
     protected override void LoadContent()
     {
-        _animationManager.Load_Content(GraphicsDevice);
-        CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width, _animationManager.Texture.Height);
+        _penguinInputHandler._animationManager.Load_Content(GraphicsDevice);
+        CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, 
+            _penguinInputHandler._animationManager.Texture.Width, _penguinInputHandler._animationManager.Texture.Height);
         //CollisionManager.Instance.sendCollisionEvent += OnColliderEnter;
         base.LoadContent();
-        _textureFractionWidth = _animationManager.Texture.Width / 3;
-        _textureFractionHeight = _animationManager.Texture.Height / 3;
+        _textureFractionWidth = _penguinInputHandler._animationManager.Texture.Width / 3;
+        _textureFractionHeight = _penguinInputHandler._animationManager.Texture.Height / 3;
         _halfTextureFractionWidth = _textureFractionWidth / 2;
         _halfTextureFractionHeight = _textureFractionHeight / 2;
     }
@@ -152,14 +101,14 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
 
     public void Draw(SpriteBatch spriteBatch)
     {
-        _animationManager.Draw(
+        _penguinInputHandler._animationManager.Draw(
             spriteBatch, 
             ref _position, 
             _penguinShotHandler.Ammo, 
-            _stateStruct.IsPressed(StateList.Reload), 
-            _stateStruct.IsPressed(StateList.Shoot),
-            _stateStruct.IsPressed(StateList.Freezing),
-            _stateStruct.IsPressed(StateList.WithEgg)
+            _penguinInputHandler._stateStruct.IsPressed(StateList.Reload), 
+            _penguinInputHandler._stateStruct.IsPressed(StateList.Shoot),
+            _penguinInputHandler._stateStruct.IsPressed(StateList.Freezing),
+            _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg)
         );
     }
     
@@ -173,16 +122,16 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         switch (otherTag)
         {
             case string t when t.StartsWith("egg"):
-                _penguinColliderHandler.HandleEggPickup(t, _stateStruct, 
-                    ref isWithEgg, ref timeTakingEgg, 
+                _penguinColliderHandler.HandleEggPickup(t, _penguinInputHandler._stateStruct, 
+                     
                     _deltaTime, ref _myEgg);
                 break;
             case string t when _penguinColliderHandler.IsEnemyBall(t):
-                _penguinColliderHandler.HandleHitByBall(ref isWithEgg, ref timeTakingEgg, ref timePuttingEgg, ref isFreezing);
+                _penguinColliderHandler.HandleHitByBall();
                 break;
             case "blueP" or "redP":
-                _penguinColliderHandler.HandleEggDelivery(otherTag, ref isWithEgg, ref timePuttingEgg,
-                    _stateStruct, _deltaTime, _myEgg);
+                _penguinColliderHandler.HandleEggDelivery(otherTag,
+                    _penguinInputHandler._stateStruct, _deltaTime, _myEgg);
                 break;
             case "obstacle":
                 _penguinColliderHandler.HandleObstacleCollision(collisionRecordOut._type, ref _position);
@@ -190,53 +139,44 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         }
     }
     
-    
     public override void Update(GameTime gameTime)
     {
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         
-        _movementsManager.UpdateInput(ref _stateStruct, isFreezing, isWithEgg);
-        
-        MoveBack(_deltaTime);
-        MoveOn(_deltaTime);
-        MoveRight(_deltaTime);
-        MoveLeft(_deltaTime);
-        MoveReload();
+        _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct, 
+            _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg);
+        _penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
+        _penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
+        _penguinInputHandler.MoveReload(ref _reloadTime);
         normalizeVelocity(ref _speed.X, ref _speed.Y);
-        _penguinColliderHandler.putEgg(_stateStruct, ref isWithEgg);
+        _penguinColliderHandler.putEgg(_penguinInputHandler._stateStruct);
         resetTakingTimer();
         resetPuttingTimer();
 
         //Console.WriteLine(_speed.X);
         //Console.WriteLine(_speed.Y);
-        if (isFreezing)
-        {
-            timeFreezing += _deltaTime;
-            if (timeFreezing >= 3)
-            {isFreezing = false; timeFreezing = 0;}
-        }
+        _penguinInputHandler.increaseTimeFreezing(_deltaTime, ref _penguinColliderHandler.isFrozen);
         
-        _animationManager.Update(
+        _penguinInputHandler._animationManager.Update(
             _deltaTime, 
-            _stateStruct.IsPressed(StateList.Moving), 
-            _stateStruct.IsPressed(StateList.Reload),
-            _stateStruct.IsPressed(StateList.WithEgg)
+            _penguinInputHandler._stateStruct.IsPressed(StateList.Moving), 
+            _penguinInputHandler._stateStruct.IsPressed(StateList.Reload),
+            _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg)
         );
         
-        _penguinShotHandler.Reload(_stateStruct, _deltaTime, ref _reloadTime);
-        _penguinShotHandler.ChargeShot(_stateStruct, ref _pressedTime, _deltaTime);
-        Vector2 MousePosition = _movementsManager.GetMousePosition();
-        _shotStruct.mouseX = (int)MousePosition.X;
-        _shotStruct.mouseY = (int)MousePosition.Y;
-        _penguinShotHandler.Shot(_stateStruct, MousePosition,  
-            _position, ref _pressedTime, _animationManager._ballTag);
+        _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _deltaTime, ref _reloadTime);
+        _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, ref _pressedTime, _deltaTime);
+        Vector2 mousePosition = _movementsManager.GetMousePosition();
+        _shotStruct.mouseX = (int)mousePosition.X;
+        _shotStruct.mouseY = (int)mousePosition.Y;
+        _penguinShotHandler.Shot(_penguinInputHandler._stateStruct, mousePosition,  
+            _position, ref _pressedTime, _penguinInputHandler._animationManager._ballTag);
         
-        //_networkManager.SendState(_stateStruct);------------------------------------------------------------------------------------
+        //_networkManager.SendState(_movementsManager.State);------------------------------------------------------------------------------------
 
         int posCollX = (int)_position.X+ _halfTextureFractionWidth;
         int posCollY = (int)_position.Y+ _halfTextureFractionHeight;
         CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY-60, _textureFractionWidth, _halfTextureFractionHeight);
-        
     }
     
 }

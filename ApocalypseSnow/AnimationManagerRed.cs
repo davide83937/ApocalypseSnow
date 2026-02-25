@@ -3,7 +3,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-public class AnimationManagerRed:IAnimation
+public class AnimationManagerRed
 {
     public string _ballTag  { get; set; }
      public Texture2D Texture { get; set; }

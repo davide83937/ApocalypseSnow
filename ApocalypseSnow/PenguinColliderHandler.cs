@@ -9,15 +9,29 @@ public class PenguinColliderHandler
     public event EventHandler<string> eggTakenEvent;
     public event EventHandler<string> eggDeleteEvent;
     public event EventHandler eggPutEvent;
+    public bool isFrozen = false;
+    public bool isWithEgg = false;
+    private float timeTakingEgg = 0;
+    private float timePuttingEgg = 0;
 
     public PenguinColliderHandler(string myTag)
     {
         _tag = myTag;
         Console.WriteLine(_tag);
     }
+
+
+    public void resetTakingTimer()
+    {
+        timeTakingEgg = 0;
+    }   
     
+    public void resetPuttingTimer()
+    {
+        timePuttingEgg = 0;
+    }  
     
-    public void HandleEggPickup(string eggTag, StateStruct stateStruct, ref bool isWithEgg, ref float timeTakingEgg, 
+    public void HandleEggPickup(string eggTag, StateStruct stateStruct, 
         float deltaTime, ref string myEgg)
     {
         if (stateStruct.IsPressed(StateList.TakingEgg) && !stateStruct.IsPressed(StateList.WithEgg))
@@ -34,9 +48,9 @@ public class PenguinColliderHandler
         }
     }
  
-    public void HandleHitByBall(ref bool isWithEgg, ref float timeTakingEgg, ref float timePuttingEgg, ref bool isFreezing)
+    public void HandleHitByBall()
     {
-        isFreezing = true;
+        isFrozen = true;
         timeTakingEgg = 0;
         timePuttingEgg = 0;
         isWithEgg = false;
@@ -49,7 +63,7 @@ public class PenguinColliderHandler
                (_tag == "penguin" && otherTag.StartsWith("RedBall"));
     }
     
-    public void HandleEggDelivery(string platformTag, ref bool isWithEgg, ref float timePuttingEgg,
+    public void HandleEggDelivery(string platformTag,
         StateStruct stateStruct, float deltaTime, string myEgg)
     {
         // Verifica se il pinguino sta consegnando l'uovo alla piattaforma corretta
@@ -86,7 +100,7 @@ public class PenguinColliderHandler
         eggTakenEvent?.Invoke(this, tagEgg);
     }
     
-    public void putEgg(StateStruct stateStruct, ref bool isWithEgg)
+    public void putEgg(StateStruct stateStruct)
     {
         if ((stateStruct.IsPressed(StateList.WithEgg)&&stateStruct.JustPressed(StateList.TakingEgg))
             || (stateStruct.JustReleased(StateList.WithEgg)&&stateStruct.JustPressed(StateList.Freezing)))

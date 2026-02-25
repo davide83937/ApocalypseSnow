@@ -8,13 +8,21 @@ public class MovementsManagerRed:IMovements
     private KeyboardState _newState = Keyboard.GetState();
     private MouseState _mouseState = Mouse.GetState();
     private bool movementKeyPressed = false;
+    //private StateStruct _stateStruct;
+    private bool isFreezing = false;
+    private bool isWithEgg = false;
+    //private float timeTakingEgg = 0;
+   // private float timePuttingEgg = 0;
+    //private float timeFreezing = 0;
+    
+    
     public Vector2 GetMousePosition()
     {
         Vector2 mousePosition = new Vector2(_mouseState.X, _mouseState.Y);
         return mousePosition;
     }
     
-    public void UpdateInput(ref StateStruct inputList, bool isFreezing, bool  isWithEgg)
+    public void UpdateInput(ref StateStruct inputList, bool isFreezing, bool isWithEgg)
     {
         inputList.Update();
         _newState = Keyboard.GetState();

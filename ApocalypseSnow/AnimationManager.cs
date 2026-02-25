@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace ApocalypseSnow;
 
-public class AnimationManager:IAnimation
+public class AnimationManager
 {
     public string _ballTag  { get; set; }
     public Texture2D Texture { get; set; }
