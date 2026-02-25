@@ -236,7 +236,7 @@ public class Game1: Game
         if (_myPenguin != null && _redPenguin != null)
         {
             // Testo Munizioni (in basso a sinistra come lo avevi)
-            string ammoText = $"Munizioni: {_myPenguin.Ammo}";
+            string ammoText = $"Munizioni: {_myPenguin._penguinShotHandler.Ammo}";
             _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(_width / 10f, _height * 0.85f), Color.Black);
 
             // Punteggio Player Blu (in alto a sinistra)

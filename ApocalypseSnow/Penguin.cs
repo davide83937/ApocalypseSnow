@@ -7,25 +7,17 @@ using Microsoft.Xna.Framework.Graphics;
 
 public class Penguin: CollisionExtensions//, DrawableGameComponent
 {
-    //public readonly string _tag;
-    //private int _countBall;
     private readonly Game _gameContext;
     private readonly IAnimation  _animationManager;
     private readonly IMovements  _movementsManager;
-
     public PenguinColliderHandler _penguinColliderHandler;
     public PenguinShotHandler _penguinShotHandler;
-    //public Vector2 _position;
     private Vector2 _speed;
     private float _pressedTime;
     private float _deltaTime;
-    private int _ammo;
-    public int Ammo{ get => _ammo; set => _ammo = value; }
     private float _reloadTime;
-    //private InputList _inputList;
     private StateStruct _stateStruct;
     private ShotStruct _shotStruct;
-    private static readonly int FrameReload;
     private int _textureFractionWidth;
     private int _textureFractionHeight;
     private int _halfTextureFractionWidth;
@@ -38,43 +30,30 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     private float timePuttingEgg = 0;
     public string _myEgg;
     
-    static Penguin()
-    {
-        FrameReload = 3;
-    }
+    
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, IAnimation animation,
         IMovements movements, NetworkManager networkManager) : base(game, tag, startPosition)
     {
-        //_tag = tag;
         _gameContext = game;
-        //_position = startPosition;
         _speed = startSpeed;
-        _ammo = 100;
         _animationManager = animation;
         _movementsManager = movements;
-        //_inputList = new InputList();
         _stateStruct = new StateStruct();
         _shotStruct = new ShotStruct();
-        //_countBall = 0;
+        _penguinColliderHandler = new PenguinColliderHandler(_tag);
+        _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
         _networkManager = new NetworkManager("127.0.0.1", 8080);
-        this.DrawOrder = 100;
-        
     }
     
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, 
         IMovements movements) : base(game, tag, startPosition)
     {
-        //_tag = tag;
         _gameContext = game;
-        //_position = startPosition;
         _speed = startSpeed;
-        _ammo = 100;
         _animationManager = animation;
         _movementsManager = movements;
-        //_inputList = new InputList();
         _stateStruct = new StateStruct();
         _shotStruct = new ShotStruct();
-        //_countBall = 0;
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
         //_networkManager = new NetworkManager("127.0.0.1", 8080);
@@ -176,7 +155,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _animationManager.Draw(
             spriteBatch, 
             ref _position, 
-            _ammo, 
+            _penguinShotHandler.Ammo, 
             _stateStruct.IsPressed(StateList.Reload), 
             _stateStruct.IsPressed(StateList.Shoot),
             _stateStruct.IsPressed(StateList.Freezing),
@@ -244,14 +223,13 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
             _stateStruct.IsPressed(StateList.WithEgg)
         );
         
-        _penguinShotHandler.Reload(_stateStruct, _deltaTime, ref _reloadTime, ref _ammo, FrameReload);
-        _penguinShotHandler.ChargeShot(_stateStruct, ref _pressedTime, _deltaTime, _ammo);
+        _penguinShotHandler.Reload(_stateStruct, _deltaTime, ref _reloadTime);
+        _penguinShotHandler.ChargeShot(_stateStruct, ref _pressedTime, _deltaTime);
         Vector2 MousePosition = _movementsManager.GetMousePosition();
         _shotStruct.mouseX = (int)MousePosition.X;
         _shotStruct.mouseY = (int)MousePosition.Y;
-        string tagBall = _animationManager._ballTag;//+ _countBall;
         _penguinShotHandler.Shot(_stateStruct, MousePosition,  
-            _position, ref _pressedTime, ref _ammo, tagBall);
+            _position, ref _pressedTime, _animationManager._ballTag);
         
         //_networkManager.SendState(_stateStruct);------------------------------------------------------------------------------------
 

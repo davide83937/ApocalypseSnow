@@ -7,11 +7,19 @@ public class PenguinShotHandler
 {
     private readonly Game _gameContext;
     private string _tag;
+    private int _ammo;
+    public int Ammo{ get => _ammo; set => _ammo = value; }
+    private static readonly int FrameReload;
 
     public PenguinShotHandler(Game gameContext, string tag)
     {
         _gameContext = gameContext;
         _tag = tag;
+        _ammo = 100;
+    }
+    static PenguinShotHandler()
+    {
+        FrameReload = 3;
     }
     
     
@@ -24,21 +32,21 @@ public class PenguinShotHandler
         float startVelocityY, float gameTime);
     
     
-    public void Reload(StateStruct stateStruct, float deltaTime, ref float reloadTime, ref int ammo, int FrameReload)
+    public void Reload(StateStruct stateStruct, float deltaTime, ref float reloadTime)
     {
         if (!stateStruct.IsPressed(StateList.Reload)) return;
         reloadTime += deltaTime;
         
         if (reloadTime > FrameReload) 
         {
-            ammo++;
+            _ammo++;
             reloadTime = 0f;
         }
     }
     
-    public void ChargeShot(StateStruct stateStruct, ref float pressedTime, float deltaTime, int ammo)
+    public void ChargeShot(StateStruct stateStruct, ref float pressedTime, float deltaTime)
     {
-        if (!stateStruct.IsPressed(StateList.Shoot) || ammo <= 0) return;
+        if (!stateStruct.IsPressed(StateList.Shoot) || _ammo <= 0) return;
         
         deltaTime *= 100000;
         pressedTime += deltaTime;
@@ -69,11 +77,11 @@ public class PenguinShotHandler
     }
     
     public void Shot(StateStruct stateStruct, Vector2 mousePosition,  
-        Vector2 position, ref float pressedTime, ref int ammo, string tagBall)
+        Vector2 position, ref float pressedTime, string tagBall)
     {
         // 1. Verifichiamo se il tasto di sparo è stato rilasciato in questo frame (JustReleased)
         // 2. Verifichiamo se ci sono munizioni
-        if (!stateStruct.JustReleased(StateList.Shoot) || ammo <= 0) return;
+        if (!stateStruct.JustReleased(StateList.Shoot) || _ammo <= 0) return;
         
         //Vector2 mousePosition = _movementsManager.GetMousePosition();
     
@@ -94,6 +102,6 @@ public class PenguinShotHandler
         //_networkManager.SendShot(_shotStruct);-------------------------------------------------------------------------
 
         pressedTime = 0;
-        ammo--;
+        _ammo--;
     }
 }
