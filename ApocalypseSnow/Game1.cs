@@ -73,15 +73,17 @@ public class Game1: Game
         Components.Add(_redPenguin);
         random = new Random();
         
+       
         
-        for(int i = 0; i < 3; i++)
+        for(int i = 0; i < 5; i++)
         {
-            int x = random.Next(0, 700);
-            int y = random.Next(0, 300);
+            int x = random.Next(250, 500);
+            int y = random.Next(0, 400);
             Egg egg = new Egg(this, new Vector2(x,y), "egg"+i);
             _eggs.Add(egg);
             Components.Add(egg);
         }
+        
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
         // l'Initialize e il LoadContent di tutti i componenti in lista.
         _myPenguin.eggTakenEvent += removeEgg;

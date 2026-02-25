@@ -37,6 +37,7 @@ namespace ApocalypseSnow
         [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, [Out] CollisionRecordOut[] collisionRecordOut, int count);
         
+
         public void addObject(string tag, float x, float y, int w, int h)
         {
             _collisionRecordIns.Add(new CollisionRecordIn(tag, x, y, w, h));
@@ -69,7 +70,8 @@ namespace ApocalypseSnow
         {
             // 1. Otteniamo l'array interno della lista (o la convertiamo in array)
             CollisionRecordIn[] inputData = _collisionRecordIns.ToArray();
-            resultsBuffer = new CollisionRecordOut[100];
+            int inputCount = inputData.Length*(inputData.Length-1)/2;
+            resultsBuffer = new CollisionRecordOut[inputCount];
             
                 check_collisions(inputData, resultsBuffer, inputData.Length);
         }

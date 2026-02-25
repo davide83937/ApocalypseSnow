@@ -57,11 +57,18 @@ extern "C" {
         float start_velocityX, float start_velocityY,
         float gameTime
     );
-    PHYSICS_API void check_collisions(
-        struct CollisionDataIn* data,
-        struct CollisionDataOut* dataOut,
-        int count
+    PHYSICS_API void check_collisions(struct CollisionDataIn* data, struct CollisionDataOut* dataOut,int count);
+
+
+    PHYSICS_API float calculate_ball_scale_only(
+        float startX, float startY,
+        float finalX, float finalY,
+        float posX,
+        float startSpeedX,
+        float L, float K,
+        float currentScale
     );
+
 
     //PHYSICS_API void check_collisions2(CollisionDataIn* data, CollisionDataOut2* dataOut, int count);
 

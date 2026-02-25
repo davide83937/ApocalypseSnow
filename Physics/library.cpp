@@ -28,7 +28,7 @@ void parabolic_motion(float gravity,float start_positionX, float start_positionY
     *positionX = start_positionX + (start_velocityX * gameTime);
     *positionY = 0.5f * gravity * pow(gameTime, 2)+ start_velocityY*gameTime + start_positionY;
 }
-
+/*
 void check_collisions1(CollisionDataIn* data, CollisionDataOut* dataOut, int count) {
     int found = 0;
     //std::cout << "Dentro il metodo check_collisions" << std::endl;
@@ -65,8 +65,8 @@ void check_collisions1(CollisionDataIn* data, CollisionDataOut* dataOut, int cou
         }
     }
 }
-
-
+*/
+/*
 void check_collisions2(CollisionDataIn* data, CollisionDataOut* dataOut, CollisionOrder* dataOrder, int count, int countOrder) {
     int found = 0;
     bool isLeft = false;
@@ -145,7 +145,7 @@ void check_collisions2(CollisionDataIn* data, CollisionDataOut* dataOut, Collisi
         }
     }
 }
-
+*/
 void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int count) {
     int found = 0;
     for (int i = 0; i < count; i++) {
@@ -191,5 +191,19 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
                 }
             }
         }
+    }
+}
+
+
+
+float calculate_ball_scale_only(float startX, float startY, float finalX, float finalY, float posX, float startSpeedX, float L, float K, float currentScale) {
+    float differenceY = std::abs(startY - finalY);
+    float x = L * (1.0f - std::exp(-K * differenceY));
+    float midpoint = (finalX + startX + 48.0f) / 2.0f;
+
+    if (startSpeedX > 0) { // Destra
+        return (posX < midpoint) ? (currentScale + x) : (currentScale - x);
+    } else { // Sinistra
+        return (posX > midpoint) ? (currentScale + x) : (currentScale - x);
     }
 }

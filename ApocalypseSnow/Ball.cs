@@ -7,12 +7,12 @@ using Vector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace ApocalypseSnow;
 
-public class Ball:DrawableGameComponent
+public class Ball:CollisionExtensions
 {
     private Texture2D _texture;
-    private string _tag;
+    //private string _tag;
     private readonly Vector2 _startPosition;
-    private Vector2 _position;
+    //private Vector2 _position;
     private readonly Vector2 _startSpeed;
     private float _ballTime;
     private readonly Vector2 _finalPosition;
@@ -27,59 +27,71 @@ public class Ball:DrawableGameComponent
     
     
 
-    public Ball(Game game,string tagPenguin, Vector2 startPosition, Vector2 startSpeed, Vector2 finalPosition, string tag) : base(game)
+    public Ball(Game game,string tagPenguin, Vector2 startPosition, Vector2 startSpeed, 
+        Vector2 finalPosition, string tag) : base(game, tag, startPosition)
     {
         this._startPosition = startPosition;
-        this._position = startPosition;
+        //this._position = startPosition;
         this._startSpeed = startSpeed;
         _ballTime = 0.0f;
         this._finalPosition = finalPosition;
-        _tag = tag;
+        //_tag = tag;
         this._scale = 1.0f;
         this.tagPenguin = tagPenguin;
     }
 
 
+    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void calculate_ball_scale(
+        float startX, float startY,
+        float finalX, float finalY,
+        float posX, float posY,
+        float startSpeedX,
+        float L, float K,
+        ref float scale,
+        out bool reachedTarget
+    );
+    
+    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern float calculate_ball_scale_only(
+        float startX, float startY, float finalX, float finalY, float posX, 
+        float startSpeedX, float L, float K, float currentScale);
+
+    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern bool check_target_reached(float posX, float finalX, float startSpeedX);
+    
     private void FinalPointCalculous()
     {
-        bool haRaggiuntoTarget = false;
-        float differenceY = Math.Abs(_startPosition.Y-_finalPosition.Y);
-        //Console.WriteLine(differenceY);
+       
+        // 1. Calcoliamo il nuovo scale delegando al C++
+        _scale = calculate_ball_scale_only(
+            _startPosition.X, _startPosition.Y, 
+            _finalPosition.X, _finalPosition.Y, 
+            _position.X, 
+            _startSpeed.X, 
+            L, K, 
+            _scale
+        );
         
-        float t = differenceY; // es: tempo, velocità, carica
-        float x = L * (1f - MathF.Exp(-K * t));
-        int f = (int)((_finalPosition.X+_startPosition.X+48)/2);
-        
-        switch (_startSpeed.X)
+        // 3. Rimozione dell'oggetto se il target è raggiunto
+        if (chechTarget())
         {
-            // Tiro verso DESTRA
-            case > 0:
-            {
-                if (_position.X >= _finalPosition.X) haRaggiuntoTarget = true;
-                if (_position.X < f) { _scale = _scale + x; }
-                else { _scale = _scale - x; }
-
-                break;
-            }
-            // Tiro verso SINISTRA
-            case < 0:
-            {
-                if (_position.X <= _finalPosition.X) haRaggiuntoTarget = true;
-                if (_position.X > f) { _scale = _scale + x; }
-                else { _scale = _scale - x; }
-
-                break;
-            }
-        }
-
-        // 3. Applichiamo l'impatto se il target è raggiunto
-        if (haRaggiuntoTarget)
-        {
-            // Rimuoviamo la palla
             Game.Components.Remove(this);
             CollisionManager.Instance.removeObject(_tag);
-            // ball_list.Remove(this); // Se hai passato il riferimento alla lista
         }
+    }
+
+    public bool chechTarget()
+    {
+        if (_startSpeed.X > 0) // Tiro verso DESTRA
+        {
+            if (_position.X >= _finalPosition.X) return true;
+        }
+        else if (_startSpeed.X < 0) // Tiro verso SINISTRA
+        {
+            if (_position.X <= _finalPosition.X) return true;
+        }
+        return false;
     }
     
 
@@ -100,11 +112,12 @@ public class Ball:DrawableGameComponent
     {
         load_texture("Content/images/palla1.png");
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height );
-        CollisionManager.Instance.sendCollisionEvent += OnColliderEnter;
+        //CollisionManager.Instance.sendCollisionEvent += OnColliderEnter;
+        base.LoadContent();
         _halfTextureFractionWidth  = _texture.Width / 2;
         _halfTextureFractionHeight = _texture.Height / 2;
     }
-
+    
 
     public void Draw(SpriteBatch spriteBatch)
     {
@@ -114,38 +127,32 @@ public class Ball:DrawableGameComponent
             SpriteEffects.None, 
             0f);
     }
-
-    void OnColliderEnter(object context, CollisionRecordOut collisionRecordOut)
+    
+    
+    protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
     {
-        if (_tag == collisionRecordOut._myTag || _tag == collisionRecordOut._otherTag)
+        //if (!collisionRecordOut.Involves(_tag)) return;
+        //string otherTag = collisionRecordOut.GetOtherTag(_tag);
+
+        switch (otherTag)
         {
-            string myTag = "";
-            string otherTag = "";
-            if (_tag == collisionRecordOut._myTag)
-            {
-                myTag = collisionRecordOut._myTag;
-                otherTag = collisionRecordOut._otherTag;
-            }
-            else if (_tag == collisionRecordOut._otherTag)
-            {
-                myTag = collisionRecordOut._otherTag;
-                otherTag = collisionRecordOut._myTag;
-            }
-            if (otherTag != tagPenguin && !otherTag.EndsWith("P") && _scale < 1.15f)
-            {
-                //Console.WriteLine(tagPenguin);
-                //Console.WriteLine("Collisione con " + otherTag);
+            case string t when isDeleteConditions(t):
                 Game.Components.Remove(this);
                 CollisionManager.Instance.removeObject(_tag);
-            }
+                break;
         }
+    }
+    private bool isDeleteConditions(string otherTag)
+    {
+        return (otherTag != tagPenguin && !otherTag.EndsWith("P") && !otherTag.StartsWith("egg") && _scale < 1.15f);
     }
     
     public override void Update(GameTime gameTime)
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _ballTime += deltaTime;
-        parabolic_motion(100,_startPosition.X+48, _startPosition.Y, ref _position.X, ref _position.Y,_startSpeed.X, -_startSpeed.Y, _ballTime);
+        parabolic_motion(100,_startPosition.X+48, _startPosition.Y, ref _position.X, ref _position.Y,
+            _startSpeed.X, -_startSpeed.Y, _ballTime);
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
         //Console.WriteLine($"Scale: {_scale}");
         //Console.WriteLine($"Gravity: {gravity}");

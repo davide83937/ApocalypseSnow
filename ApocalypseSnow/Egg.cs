@@ -7,17 +7,16 @@ using Vector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace ApocalypseSnow;
 
-public class Egg:DrawableGameComponent
+public class Egg:CollisionExtensions
 {
     public Texture2D _texture;
-    public string _tag;
-    public Vector2 _position;
-    
+    //public string _tag;
+    //public Vector2 _position;
 
-    public Egg(Game game, Vector2 startPosition, string tag) : base(game)
+    public Egg(Game game, Vector2 startPosition, string tag) : base(game, tag, startPosition)
     {
-        _position = startPosition;
-        _tag = tag;
+        //_position = startPosition;
+        //_tag = tag;
     }
 
     private void load_texture(string path)
@@ -31,7 +30,7 @@ public class Egg:DrawableGameComponent
     {
         load_texture("Content/images/egg.png");
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height );
-        CollisionManager.Instance.sendCollisionEvent += OnColliderEnter;
+        base.LoadContent();
         base.LoadContent();
     }
 
@@ -46,28 +45,28 @@ public class Egg:DrawableGameComponent
     
   
     
-    void OnColliderEnter(object context, CollisionRecordOut collisionRecordOut)
+    protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
     {
-        if (_tag == collisionRecordOut._myTag || _tag == collisionRecordOut._otherTag)
+        //if (!collisionRecordOut.Involves(_tag)) return;
+        //string otherTag = collisionRecordOut.GetOtherTag(_tag);
+        switch (otherTag)
         {
-            string myTag = "";
-            string otherTag = "";
-            if (_tag == collisionRecordOut._myTag)
-            {
-                myTag = collisionRecordOut._myTag;
-                otherTag = collisionRecordOut._otherTag;
-            }
-            else if (_tag == collisionRecordOut._otherTag)
-            {
-                myTag = collisionRecordOut._otherTag;
-                otherTag = collisionRecordOut._myTag;
-            }
-            if (otherTag == "obstacle" || otherTag.StartsWith("egg"))
-            {
-                int numero = myTag[myTag.Length - 1] - '0';
-                _position.Y += numero;
+            case "obstacle":
+                HandleObstacleCollision(collisionRecordOut._type);
                 CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height);
-            }
+                break;
+        }
+    }
+    
+    private void HandleObstacleCollision(int collisionType)
+    {
+        const int bounceDistance = 5;
+        switch (collisionType)
+        {
+            case 1: _position.Y -= bounceDistance; break; // TOP
+            case 2: _position.Y += bounceDistance; break; // BOTTOM
+            case 3: _position.X += bounceDistance; break; // LEFT
+            case 4: _position.X -= bounceDistance; break; // RIGHT
         }
     }
 }

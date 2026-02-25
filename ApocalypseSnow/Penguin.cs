@@ -7,14 +7,14 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 
-public class Penguin: DrawableGameComponent
+public class Penguin: CollisionExtensions//, DrawableGameComponent
 {
-    public readonly string _tag;
+    //public readonly string _tag;
     private int _countBall;
     private readonly Game _gameContext;
     private readonly IAnimation  _animationManager;
     private readonly IMovements  _movementsManager;
-    public Vector2 _position;
+    //public Vector2 _position;
     private Vector2 _speed;
     private float _pressedTime;
     private float _deltaTime;
@@ -40,17 +40,16 @@ public class Penguin: DrawableGameComponent
     public event EventHandler<string> eggDeleteEvent;
     public event EventHandler eggPutEvent;
     
-    
-
     static Penguin()
     {
         FrameReload = 3;
     }
-    public Penguin(Game game, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements, NetworkManager networkManager) : base(game)
+    public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, IAnimation animation,
+        IMovements movements, NetworkManager networkManager) : base(game, tag, startPosition)
     {
-        _tag = "penguin";
+        //_tag = tag;
         _gameContext = game;
-        _position = startPosition;
+        //_position = startPosition;
         _speed = startSpeed;
         _ammo = 100;
         _animationManager = animation;
@@ -64,11 +63,12 @@ public class Penguin: DrawableGameComponent
         
     }
     
-    public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, IMovements movements) : base(game)
+    public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, IAnimation animation, 
+        IMovements movements) : base(game, tag, startPosition)
     {
-        _tag = tag;
+        //_tag = tag;
         _gameContext = game;
-        _position = startPosition;
+        //_position = startPosition;
         _speed = startSpeed;
         _ammo = 100;
         _animationManager = animation;
@@ -119,8 +119,6 @@ public class Penguin: DrawableGameComponent
         //Console.WriteLine(pressedTime);
      
     }
-
-    
  
     
     private void Shot(float pressedTime)
@@ -138,8 +136,6 @@ public class Penguin: DrawableGameComponent
         
         normalizeVelocity(ref differenceX, ref differenceY);
         
-    
-  
         float coX = (differenceX / 150) * (-1);
         Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;
         
@@ -263,13 +259,15 @@ public class Penguin: DrawableGameComponent
     {
         _animationManager.Load_Content(GraphicsDevice);
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _animationManager.Texture.Width, _animationManager.Texture.Height);
-        CollisionManager.Instance.sendCollisionEvent += OnColliderEnter;
+        //CollisionManager.Instance.sendCollisionEvent += OnColliderEnter;
+        base.LoadContent();
         _textureFractionWidth = _animationManager.Texture.Width / 3;
         _textureFractionHeight = _animationManager.Texture.Height / 3;
         _halfTextureFractionWidth = _textureFractionWidth / 2;
         _halfTextureFractionHeight = _textureFractionHeight / 2;
     }
-    
+
+
 
     public void Draw(SpriteBatch spriteBatch)
     {
@@ -283,98 +281,93 @@ public class Penguin: DrawableGameComponent
             _stateStruct.IsPressed(StateList.WithEgg)
         );
     }
-
-    public void OnColliderEnter(object context, CollisionRecordOut collisionRecordOut)
+    
+   
+    
+    protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
     {
-        if (_tag == collisionRecordOut._myTag || _tag == collisionRecordOut._otherTag)
+        //if (!collisionRecordOut.Involves(_tag)) return;
+       // string otherTag = collisionRecordOut.GetOtherTag(_tag);
+
+        switch (otherTag)
         {
-            string myTag = "";
-            string otherTag = "";
-            if (_tag == collisionRecordOut._myTag)
+            case string t when t.StartsWith("egg"):
+                HandleEggPickup(t);
+                break;
+            case string t when IsEnemyBall(t):
+                HandleHitByBall();
+                break;
+            case "blueP" or "redP":
+                HandleEggDelivery(otherTag);
+                break;
+            case "obstacle":
+                HandleObstacleCollision(collisionRecordOut._type);
+                break;
+        }
+    }
+ 
+    
+    private void HandleEggPickup(string eggTag)
+    {
+        if (_stateStruct.IsPressed(StateList.TakingEgg) && !_stateStruct.IsPressed(StateList.WithEgg))
+        {
+            timeTakingEgg += _deltaTime;
+            //Console.WriteLine(t);
+            if (timeTakingEgg > 1)
             {
-                myTag = collisionRecordOut._myTag;
-                otherTag = collisionRecordOut._otherTag;
-            }
-            else if (_tag == collisionRecordOut._otherTag)
-            {
-                myTag = collisionRecordOut._otherTag;
-                otherTag = collisionRecordOut._myTag;
-            }
-
-            if (otherTag.StartsWith("egg") && _stateStruct.IsPressed(StateList.TakingEgg))
-            {
-                timeTakingEgg += _deltaTime;
-                if (timeTakingEgg > 1)
-                {
-                    isWithEgg = true;
-                    timeTakingEgg = 0;
-                    _myEgg = otherTag;
-                    eggTakenEventFunction(otherTag);
-                }
-            }
-            
-            if (myTag=="penguinRed" && otherTag.StartsWith("Ball"))
-            {
-                isFreezing = true;
+                isWithEgg = true;
                 timeTakingEgg = 0;
-                timePuttingEgg = 0;
-                isWithEgg = false;
-                
-            }
-            if (myTag=="penguin" && otherTag.StartsWith("RedBall"))
-            {
-                isFreezing = true;
-                timeTakingEgg = 0;
-                timePuttingEgg = 0;
-                isWithEgg = false;
-                
-            }
-            if (myTag=="penguin" && otherTag=="blueP" && _stateStruct.IsPressed(StateList.WithEgg)&& _stateStruct.IsPressed(StateList.PuttingEgg))
-            {
-                timePuttingEgg += _deltaTime;
-                if (timePuttingEgg > 1)
-                {
-                    deleteEgg(_myEgg);
-                    timePuttingEgg = 0;
-                    isWithEgg = false;
-                }
-            }
-            if (myTag=="penguinRed" && otherTag=="redP" && _stateStruct.IsPressed(StateList.WithEgg)&& _stateStruct.IsPressed(StateList.PuttingEgg))
-            {
-                timePuttingEgg += _deltaTime;
-                if (timePuttingEgg > 1)
-                {
-                    deleteEgg(_myEgg);
-                    timePuttingEgg = 0;
-                    isWithEgg = false;
-                }
-            }
-
-            if (otherTag == "obstacle")
-            {
-                switch (collisionRecordOut._type)
-                {
-                    case 1: //TOP
-                        //Console.WriteLine("Collisione 1 - TOP");
-                        _position.Y -= 5;
-                        break;
-                    case 2:
-                        //Console.WriteLine("Collisione 2 - BOTTOM");
-                        _position.Y += 5;
-                        break;
-                    case 3:
-                        //Console.WriteLine("Collisione 3 - LEFT");
-                        _position.X += 5;
-                        break;
-                    case 4:
-                        //Console.WriteLine("Collisione 4 - RIGHT");
-                        _position.X -= 5;
-                        break;
-                }
+                _myEgg = eggTag;
+                eggTakenEventFunction(eggTag);
             }
         }
     }
  
+    private void HandleHitByBall()
+    {
+        isFreezing = true;
+        timeTakingEgg = 0;
+        timePuttingEgg = 0;
+        isWithEgg = false;
+    }
+    
+    private bool IsEnemyBall(string otherTag)
+    {
+        // Determina se la palla colpita è nemica in base al tag del pinguino corrente
+        return (_tag == "penguinRed" && otherTag.StartsWith("Ball")) ||
+               (_tag == "penguin" && otherTag.StartsWith("RedBall"));
+    }
+    
+    private void HandleEggDelivery(string platformTag)
+    {
+        // Verifica se il pinguino sta consegnando l'uovo alla piattaforma corretta
+        bool isCorrectPlatform = (_tag == "penguin" && platformTag == "blueP") || 
+                                 (_tag == "penguinRed" && platformTag == "redP");
+
+        if (isCorrectPlatform && _stateStruct.IsPressed(StateList.WithEgg) && _stateStruct.IsPressed(StateList.PuttingEgg))
+        {
+            timePuttingEgg += _deltaTime;
+            Console.WriteLine(timePuttingEgg);
+            if (timePuttingEgg > 1)
+            {
+                deleteEgg(_myEgg);
+                timePuttingEgg = 0;
+                isWithEgg = false;
+            }
+        }
+    }
+    
+    private void HandleObstacleCollision(int collisionType)
+    {
+        const float bounceDistance = 5f;
+        switch (collisionType)
+        {
+            case 1: _position.Y -= bounceDistance; break; // TOP
+            case 2: _position.Y += bounceDistance; break; // BOTTOM
+            case 3: _position.X += bounceDistance; break; // LEFT
+            case 4: _position.X -= bounceDistance; break; // RIGHT
+        }
+    }
     
     public override void Update(GameTime gameTime)
     {
