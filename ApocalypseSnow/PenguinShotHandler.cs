@@ -69,7 +69,7 @@ public class PenguinShotHandler
     }
     
     public void Shot(StateStruct stateStruct, Vector2 mousePosition,  
-        Vector2 position, ref float pressedTime, ref int ammo, string tagBall, ref int _countBall)
+        Vector2 position, ref float pressedTime, ref int ammo, string tagBall)
     {
         // 1. Verifichiamo se il tasto di sparo è stato rilasciato in questo frame (JustReleased)
         // 2. Verifichiamo se ci sono munizioni
@@ -95,6 +95,5 @@ public class PenguinShotHandler
 
         pressedTime = 0;
         ammo--;
-        _countBall++;
     }
 }

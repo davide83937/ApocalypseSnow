@@ -8,7 +8,7 @@ using Microsoft.Xna.Framework.Graphics;
 public class Penguin: CollisionExtensions//, DrawableGameComponent
 {
     //public readonly string _tag;
-    private int _countBall;
+    //private int _countBall;
     private readonly Game _gameContext;
     private readonly IAnimation  _animationManager;
     private readonly IMovements  _movementsManager;
@@ -55,7 +55,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         //_inputList = new InputList();
         _stateStruct = new StateStruct();
         _shotStruct = new ShotStruct();
-        _countBall = 0;
+        //_countBall = 0;
         _networkManager = new NetworkManager("127.0.0.1", 8080);
         this.DrawOrder = 100;
         
@@ -74,7 +74,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         //_inputList = new InputList();
         _stateStruct = new StateStruct();
         _shotStruct = new ShotStruct();
-        _countBall = 0;
+        //_countBall = 0;
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
         //_networkManager = new NetworkManager("127.0.0.1", 8080);
@@ -249,9 +249,9 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         Vector2 MousePosition = _movementsManager.GetMousePosition();
         _shotStruct.mouseX = (int)MousePosition.X;
         _shotStruct.mouseY = (int)MousePosition.Y;
-        string tagBall =_animationManager._ballTag+ _countBall;
+        string tagBall = _animationManager._ballTag;//+ _countBall;
         _penguinShotHandler.Shot(_stateStruct, MousePosition,  
-            _position, ref _pressedTime, ref _ammo, tagBall, ref _countBall);
+            _position, ref _pressedTime, ref _ammo, tagBall);
         
         //_networkManager.SendState(_stateStruct);------------------------------------------------------------------------------------
 
