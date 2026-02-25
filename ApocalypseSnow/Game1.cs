@@ -141,8 +141,10 @@ public class Game1: Game
             _eggs.Remove(eggToRemove);
 
             // 3. Aggiorniamo il punteggio
-            if (sender is Penguin penguin)
+            Penguin penguin = null;
+            if (sender == _myPenguin._penguinColliderHandler)
             {
+                penguin = _myPenguin;
                 if (penguin._tag == "penguin")
                 {
                     _myPenguinScore++;
@@ -152,10 +154,11 @@ public class Game1: Game
                     _redPenguinScore++;
                 }
             }
+        
         }
     }
 
-    private void addEgg(object sender, EventArgs e)
+    /*private void addEgg(object sender, EventArgs e)
     {
         foreach (Egg egg in _eggs)
         {
@@ -168,6 +171,31 @@ public class Game1: Game
                     egg._position.Y = penguin._position.Y+100;
                     CollisionManager.Instance.addObject(egg._tag, egg._position.X, egg._position.Y, egg._texture.Width,
                         egg._texture.Height);
+                }
+            }
+        }
+    }*/
+    
+    private void addEgg(object sender, EventArgs e)
+    {
+        // Determiniamo quale pinguino ha lanciato l'evento tramite il suo handler
+        Penguin penguin = null;
+        if (sender == _myPenguin._penguinColliderHandler) penguin = _myPenguin;
+        else if (sender == _redPenguin._penguinColliderHandler) penguin = _redPenguin;
+
+        if (penguin != null)
+        {
+            foreach (Egg egg in _eggs)
+            {
+                if (egg._tag == penguin._myEgg)
+                {
+                    if (!Components.Contains(egg)) Components.Add(egg); // Evita duplicati
+                    egg._position.X = penguin._position.X + 48;
+                    egg._position.Y = penguin._position.Y + 100;
+                
+                    CollisionManager.Instance.addObject(egg._tag, egg._position.X, egg._position.Y, 
+                        egg._texture.Width, egg._texture.Height);
+                    break; 
                 }
             }
         }
