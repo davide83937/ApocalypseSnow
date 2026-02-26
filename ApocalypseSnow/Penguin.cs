@@ -39,7 +39,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
         _penguinInputHandler = new PenguinInputHandler(_tag);
-        _networkManager = new NetworkManager("127.0.0.1", 8080);
+        _networkManager = networkManager;
     }
     
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, 
@@ -146,6 +146,35 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
             _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg);
         _penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
         _penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
+        if (_networkManager != null)
+        {
+            _networkManager.SendState(_penguinInputHandler._stateStruct, _deltaTime);
+            // 2. Ricevi gli aggiornamenti dal server
+            _networkManager.Receive(
+                (ackSeq, x, y) =>
+                {
+                    // Qui il server ti dà la tua posizione "vera"
+                    // Per ora sovrascriviamo, poi potrai fare interpolazione
+                    _position = new Vector2(x, y);
+                },
+                (rx, ry, rMask) =>
+                {
+                    // Aggiorna il pinguino rosso
+                    _position = new Vector2(rx, ry);
+                    // Opzionale: aggiorna anche l'animazione dell'avversario
+                    // _redPenguin._penguinInputHandler._stateStruct.Current = (StateList)rMask;
+                }
+            );
+        }
+        else
+        {
+            _penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
+            _penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
+        }
+
+
+        //_penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
+        //_penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
         _penguinInputHandler.MoveReload(ref _penguinShotHandler._reloadTime);
         normalizeVelocity(ref _speed.X, ref _speed.Y);
         _penguinColliderHandler.putEgg(_penguinInputHandler._stateStruct);

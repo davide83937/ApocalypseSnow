@@ -12,6 +12,7 @@ public class NetworkManager : IDisposable
     private NetworkStream _stream;
     private readonly string _ip;
     private readonly int _port;
+    private uint _stateSequence = 0;
 
     public NetworkManager(string ip, int port)
     {
@@ -35,7 +36,7 @@ public class NetworkManager : IDisposable
     }
     
 
-    public void SendState(StateStruct state)
+    /*public void SendState(StateStruct state)
     {
         if (_stream == null || !_tcpClient.Connected) return;
 
@@ -53,6 +54,56 @@ public class NetworkManager : IDisposable
         {
             // Gestione eventuale disconnessione
             Connect(); 
+        }
+    }*/
+    
+
+    public void SendState(StateStruct state, float deltaTime)
+    {
+        if (_stream == null || !_tcpClient.Connected) return;
+
+        // Pacchetto: 1 (Tipo) + 4 (Mask) + 4 (Seq) + 4 (DeltaTime) = 13 byte
+        byte[] packet = new byte[13];
+        packet[0] = (byte)MessageType.State; 
+    
+        _stateSequence++;
+
+        // Copiamo i dati partendo dall'indice 1 (dopo il tipo)
+        Buffer.BlockCopy(BitConverter.GetBytes((int)state.Current), 0, packet, 1, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(_stateSequence), 0, packet, 5, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(deltaTime), 0, packet, 9, 4);
+
+        try {
+            _stream.Write(packet, 0, packet.Length);
+            // Evitiamo Flush() eccessivi per performance, ma qui va bene
+        } catch (IOException) { Connect(); }
+    }
+    
+    public void Receive(Action<uint, float, float> onAuth, Action<float, float, int> onRemote)
+    {
+        // Verifichiamo se ci sono dati pronti nello stream
+        while (_tcpClient.Connected && _stream.DataAvailable)
+        {
+            int type = _stream.ReadByte();
+            if (type == -1) break;
+
+            byte[] payload = new byte[12]; // La maggior parte dei messaggi sono 1+12 byte
+            _stream.Read(payload, 0, 12);
+
+            if (type == 4) // MsgAuthState (Il mio pinguino autoritativo)
+            {
+                uint ackSeq = BitConverter.ToUInt32(payload, 0);
+                float x = BitConverter.ToSingle(payload, 4);
+                float y = BitConverter.ToSingle(payload, 8);
+                onAuth?.Invoke(ackSeq, x, y);
+            }
+            else if (type == 6) // MsgRemoteState (Il pinguino avversario)
+            {
+                float x = BitConverter.ToSingle(payload, 0);
+                float y = BitConverter.ToSingle(payload, 4);
+                int mask = BitConverter.ToInt32(payload, 8);
+                onRemote?.Invoke(x, y, mask);
+            }
         }
     }
 
@@ -101,13 +152,13 @@ public class NetworkManager : IDisposable
         if (_stream == null || !_tcpClient.Connected) 
             throw new Exception("Non connesso al server");
 
-        byte[] buffer = new byte[13];
+        byte[] buffer = new byte[21];
         int totalRead = 0;
     
         // Leggiamo fino a riempire il buffer da 13 byte
-        while (totalRead < 13)
+        while (totalRead < 21)
         {
-            int read = _stream.Read(buffer, totalRead, 13 - totalRead);
+            int read = _stream.Read(buffer, totalRead, 21 - totalRead);
             if (read <= 0) throw new Exception("Server disconnesso durante l'attesa del JoinAck");
             totalRead += read;
         }
@@ -122,7 +173,9 @@ public class NetworkManager : IDisposable
             Type = (MessageType)buffer[0],
             PlayerId = BitConverter.ToUInt32(buffer, 1),
             SpawnX = BitConverter.ToSingle(buffer, 5),
-            SpawnY = BitConverter.ToSingle(buffer, 9)
+            SpawnY = BitConverter.ToSingle(buffer, 9),
+            OpponentSpawnX = BitConverter.ToSingle(buffer, 13), // Lettura nuovi dati
+            OpponentSpawnY = BitConverter.ToSingle(buffer, 17)  // Lettura nuovi dati
         };
     }
 

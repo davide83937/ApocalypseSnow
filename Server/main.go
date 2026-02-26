@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	MsgState       = 1 // 9B  [type][mask:int32][seq:uint32]
+	MsgState       = 1 // 13B [type][mask:int32][seq:uint32][dt:float32]
 	MsgShot        = 2 // 13B [type][a:int32][b:int32][charge:int32]  (EVENT: release)
 	MsgJoin        = 3 // 9B  [type][0][0]
 	MsgAuthState   = 4 // 13B [type][ack:uint32][x:float32][y:float32]                 (SELF)
@@ -64,6 +64,7 @@ type Client struct {
 type StateMsg struct {
 	mask int32
 	seq  uint32
+	dt   float32 // Aggiungi questo campo
 }
 
 type ShotMsg struct {
@@ -103,7 +104,7 @@ func sanitizeMask(m int32) int32 {
 	return m
 }
 
-func stepFromStateDLL(x, y float32, mask int32) (float32, float32) {
+func stepFromStateDLL(x, y float32, mask int32, dt float32) (float32, float32) {
 	if (mask & Reload) != 0 {
 		return x, y
 	}
@@ -134,18 +135,20 @@ func stepFromStateDLL(x, y float32, mask int32) (float32, float32) {
 	cx := C.float(x)
 	cy := C.float(y)
 
-	C.uniform_rectilinear_motion(&cx, vx, C.float(MoveDt))
-	C.uniform_rectilinear_motion(&cy, vy, C.float(MoveDt))
+	C.uniform_rectilinear_motion(&cx, vx, C.float(dt))
+	C.uniform_rectilinear_motion(&cy, vy, C.float(dt))
 
 	return float32(cx), float32(cy)
 }
 
-func sendJoinAck(c *Client, playerId uint32, spawnX, spawnY float32) {
-	buf := make([]byte, 13)
+func sendJoinAck(c *Client, playerId uint32, spawnX, spawnY, oppX, oppY float32) {
+	buf := make([]byte, 21)
 	buf[0] = MsgJoinAck
 	binary.LittleEndian.PutUint32(buf[1:5], playerId)
 	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(spawnX))
 	binary.LittleEndian.PutUint32(buf[9:13], math.Float32bits(spawnY))
+	binary.LittleEndian.PutUint32(buf[13:17], math.Float32bits(oppX)) // Nuova coordinata X avversario
+	binary.LittleEndian.PutUint32(buf[17:21], math.Float32bits(oppY)) // Nuova coordinata Y avversario
 	trySend(c, buf, true)
 }
 
@@ -245,15 +248,16 @@ func readerLoop(c *Client) {
 			}
 
 		case MsgState:
-			pl, err := readExactly(c.conn, 8)
+			pl, err := readExactly(c.conn, 12)
 			if err != nil {
 				return
 			}
 			mask := int32(binary.LittleEndian.Uint32(pl[0:4]))
 			mask = sanitizeMask(mask)
 			seq := binary.LittleEndian.Uint32(pl[4:8])
+			dt := math.Float32frombits(binary.LittleEndian.Uint32(pl[8:12]))
 
-			msg := StateMsg{mask: mask, seq: seq}
+			msg := StateMsg{mask: mask, seq: seq, dt: dt}
 
 			select {
 			case c.input <- msg:
@@ -329,8 +333,8 @@ func newSession(a, b *Client) *Session {
 		tick: time.NewTicker(time.Second / time.Duration(MoveHz)),
 	}
 
-	s.ax, s.ay = 400, 500
-	s.bx, s.by = 400, 100
+	s.ax, s.ay = 100, 300
+	s.bx, s.by = 550, 25
 
 	a.id = nextID()
 	b.id = nextID()
@@ -348,9 +352,10 @@ func (s *Session) run() {
 	fmt.Printf("[SESSION] start A=%v id=%d | B=%v id=%d\n",
 		s.a.conn.RemoteAddr(), s.a.id, s.b.conn.RemoteAddr(), s.b.id)
 
-	sendJoinAck(s.a, s.a.id, s.ax, s.ay)
-	sendJoinAck(s.b, s.b.id, s.bx, s.by)
-
+	sendJoinAck(s.a, s.a.id, s.ax, s.ay, s.bx, s.by) // Invia a player A la sua pos e quella di B
+	sendJoinAck(s.b, s.b.id, s.bx, s.by, s.ax, s.ay) // Invia a player B la sua pos e quella di A
+	// Variabili per conservare l'ultimo dt ricevuto
+	var aDt, bDt float32 = MoveDt, MoveDt
 	for {
 		select {
 		case <-s.a.done:
@@ -359,12 +364,13 @@ func (s *Session) run() {
 			return
 
 		case <-s.tick.C:
-			s.aMask, s.aAck = drainState(s.a, s.aMask, s.aAck)
-			s.bMask, s.bAck = drainState(s.b, s.bMask, s.bAck)
+			// Aggiorna maschere, sequenze e deltaTime
+			s.aMask, s.aAck, aDt = drainState(s.a, s.aMask, s.aAck, aDt)
+			s.bMask, s.bAck, bDt = drainState(s.b, s.bMask, s.bAck, bDt)
 
-			// movimento autoritativo
-			s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask)
-			s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask)
+			// Calcola il movimento usando i dt specifici inviati dai client
+			s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask, aDt)
+			s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask, bDt)
 
 			// SELF auth + OTHER state
 			sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
@@ -380,14 +386,15 @@ func (s *Session) run() {
 	}
 }
 
-func drainState(c *Client, curMask int32, curAck uint32) (int32, uint32) {
+func drainState(c *Client, curMask int32, curAck uint32, curDt float32) (int32, uint32, float32) {
 	for {
 		select {
 		case m := <-c.input:
 			curMask = m.mask
 			curAck = m.seq
+			curDt = m.dt // Salva l'ultimo dt ricevuto
 		default:
-			return curMask, curAck
+			return curMask, curAck, curDt
 		}
 	}
 }

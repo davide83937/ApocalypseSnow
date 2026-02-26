@@ -45,32 +45,39 @@ public class Game1: Game
         
         //CONNESSIONE ------------------------------------------------------
         NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
-        networkManager.Connect();
+        //networkManager.Connect();
         string bluePathPlatform = "Content/images/green_logo.png";
         string redPathPlatform = "Content/images/red_logo.png";
- 
-        _bluePlatform = new BasePlatform(this, new Vector2(100, 300), "blueP", bluePathPlatform);
-        _redPlatform =  new BasePlatform(this, new Vector2(550, 25), "redP", redPathPlatform);
-        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements);// <-MANCAVA ULTIMO PARAMETRO
-        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed);
-        //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
-        _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
-        _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
-        _eggs = new List<Egg>();
-        //Console.ReadLine("Inserisci il tuo nome");
+        
         string playerName = "Davide";
         JoinStruct joinStruct = new JoinStruct(playerName);
         networkManager.SendJoin(joinStruct);
         // 2. Attendi la risposta (il gioco si fermerà qui finché non arriva il secondo player)
-        JoinAckStruct ack = _networkManager.WaitForJoinAck();
+        JoinAckStruct ack = networkManager.WaitForJoinAck();
+        Console.WriteLine("--- Connessione Stabilita ---");
+        Console.WriteLine($"Messaggio Tipo: {ack.Type}");
+        Console.WriteLine($"ID Giocatore assegnato: {ack.PlayerId}");
+        Console.WriteLine($"Posizione di Spawn: X={ack.SpawnX}, Y={ack.SpawnY}");
+        Console.WriteLine($"Posizione di Spawn: X={ack.OpponentSpawnX}, Y={ack.OpponentSpawnY}");
+        Console.WriteLine("-----------------------------");
+ 
+        _bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
+        _redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
+        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements, networkManager);// <-MANCAVA ULTIMO PARAMETRO
+        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, networkManager);
+        //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
+        _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
+        _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
+        _eggs = new List<Egg>();
+     
         
         Components.Add(collisionManager);
-        //Components.Add(_myPenguin);
+        Components.Add(_myPenguin);
         Components.Add(_obstacle);
         //Components.Add(_obstacle1);
         Components.Add(_bluePlatform);
         Components.Add(_redPlatform);
-        Components.Add(_myPenguin);
+        //Components.Add(_myPenguin);
         Components.Add(_redPenguin);
         random = new Random();
         
