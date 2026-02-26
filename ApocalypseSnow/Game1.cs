@@ -44,8 +44,8 @@ public class Game1: Game
         CollisionManager collisionManager = new CollisionManager(this);
         
         //CONNESSIONE ------------------------------------------------------
-        //NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
-        //networkManager.Connect();
+        NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
+        networkManager.Connect();
         string bluePathPlatform = "Content/images/green_logo.png";
         string redPathPlatform = "Content/images/red_logo.png";
  
@@ -60,7 +60,9 @@ public class Game1: Game
         //Console.ReadLine("Inserisci il tuo nome");
         string playerName = "Davide";
         JoinStruct joinStruct = new JoinStruct(playerName);
-        //networkManager.SendJoin(joinStruct);--------------------------------------------------------------------------
+        networkManager.SendJoin(joinStruct);
+        // 2. Attendi la risposta (il gioco si fermerà qui finché non arriva il secondo player)
+        JoinAckStruct ack = _networkManager.WaitForJoinAck();
         
         Components.Add(collisionManager);
         //Components.Add(_myPenguin);

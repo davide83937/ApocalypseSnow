@@ -95,6 +95,36 @@ public class NetworkManager : IDisposable
             _stream.Flush();
         }
     }
+    
+    public JoinAckStruct WaitForJoinAck()
+    {
+        if (_stream == null || !_tcpClient.Connected) 
+            throw new Exception("Non connesso al server");
+
+        byte[] buffer = new byte[13];
+        int totalRead = 0;
+    
+        // Leggiamo fino a riempire il buffer da 13 byte
+        while (totalRead < 13)
+        {
+            int read = _stream.Read(buffer, totalRead, 13 - totalRead);
+            if (read <= 0) throw new Exception("Server disconnesso durante l'attesa del JoinAck");
+            totalRead += read;
+        }
+
+        // Verifichiamo che il tipo sia corretto (JoinAck = 5)
+        if (buffer[0] != (byte)MessageType.JoinAck)
+            throw new Exception($"Ricevuto tipo messaggio inatteso: {buffer[0]}");
+
+        // Estraiamo i dati dal buffer binario (Little Endian come in Go)
+        return new JoinAckStruct
+        {
+            Type = (MessageType)buffer[0],
+            PlayerId = BitConverter.ToUInt32(buffer, 1),
+            SpawnX = BitConverter.ToSingle(buffer, 5),
+            SpawnY = BitConverter.ToSingle(buffer, 9)
+        };
+    }
 
     public void Dispose()
     {
