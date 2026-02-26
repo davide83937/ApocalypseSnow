@@ -21,8 +21,9 @@ public class MovementsManagerRed:IMovements
         Vector2 mousePosition = new Vector2(_mouseState.X, _mouseState.Y);
         return mousePosition;
     }
-    
-    public void UpdateInput(ref StateStruct inputList, bool isFreezing, bool isWithEgg)
+
+    public Vector2 UpdateInput(ref StateStruct inputList, bool isFreezing, bool isWithEgg,
+        NetworkManager _networkManager, float _deltaTime)
     {
         inputList.Update();
         _newState = Keyboard.GetState();
@@ -31,18 +32,37 @@ public class MovementsManagerRed:IMovements
         if (_newState.IsKeyDown(Keys.Down)) inputList.Current |= StateList.Down;
         if (_newState.IsKeyDown(Keys.Left)) inputList.Current |= StateList.Left;
         if (_newState.IsKeyDown(Keys.Right)) inputList.Current |= StateList.Right;
-        if(isWithEgg) inputList.Current |= StateList.WithEgg;
-        if (_newState.IsKeyDown(Keys.F)&& !isFreezing && !isWithEgg) inputList.Current |= StateList.Reload;
-        if (_newState.IsKeyDown(Keys.T)&& !isFreezing) inputList.Current |= StateList.TakingEgg;
-       
+        if (isWithEgg) inputList.Current |= StateList.WithEgg;
+        if (_newState.IsKeyDown(Keys.F) && !isFreezing && !isWithEgg) inputList.Current |= StateList.Reload;
+        if (_newState.IsKeyDown(Keys.T) && !isFreezing) inputList.Current |= StateList.TakingEgg;
+
         if (_newState.IsKeyDown(Keys.M) && !isFreezing && isWithEgg) inputList.Current |= StateList.PuttingEgg;
-        
-        if (_mouseState.RightButton == ButtonState.Pressed&& !isFreezing&& !isWithEgg) inputList.Current |= StateList.Shoot;
+
+        if (_mouseState.RightButton == ButtonState.Pressed && !isFreezing && !isWithEgg)
+            inputList.Current |= StateList.Shoot;
         // Calcolo automatico di IsMoving
-        movementKeyPressed = 
-            _newState.IsKeyDown(Keys.Up) || _newState.IsKeyDown(Keys.Down) || 
+        movementKeyPressed =
+            _newState.IsKeyDown(Keys.Up) || _newState.IsKeyDown(Keys.Down) ||
             _newState.IsKeyDown(Keys.Left) || _newState.IsKeyDown(Keys.Right);
         if (movementKeyPressed && !isFreezing) inputList.Current |= StateList.Moving;
         if (isFreezing) inputList.Current |= StateList.Freezing;
-    }
+        Vector2 vector2 = Vector2.Zero;
+        _networkManager.Receive(
+            (ackSeq, x, y) =>
+            {
+                // Qui il server ti dà la tua posizione "vera"
+                // Per ora sovrascriviamo, poi potrai fare interpolazione
+                //vector2 = new Vector2(x, y);
+            },
+            (rx, ry, rMask) =>
+            {
+                // Aggiorna il pinguino rosso
+                vector2 = new Vector2(rx, ry);
+                // Opzionale: aggiorna anche l'animazione dell'avversario
+                // _redPenguin._penguinInputHandler._stateStruct.Current = (StateList)rMask;
+            })
+            ;
+        return vector2;
+    
+}
 }
