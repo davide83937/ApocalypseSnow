@@ -14,9 +14,8 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     public PenguinShotHandler _penguinShotHandler;
     public PenguinInputHandler _penguinInputHandler;
     private Vector2 _speed;
-    private float _pressedTime;
     private float _deltaTime;
-    private float _reloadTime;
+    //private float _reloadTime;
     //private StateStruct _stateStruct;
     private ShotStruct _shotStruct;
     private int _textureFractionWidth;
@@ -147,7 +146,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
             _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg);
         _penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
         _penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
-        _penguinInputHandler.MoveReload(ref _reloadTime);
+        _penguinInputHandler.MoveReload(ref _penguinShotHandler._reloadTime);
         normalizeVelocity(ref _speed.X, ref _speed.Y);
         _penguinColliderHandler.putEgg(_penguinInputHandler._stateStruct);
         resetTakingTimer();
@@ -164,13 +163,13 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
             _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg)
         );
         
-        _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _deltaTime, ref _reloadTime);
-        _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, ref _pressedTime, _deltaTime);
+        _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _deltaTime);
+        _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _deltaTime);
         Vector2 mousePosition = _movementsManager.GetMousePosition();
         _shotStruct.mouseX = (int)mousePosition.X;
         _shotStruct.mouseY = (int)mousePosition.Y;
         _penguinShotHandler.Shot(_penguinInputHandler._stateStruct, mousePosition,  
-            _position, ref _pressedTime, _penguinInputHandler._animationManager._ballTag);
+            _position, _penguinInputHandler._animationManager._ballTag);
         
         //_networkManager.SendState(_movementsManager.State);------------------------------------------------------------------------------------
 

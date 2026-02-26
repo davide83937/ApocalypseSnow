@@ -10,6 +10,8 @@ public class PenguinShotHandler
     private int _ammo;
     public int Ammo{ get => _ammo; set => _ammo = value; }
     private static readonly int FrameReload;
+    public float pressedTime;
+    public float _reloadTime;
 
     public PenguinShotHandler(Game gameContext, string tag)
     {
@@ -32,19 +34,19 @@ public class PenguinShotHandler
         float startVelocityY, float gameTime);
     
     
-    public void Reload(StateStruct stateStruct, float deltaTime, ref float reloadTime)
+    public void Reload(StateStruct stateStruct, float deltaTime)
     {
         if (!stateStruct.IsPressed(StateList.Reload)) return;
-        reloadTime += deltaTime;
+        _reloadTime += deltaTime;
         
-        if (reloadTime > FrameReload) 
+        if (_reloadTime > FrameReload) 
         {
             _ammo++;
-            reloadTime = 0f;
+            _reloadTime = 0f;
         }
     }
     
-    public void ChargeShot(StateStruct stateStruct, ref float pressedTime, float deltaTime)
+    public void ChargeShot(StateStruct stateStruct, float deltaTime)
     {
         if (!stateStruct.IsPressed(StateList.Shoot) || _ammo <= 0) return;
         
@@ -77,7 +79,7 @@ public class PenguinShotHandler
     }
     
     public void Shot(StateStruct stateStruct, Vector2 mousePosition,  
-        Vector2 position, ref float pressedTime, string tagBall)
+        Vector2 position, string tagBall)
     {
         // 1. Verifichiamo se il tasto di sparo è stato rilasciato in questo frame (JustReleased)
         // 2. Verifichiamo se ci sono munizioni
