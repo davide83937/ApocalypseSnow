@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	MsgState       = 1 // 13B [type][mask:int32][seq:uint32][dt:float32]
+	MsgState       = 1 // 21B [type][mask:int32][seq:uint32][dt:float32][x:float32][y:float32]
 	MsgShot        = 2 // 13B [type][a:int32][b:int32][charge:int32]  (EVENT: release)
 	MsgJoin        = 3 // 9B  [type][0][0]
 	MsgAuthState   = 4 // 13B [type][ack:uint32][x:float32][y:float32]                 (SELF)
@@ -65,6 +65,8 @@ type StateMsg struct {
 	mask int32
 	seq  uint32
 	dt   float32 // Aggiungi questo campo
+	x    float32 // Posizione calcolata dal client
+	y    float32 // Posizione calcolata dal client
 }
 
 type ShotMsg struct {
@@ -248,7 +250,7 @@ func readerLoop(c *Client) {
 			}
 
 		case MsgState:
-			pl, err := readExactly(c.conn, 12)
+			pl, err := readExactly(c.conn, 20)
 			if err != nil {
 				return
 			}
@@ -256,8 +258,10 @@ func readerLoop(c *Client) {
 			mask = sanitizeMask(mask)
 			seq := binary.LittleEndian.Uint32(pl[4:8])
 			dt := math.Float32frombits(binary.LittleEndian.Uint32(pl[8:12]))
+			clientX := math.Float32frombits(binary.LittleEndian.Uint32(pl[12:16]))
+			clientY := math.Float32frombits(binary.LittleEndian.Uint32(pl[16:20]))
 
-			msg := StateMsg{mask: mask, seq: seq, dt: dt}
+			msg := StateMsg{mask: mask, seq: seq, dt: dt, x: clientX, y: clientY}
 
 			select {
 			case c.input <- msg:
@@ -302,6 +306,16 @@ func readerLoop(c *Client) {
 			return
 		}
 	}
+}
+
+// Verifica se la differenza tra la posizione del server (sx, sy)
+// e quella del client (cx, cy) è trascurabile.
+func isCloseEnough(sx, sy, cx, cy float32) bool {
+	const epsilon = 0.1 // Margine di errore tollerato in pixel
+	dx := sx - cx
+	dy := sy - cy
+	// Utilizza il quadrato della distanza per evitare il calcolo della radice quadrata
+	return (dx*dx + dy*dy) < (epsilon * epsilon)
 }
 
 // ============== MATCHMAKER ==============
@@ -356,6 +370,7 @@ func (s *Session) run() {
 	sendJoinAck(s.b, s.b.id, s.bx, s.by, s.ax, s.ay) // Invia a player B la sua pos e quella di A
 	// Variabili per conservare l'ultimo dt ricevuto
 	var aDt, bDt float32 = MoveDt, MoveDt
+	var aClientX, aClientY, bClientX, bClientY float32
 	for {
 		select {
 		case <-s.a.done:
@@ -365,23 +380,46 @@ func (s *Session) run() {
 
 		case <-s.tick.C:
 			// Aggiorna maschere, sequenze e deltaTime
-			s.aMask, s.aAck, aDt = drainState(s.a, s.aMask, s.aAck, aDt)
-			s.bMask, s.bAck, bDt = drainState(s.b, s.bMask, s.bAck, bDt)
+			s.aMask, s.aAck, aDt, aClientX, aClientY = drainStateWithPos(s.a, s.aMask, s.aAck, aDt)
+			s.bMask, s.bAck, bDt, bClientX, bClientY = drainStateWithPos(s.b, s.bMask, s.bAck, bDt)
 
 			// Calcola il movimento usando i dt specifici inviati dai client
 			s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask, aDt)
 			s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask, bDt)
 
-			// SELF auth + OTHER state
-			sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
-			sendRemoteState(s.a, s.bx, s.by, s.bMask)
-
-			sendAuthStateSelf(s.b, s.bAck, s.bx, s.by)
+			// RECONCILIATION: Verifica Player A
+			if !isCloseEnough(s.ax, s.ay, aClientX, aClientY) {
+				// Se la differenza è troppa, inviamo la correzione al client
+				sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
+			}
+			// Inviamo sempre la posizione autoritativa all'avversario
 			sendRemoteState(s.b, s.ax, s.ay, s.aMask)
+
+			// RECONCILIATION: Verifica Player B
+			if !isCloseEnough(s.bx, s.by, bClientX, bClientY) {
+				sendAuthStateSelf(s.b, s.bAck, s.bx, s.by)
+			}
+			sendRemoteState(s.a, s.bx, s.by, s.bMask)
 
 			// forward shot events (release) subito
 			forwardShots(s.a, s.b)
 			forwardShots(s.b, s.a)
+		}
+	}
+}
+
+func drainStateWithPos(c *Client, curMask int32, curAck uint32, curDt float32) (int32, uint32, float32, float32, float32) {
+	lastX, lastY := float32(0), float32(0)
+	for {
+		select {
+		case m := <-c.input:
+			curMask = m.mask
+			curAck = m.seq
+			curDt = m.dt
+			lastX = m.x
+			lastY = m.y
+		default:
+			return curMask, curAck, curDt, lastX, lastY
 		}
 	}
 }

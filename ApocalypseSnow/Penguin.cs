@@ -143,13 +143,13 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         
        
-        _position=_movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct, 
-            _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _networkManager, _deltaTime);
+        _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct, 
+            _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _deltaTime);
     
-        //_penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
-        //_penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
+        _penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
+        _penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
             // 2. Ricevi gli aggiornamenti dal server
-            
+        _networkManager.SendState(_penguinInputHandler._stateStruct, _deltaTime, _position);
         
         //_penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
         //_penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);

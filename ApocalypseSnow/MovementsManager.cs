@@ -18,7 +18,7 @@ public class MovementsManager:IMovements
     }
     
 
-    public Vector2 UpdateInput(ref StateStruct stateStruct, bool isFreezing, bool isWithEgg, NetworkManager _networkManager, 
+    public void UpdateInput(ref StateStruct stateStruct, bool isFreezing, bool isWithEgg, 
         float _deltaTime)
     {
         
@@ -43,25 +43,11 @@ public class MovementsManager:IMovements
             _newState.IsKeyDown(Keys.A) || _newState.IsKeyDown(Keys.D);
         if (movementKeyPressed && !isFreezing) stateStruct.Current |= StateList.Moving;
         if (isFreezing) stateStruct.Current |= StateList.Freezing;
-        Vector2 vector2 = Vector2.Zero;
-        _networkManager.SendState(stateStruct, _deltaTime);
-        _networkManager.Receive(
-            (ackSeq, x, y) =>
-            {
-                // Qui il server ti dà la tua posizione "vera"
-                // Per ora sovrascriviamo, poi potrai fare interpolazione
-                vector2 = new Vector2(x, y);
-            },
-            (rx, ry, rMask) =>
-            {
-                // Aggiorna il pinguino rosso
-                //vector2 = new Vector2(rx, ry);
-                // Opzionale: aggiorna anche l'animazione dell'avversario
-                // _redPenguin._penguinInputHandler._stateStruct.Current = (StateList)rMask;
-            }
-        );
+        //Vector2 vector2 = Vector2.Zero;
+        //_networkManager.SendState(stateStruct, _deltaTime);
+        //_networkManager.Receive();
         // 2. Ricevi gli aggiornamenti dal server
-        return vector2;
+       // return vector2;
     }
     
 }

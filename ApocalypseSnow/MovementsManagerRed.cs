@@ -11,10 +11,23 @@ public class MovementsManagerRed:IMovements
     //private StateStruct _stateStruct;
     private bool isFreezing = false;
     private bool isWithEgg = false;
+    private StateList _remoteState = StateList.None;
     //private float timeTakingEgg = 0;
    // private float timePuttingEgg = 0;
     //private float timeFreezing = 0;
     
+    public MovementsManagerRed(NetworkManager networkManager)
+    {
+        if (networkManager != null)
+        {
+            // Ci iscriviamo all'evento per ricevere i dati remoti
+            networkManager.OnRemoteReceived += HandleRemoteState;
+        }
+    }
+    private void HandleRemoteState(float x, float y, int mask)
+    {
+        _remoteState = (StateList)mask;
+    }
     
     public Vector2 GetMousePosition()
     {
@@ -22,7 +35,20 @@ public class MovementsManagerRed:IMovements
         return mousePosition;
     }
 
-    public Vector2 UpdateInput(ref StateStruct inputList, bool isFreezing, bool isWithEgg,
+    public void UpdateInput(ref StateStruct inputList, bool isFreezing, bool isWithEgg, float deltaTime)
+    {
+        // 1. Spostiamo lo stato attuale in quello vecchio
+        inputList.Update();
+
+        // 2. Applichiamo la maschera di bit che il server ci ha inviato dietro le quinte
+        inputList.Current = _remoteState;
+
+        // 3. Forziamo gli stati di gioco locali
+        if (isWithEgg) inputList.Current |= StateList.WithEgg;
+        if (isFreezing) inputList.Current |= StateList.Freezing;
+    }
+    
+    /*public Vector2 UpdateInput(ref StateStruct inputList, bool isFreezing, bool isWithEgg,
         NetworkManager _networkManager, float _deltaTime)
     {
         inputList.Update();
@@ -64,5 +90,5 @@ public class MovementsManagerRed:IMovements
             ;
         return vector2;
     
-}
+}*/
 }

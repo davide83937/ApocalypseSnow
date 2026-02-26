@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.IO;
+using Microsoft.Xna.Framework;
 using Encoding = System.Text.Encoding;
 
 namespace ApocalypseSnow;
@@ -13,6 +14,8 @@ public class NetworkManager : IDisposable
     private readonly string _ip;
     private readonly int _port;
     private uint _stateSequence = 0;
+    public event Action<uint, float, float> OnAuthReceived;
+    public event Action<float, float, int> OnRemoteReceived;
 
     public NetworkManager(string ip, int port)
     {
@@ -58,28 +61,74 @@ public class NetworkManager : IDisposable
     }*/
     
 
-    public void SendState(StateStruct state, float deltaTime)
+    public void SendState(StateStruct state, float deltaTime, Vector2 position)
     {
+        // Se non siamo connessi, non inviamo nulla
         if (_stream == null || !_tcpClient.Connected) return;
 
-        // Pacchetto: 1 (Tipo) + 4 (Mask) + 4 (Seq) + 4 (DeltaTime) = 13 byte
-        byte[] packet = new byte[13];
+        // La dimensione del pacchetto passa da 13 a 21 byte per includere X e Y
+        // Pacchetto: 1 (Tipo) + 4 (Mask) + 4 (Seq) + 4 (DeltaTime) + 4 (X) + 4 (Y) = 21 byte
+        byte[] packet = new byte[21];
+    
+        // 1. Inseriamo il tipo di messaggio (1 byte)
         packet[0] = (byte)MessageType.State; 
     
+        // Incrementiamo il numero di sequenza per l'ordine dei pacchetti
         _stateSequence++;
 
-        // Copiamo i dati partendo dall'indice 1 (dopo il tipo)
+        // 2. Inseriamo i dati nel buffer (Little Endian, come si aspetta Go)
         Buffer.BlockCopy(BitConverter.GetBytes((int)state.Current), 0, packet, 1, 4);
         Buffer.BlockCopy(BitConverter.GetBytes(_stateSequence), 0, packet, 5, 4);
         Buffer.BlockCopy(BitConverter.GetBytes(deltaTime), 0, packet, 9, 4);
+    
+        // 3. Aggiungiamo le coordinate appena calcolate localmente
+        Buffer.BlockCopy(BitConverter.GetBytes(position.X), 0, packet, 13, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(position.Y), 0, packet, 17, 4);
 
-        try {
+        try 
+        {
+            // 4. Inviamo il pacchetto al server
             _stream.Write(packet, 0, packet.Length);
-            // Evitiamo Flush() eccessivi per performance, ma qui va bene
-        } catch (IOException) { Connect(); }
+            // Evitiamo Flush() qui se viene chiamato ad ogni frame per non bloccare il thread, 
+            // Write() sul NetworkStream invia già rapidamente in background
+        } 
+        catch (IOException) 
+        { 
+            // In caso di errore di rete, tentiamo la riconnessione
+            Connect(); 
+        }
     }
     
-    public void Receive(Action<uint, float, float> onAuth, Action<float, float, int> onRemote)
+    public void Receive()
+    {
+        while (_tcpClient.Connected && _stream.DataAvailable)
+        {
+            int type = _stream.ReadByte();
+            if (type == -1) break;
+
+            byte[] payload = new byte[12];
+            _stream.Read(payload, 0, 12);
+
+            if (type == 4) // MsgAuthState
+            {
+                uint ackSeq = BitConverter.ToUInt32(payload, 0);
+                float x = BitConverter.ToSingle(payload, 4);
+                float y = BitConverter.ToSingle(payload, 8);
+                // Lancia l'evento a chiunque sia in ascolto
+                OnAuthReceived?.Invoke(ackSeq, x, y);
+            }
+            else if (type == 6) // MsgRemoteState
+            {
+                float x = BitConverter.ToSingle(payload, 0);
+                float y = BitConverter.ToSingle(payload, 4);
+                int mask = BitConverter.ToInt32(payload, 8);
+                // Lancia l'evento a chiunque sia in ascolto
+                OnRemoteReceived?.Invoke(x, y, mask);
+            }
+        }
+    }
+    
+    /*public void Receive(Action<uint, float, float> onAuth, Action<float, float, int> onRemote)
     {
         // Verifichiamo se ci sono dati pronti nello stream
         while (_tcpClient.Connected && _stream.DataAvailable)
@@ -105,7 +154,7 @@ public class NetworkManager : IDisposable
                 onRemote?.Invoke(x, y, mask);
             }
         }
-    }
+    }*/
 
     public void SendShot(ShotStruct shot)
     {
