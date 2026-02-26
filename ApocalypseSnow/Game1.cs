@@ -40,9 +40,9 @@ public class Game1: Game
     {
         // 1. Crea il pinguino qui
         //CONNESSIONE ------------------------------------------------------
-        networkManager = new NetworkManager("127.0.0.1", 8080);
-        IMovements movements = new MovementsManager(networkManager, this);
-        IMovements movementsRed = new MovementsManagerRed(networkManager);
+        networkManager = new NetworkManager(this, "127.0.0.1", 8080);
+        IMovements movements = new MovementsManager(this);
+        IMovements movementsRed = new MovementsManagerRed();
         CollisionManager collisionManager = new CollisionManager(this);
         
         

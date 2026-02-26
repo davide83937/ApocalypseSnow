@@ -48,7 +48,7 @@ const (
 
 	ListenAddr = ":8080"
 
-	chargeCap int32 = 500
+	chargeCap int32 = 200000
 )
 
 type Client struct {

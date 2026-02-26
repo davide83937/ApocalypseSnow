@@ -101,7 +101,14 @@ public class PenguinShotHandler
         //string tagBall =_animationManager._ballTag+ _countBall;
         Ball b = new Ball(_gameContext, _tag, position, startSpeed, finalPosition, tagBall);
         _gameContext.Components.Add(b);
-        //_networkManager.SendShot(_shotStruct);-------------------------------------------------------------------------
+        ShotStruct shotStruct = new ShotStruct();
+        shotStruct.mouseX = (int)mousePosition.X;
+        shotStruct.mouseY = (int)mousePosition.Y;
+        shotStruct.charge = (int)pressedTime; // Inviamo il tempo di pressione
+
+        // NOTA: Assicurati di avere un riferimento a _networkManager in questa classe, 
+        // passandolo magari dal costruttore o tramite una Singleton/GameManager
+        NetworkManager.Instance.SendShot(shotStruct);
 
         pressedTime = 0;
         _ammo--;

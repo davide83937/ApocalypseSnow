@@ -9,14 +9,13 @@ public class MovementsManager:IMovements
     private KeyboardState _newState = Keyboard.GetState();
     private MouseState _mouseState = Mouse.GetState();
     private bool movementKeyPressed = false;
-    NetworkManager networkManager;
     private Game _game;
     ShotStruct _shotStruct;
 
     
-    public MovementsManager(NetworkManager networkManager, Game game)
+    public MovementsManager(Game game)
     {
-        this.networkManager = networkManager;
+        //this.networkManager = networkManager;
         _game = game;
     }
 
@@ -54,7 +53,7 @@ public class MovementsManager:IMovements
                 Vector2 mousePosition = GetMousePosition();
                 _shotStruct.mouseX= (int)mousePosition.X;
                 _shotStruct.mouseY= (int)mousePosition.Y;
-                networkManager.SendShot(_shotStruct);
+                //NetworkManager.Instance.SendShot(_shotStruct);
             }
         }
 
@@ -66,7 +65,7 @@ public class MovementsManager:IMovements
         //Vector2 vector2 = Vector2.Zero;
         //_networkManager.SendState(stateStruct, _deltaTime);
         //_networkManager.Receive();
-        networkManager.SendState(stateStruct, _deltaTime, _position);
+        NetworkManager.Instance.SendState(stateStruct, _deltaTime, _position);
         // 2. Ricevi gli aggiornamenti dal server
        // return vector2;
     }

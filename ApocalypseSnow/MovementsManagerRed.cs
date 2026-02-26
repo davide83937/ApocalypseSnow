@@ -16,12 +16,12 @@ public class MovementsManagerRed:IMovements
    // private float timePuttingEgg = 0;
     //private float timeFreezing = 0;
     
-    public MovementsManagerRed(NetworkManager networkManager)
+    public MovementsManagerRed()
     {
-        if (networkManager != null)
+        if (NetworkManager.Instance != null)
         {
             // Ci iscriviamo all'evento per ricevere i dati remoti
-            networkManager.OnRemoteReceived += HandleRemoteState;
+            NetworkManager.Instance.OnRemoteReceived += HandleRemoteState;
         }
     }
     private void HandleRemoteState(float x, float y, int mask)

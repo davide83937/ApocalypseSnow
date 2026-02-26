@@ -7,7 +7,7 @@ using Encoding = System.Text.Encoding;
 
 namespace ApocalypseSnow;
 
-public class NetworkManager : IDisposable
+public class NetworkManager : GameComponent, IDisposable
 {
     private TcpClient _tcpClient;
     private NetworkStream _stream;
@@ -17,13 +17,30 @@ public class NetworkManager : IDisposable
     public event Action<uint, float, float> OnAuthReceived;
     public event Action<float, float, int> OnRemoteReceived;
     public event Action<int, int, int> OnRemoteShotReceived; // mouseX, mouseY, charge
+    private static NetworkManager _instance;
 
-    public NetworkManager(string ip, int port)
+    
+    public static NetworkManager Instance
     {
+        get
+        {
+            if (_instance == null)
+                throw new Exception("NetworkManager deve essere inizializzato in Game1 prima dell'uso!");
+            return _instance;
+        }
+    }
+
+    // Il costruttore deve accettare 'Game' e passarlo al padre tramite base(game)
+    public NetworkManager(Game game, string ip, int port) : base(game)
+    {
+        if (_instance != null)
+            throw new Exception("Puoi creare solo una istanza di NetworkManager!");
+        _instance = this;
         _ip = ip;
         _port = port;
         Connect();
     }
+
 
     public void Connect()
     {
@@ -39,6 +56,25 @@ public class NetworkManager : IDisposable
         }
     }
     
+    public void SendJoin(JoinStruct join)
+    {
+        if (_stream == null || !_tcpClient.Connected) return;
+
+        using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
+        using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(ms, System.Text.Encoding.UTF8))
+        {
+            // 1. Scriviamo il tipo (1 byte)
+            writer.Write((byte)join.Type);
+
+            // 2. Scriviamo la stringa
+            // BinaryWriter aggiunge automaticamente un prefisso con la lunghezza
+            writer.Write(join.playerName);
+
+            byte[] packet = ms.ToArray();
+            _stream.Write(packet, 0, packet.Length);
+            _stream.Flush();
+        }
+    }
 
     /*public void SendState(StateStruct state)
     {
@@ -169,10 +205,16 @@ public class NetworkManager : IDisposable
     {
         if (_stream == null || !_tcpClient.Connected) return;
 
-        byte[] packet = new byte[9];
+        // Pacchetto: 1 byte (Type) + 4 byte (mouseX) + 4 byte (mouseY) + 4 byte (charge) = 13 byte
+        byte[] packet = new byte[13];
+    
+        // 1. Inseriamo il tipo all'inizio
         packet[0] = (byte)shot.Type;
-        Buffer.BlockCopy(BitConverter.GetBytes((int)shot.mouseX), 0, packet, 0, 4);
-        Buffer.BlockCopy(BitConverter.GetBytes((int)shot.mouseY), 0, packet, 4, 4);
+    
+        // 2. Inseriamo i dati sfalsando correttamente l'offset di destinazione (1, 5, 9)
+        Buffer.BlockCopy(BitConverter.GetBytes(shot.mouseX), 0, packet, 1, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(shot.mouseY), 0, packet, 5, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(shot.charge), 0, packet, 9, 4);
 
         try
         {
@@ -182,26 +224,6 @@ public class NetworkManager : IDisposable
         catch (IOException)
         {
             Connect();
-        }
-    }
-    
-    public void SendJoin(JoinStruct join)
-    {
-        if (_stream == null || !_tcpClient.Connected) return;
-
-        using (MemoryStream ms = new MemoryStream())
-        using (BinaryWriter writer = new BinaryWriter(ms, Encoding.UTF8))
-        {
-            // 1. Scriviamo il tipo (1 byte)
-            writer.Write((byte)join.Type);
-
-            // 2. Scriviamo la stringa
-            // BinaryWriter aggiunge automaticamente un prefisso con la lunghezza
-            writer.Write(join.playerName);
-
-            byte[] packet = ms.ToArray();
-            _stream.Write(packet, 0, packet.Length);
-            _stream.Flush();
         }
     }
     
@@ -237,9 +259,13 @@ public class NetworkManager : IDisposable
         };
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        _stream?.Close();
-        _tcpClient?.Close();
+        if (disposing)
+        {
+            _stream?.Close();
+            _tcpClient?.Close();
+        }
+        base.Dispose(disposing);
     }
 }
