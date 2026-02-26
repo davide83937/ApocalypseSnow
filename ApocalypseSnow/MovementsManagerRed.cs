@@ -35,7 +35,7 @@ public class MovementsManagerRed:IMovements
         return mousePosition;
     }
 
-    public void UpdateInput(ref StateStruct inputList, bool isFreezing, bool isWithEgg, float deltaTime)
+    public void UpdateInput(ref StateStruct inputList, bool isFreezing, bool isWithEgg, float deltaTime, Vector2 position)
     {
         // 1. Spostiamo lo stato attuale in quello vecchio
         inputList.Update();

@@ -25,6 +25,7 @@ public class Game1: Game
     private Texture2D _backgroundTexture;
     private List<Egg>  _eggs;
     private Random random;
+    private NetworkManager networkManager;
     
     public Game1()
     {
@@ -38,14 +39,13 @@ public class Game1: Game
     protected override void Initialize()
     {
         // 1. Crea il pinguino qui
-        
-        IMovements movements = new MovementsManager();
-        IMovements movementsRed = new MovementsManagerRed();
+        //CONNESSIONE ------------------------------------------------------
+        networkManager = new NetworkManager("127.0.0.1", 8080);
+        IMovements movements = new MovementsManager(networkManager, this);
+        IMovements movementsRed = new MovementsManagerRed(networkManager);
         CollisionManager collisionManager = new CollisionManager(this);
         
-        //CONNESSIONE ------------------------------------------------------
-        NetworkManager networkManager = new NetworkManager("127.0.0.1", 8080);
-        //networkManager.Connect();
+        
         string bluePathPlatform = "Content/images/green_logo.png";
         string redPathPlatform = "Content/images/red_logo.png";
         
@@ -63,8 +63,8 @@ public class Game1: Game
  
         _bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
         _redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
-        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements, networkManager);// <-MANCAVA ULTIMO PARAMETRO
-        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, networkManager);
+        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements);// <-MANCAVA ULTIMO PARAMETRO
+        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed);
         //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
         _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
@@ -100,6 +100,29 @@ public class Game1: Game
         _redPenguin._penguinColliderHandler.eggPutEvent += addEgg;
         _myPenguin._penguinColliderHandler.eggDeleteEvent += removeEggCompletaly;
         _redPenguin._penguinColliderHandler.eggDeleteEvent += removeEggCompletaly           ;
+        networkManager.OnAuthReceived += (ackSeq, x, y) => 
+        {
+            // Il server corregge il NOSTRO pinguino
+            _myPenguin._position.X = x;
+            _myPenguin._position.Y = y;
+        };
+
+        networkManager.OnRemoteReceived += (x, y, mask) => 
+        {
+            // Il server ci aggiorna sulla posizione del NEMICO
+            _redPenguin._position.X = x;
+            _redPenguin._position.Y = y;
+        };
+        
+        networkManager.OnRemoteShotReceived += (mx, my, charge) => 
+        {
+            // Quando l'avversario spara, il pinguino rosso deve eseguire l'azione
+            // verso le coordinate ricevute
+            Vector2 target = new Vector2(mx, my);
+            _redPenguin.HandleRemoteShot(target);
+        };
+        
+        
         base.Initialize();
     }
     
@@ -294,6 +317,8 @@ public class Game1: Game
     {
         _width = GraphicsDevice.Viewport.Width;
         _height = GraphicsDevice.Viewport.Height;
+        
+        networkManager?.Receive();
         if (_eggs.Count == 0)
         {
             if (_myPenguinScore > _redPenguinScore)

@@ -1,4 +1,6 @@
-﻿namespace ApocalypseSnow;
+﻿using Microsoft.Xna.Framework.Input;
+
+namespace ApocalypseSnow;
 
 using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
@@ -22,25 +24,12 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     private int _textureFractionHeight;
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
-    private NetworkManager  _networkManager;
+
 
     public string _myEgg;
     
     
-    public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed,
-        IMovements movements, NetworkManager networkManager) : base(game, tag, startPosition)
-    {
-        _gameContext = game;
-        _speed = startSpeed;
-        //_animationManager = animation;
-        _movementsManager = movements;
-        //_stateStruct = new StateStruct();
-        _shotStruct = new ShotStruct();
-        _penguinColliderHandler = new PenguinColliderHandler(_tag);
-        _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
-        _penguinInputHandler = new PenguinInputHandler(_tag);
-        _networkManager = networkManager;
-    }
+  
     
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed, 
         IMovements movements) : base(game, tag, startPosition)
@@ -111,6 +100,16 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         );
     }
     
+    public void HandleRemoteShot(Vector2 target)
+    {
+        // Chiamiamo lo shot handler usando la posizione passata dal server invece del mouse locale
+        _penguinShotHandler.Shot(
+            _penguinInputHandler._stateStruct, 
+            target, 
+            _position, 
+            _penguinInputHandler._animationManager._ballTag
+        );
+    }
    
     
     protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
@@ -143,15 +142,23 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         
        
-        _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct, 
-            _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _deltaTime);
+  
     
+       KeyboardState _newState = Keyboard.GetState();
+        if (_newState.IsKeyDown(Keys.P)){
+            _penguinInputHandler.getMotion(ref _position.X, 100, _deltaTime);
+        }
         _penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
         _penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
-            // 2. Ricevi gli aggiornamenti dal server
-        _networkManager.SendState(_penguinInputHandler._stateStruct, _deltaTime, _position);
-        
-        //_penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
+        _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct, 
+            _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _deltaTime, _position);
+         
+           /* if (_tag == "penguin")
+            {
+                _networkManager.SendState(_penguinInputHandler._stateStruct, _deltaTime, _position);
+            }*/
+
+            //_penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
         //_penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
         _penguinInputHandler.MoveReload(ref _penguinShotHandler._reloadTime);
         normalizeVelocity(ref _speed.X, ref _speed.Y);
@@ -177,6 +184,8 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         _shotStruct.mouseY = (int)mousePosition.Y;
         _penguinShotHandler.Shot(_penguinInputHandler._stateStruct, mousePosition,  
             _position, _penguinInputHandler._animationManager._ballTag);
+       
+        
         
         //_networkManager.SendState(_movementsManager.State);------------------------------------------------------------------------------------
 

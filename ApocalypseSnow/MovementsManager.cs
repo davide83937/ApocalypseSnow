@@ -9,7 +9,16 @@ public class MovementsManager:IMovements
     private KeyboardState _newState = Keyboard.GetState();
     private MouseState _mouseState = Mouse.GetState();
     private bool movementKeyPressed = false;
+    NetworkManager networkManager;
+    private Game _game;
+    ShotStruct _shotStruct;
 
+    
+    public MovementsManager(NetworkManager networkManager, Game game)
+    {
+        this.networkManager = networkManager;
+        _game = game;
+    }
 
     public Vector2 GetMousePosition()
     {
@@ -19,7 +28,7 @@ public class MovementsManager:IMovements
     
 
     public void UpdateInput(ref StateStruct stateStruct, bool isFreezing, bool isWithEgg, 
-        float _deltaTime)
+        float _deltaTime, Vector2 _position)
     {
         
         stateStruct.Update();
@@ -35,9 +44,20 @@ public class MovementsManager:IMovements
         if (_newState.IsKeyDown(Keys.E) && !isFreezing) stateStruct.Current |= StateList.TakingEgg;
         if(isWithEgg) stateStruct.Current |= StateList.WithEgg;
         if (_newState.IsKeyDown(Keys.Space) && !isFreezing && isWithEgg) stateStruct.Current |= StateList.PuttingEgg;
-       
-        if (_mouseState.LeftButton == ButtonState.Pressed && !isFreezing && !isWithEgg) stateStruct.Current |= StateList.Shoot;
-      
+
+        if (_game.IsActive)
+        {
+            if (_mouseState.LeftButton == ButtonState.Pressed && !isFreezing && !isWithEgg)
+                stateStruct.Current |= StateList.Shoot;
+            if (stateStruct.JustReleased(StateList.Shoot))
+            {
+                Vector2 mousePosition = GetMousePosition();
+                _shotStruct.mouseX= (int)mousePosition.X;
+                _shotStruct.mouseY= (int)mousePosition.Y;
+                networkManager.SendShot(_shotStruct);
+            }
+        }
+
         movementKeyPressed =
             _newState.IsKeyDown(Keys.W) || _newState.IsKeyDown(Keys.S) ||
             _newState.IsKeyDown(Keys.A) || _newState.IsKeyDown(Keys.D);
@@ -46,6 +66,7 @@ public class MovementsManager:IMovements
         //Vector2 vector2 = Vector2.Zero;
         //_networkManager.SendState(stateStruct, _deltaTime);
         //_networkManager.Receive();
+        networkManager.SendState(stateStruct, _deltaTime, _position);
         // 2. Ricevi gli aggiornamenti dal server
        // return vector2;
     }

@@ -87,6 +87,9 @@ type Session struct {
 	aAck uint32
 	bAck uint32
 
+	aClientX, aClientY float32 // Aggiungi queste
+	bClientX, bClientY float32 // Aggiungi queste
+
 	tick *time.Ticker
 }
 
@@ -107,7 +110,7 @@ func sanitizeMask(m int32) int32 {
 }
 
 func stepFromStateDLL(x, y float32, mask int32, dt float32) (float32, float32) {
-	if (mask & Reload) != 0 {
+	if (mask&Reload) != 0 || (mask&Freezing) != 0 {
 		return x, y
 	}
 
@@ -370,7 +373,7 @@ func (s *Session) run() {
 	sendJoinAck(s.b, s.b.id, s.bx, s.by, s.ax, s.ay) // Invia a player B la sua pos e quella di A
 	// Variabili per conservare l'ultimo dt ricevuto
 	var aDt, bDt float32 = MoveDt, MoveDt
-	var aClientX, aClientY, bClientX, bClientY float32
+	//var aClientX, aClientY, bClientX, bClientY float32
 	for {
 		select {
 		case <-s.a.done:
@@ -380,15 +383,15 @@ func (s *Session) run() {
 
 		case <-s.tick.C:
 			// Aggiorna maschere, sequenze e deltaTime
-			s.aMask, s.aAck, aDt, aClientX, aClientY = drainStateWithPos(s.a, s.aMask, s.aAck, aDt)
-			s.bMask, s.bAck, bDt, bClientX, bClientY = drainStateWithPos(s.b, s.bMask, s.bAck, bDt)
+			s.aMask, s.aAck, aDt, s.aClientX, s.aClientY = drainStateWithPos(s.a, s.aMask, s.aAck, aDt, s.aClientX, s.aClientY)
+			s.bMask, s.bAck, bDt, s.bClientX, s.bClientY = drainStateWithPos(s.b, s.bMask, s.bAck, bDt, s.bClientX, s.bClientY)
 
 			// Calcola il movimento usando i dt specifici inviati dai client
 			s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask, aDt)
 			s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask, bDt)
 
 			// RECONCILIATION: Verifica Player A
-			if !isCloseEnough(s.ax, s.ay, aClientX, aClientY) {
+			if !isCloseEnough(s.ax, s.ay, s.aClientX, s.aClientY) {
 				// Se la differenza è troppa, inviamo la correzione al client
 				sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
 			}
@@ -396,7 +399,7 @@ func (s *Session) run() {
 			sendRemoteState(s.b, s.ax, s.ay, s.aMask)
 
 			// RECONCILIATION: Verifica Player B
-			if !isCloseEnough(s.bx, s.by, bClientX, bClientY) {
+			if !isCloseEnough(s.bx, s.by, s.bClientX, s.bClientY) {
 				sendAuthStateSelf(s.b, s.bAck, s.bx, s.by)
 			}
 			sendRemoteState(s.a, s.bx, s.by, s.bMask)
@@ -408,18 +411,17 @@ func (s *Session) run() {
 	}
 }
 
-func drainStateWithPos(c *Client, curMask int32, curAck uint32, curDt float32) (int32, uint32, float32, float32, float32) {
-	lastX, lastY := float32(0), float32(0)
+func drainStateWithPos(c *Client, curMask int32, curAck uint32, curDt float32, curX, curY float32) (int32, uint32, float32, float32, float32) {
 	for {
 		select {
 		case m := <-c.input:
 			curMask = m.mask
 			curAck = m.seq
 			curDt = m.dt
-			lastX = m.x
-			lastY = m.y
+			curX = m.x
+			curY = m.y
 		default:
-			return curMask, curAck, curDt, lastX, lastY
+			return curMask, curAck, curDt, curX, curY
 		}
 	}
 }

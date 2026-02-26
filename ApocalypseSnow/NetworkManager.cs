@@ -16,6 +16,7 @@ public class NetworkManager : IDisposable
     private uint _stateSequence = 0;
     public event Action<uint, float, float> OnAuthReceived;
     public event Action<float, float, int> OnRemoteReceived;
+    public event Action<int, int, int> OnRemoteShotReceived; // mouseX, mouseY, charge
 
     public NetworkManager(string ip, int port)
     {
@@ -124,6 +125,14 @@ public class NetworkManager : IDisposable
                 int mask = BitConverter.ToInt32(payload, 8);
                 // Lancia l'evento a chiunque sia in ascolto
                 OnRemoteReceived?.Invoke(x, y, mask);
+            }
+            else if (type == 7) // MsgRemoteShot (Ricevuto dal server per l'avversario)
+            {
+                int mx = BitConverter.ToInt32(payload, 0);
+                int my = BitConverter.ToInt32(payload, 4);
+                int charge = BitConverter.ToInt32(payload, 8);
+                // Lancia l'evento
+                OnRemoteShotReceived?.Invoke(mx, my, charge);
             }
         }
     }

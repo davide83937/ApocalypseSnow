@@ -22,7 +22,12 @@ public class PenguinInputHandler
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern void uniform_rectilinear_motion(ref float position, float velocity, float deltaTime);
-    
+
+
+    public void getMotion(ref float position, float velocity,float deltaTime)
+    {
+        uniform_rectilinear_motion(ref position, velocity, deltaTime);
+    }
     
     public bool isTakingEggJustReleased()
     {
