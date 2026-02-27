@@ -7,6 +7,7 @@ public abstract class CollisionExtensions : DrawableGameComponent
 {
     public string _tag;
     public Vector2 _position;
+    
 
     protected CollisionExtensions(Game game, string tag, Vector2 position) : base(game)
     {

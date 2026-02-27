@@ -160,6 +160,8 @@ func sendJoinAck(c *Client, playerId uint32, spawnX, spawnY, oppX, oppY float32)
 func sendAuthStateSelf(c *Client, ackSeq uint32, x, y float32) {
 	buf := make([]byte, 13)
 	buf[0] = MsgAuthState
+	x = float32(math.Round(float64(x)))
+	y = float32(math.Round(float64(y)))
 	binary.LittleEndian.PutUint32(buf[1:5], ackSeq)
 	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(x))
 	binary.LittleEndian.PutUint32(buf[9:13], math.Float32bits(y))
@@ -169,6 +171,9 @@ func sendAuthStateSelf(c *Client, ackSeq uint32, x, y float32) {
 func sendRemoteState(c *Client, x, y float32, mask int32) {
 	buf := make([]byte, 13)
 	buf[0] = MsgRemoteState
+	// Arrotondiamo anche qui per la posizione dell'avversario
+	x = float32(math.Round(float64(x)))
+	y = float32(math.Round(float64(y)))
 	binary.LittleEndian.PutUint32(buf[1:5], math.Float32bits(x))
 	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(y))
 	binary.LittleEndian.PutUint32(buf[9:13], uint32(mask))
@@ -314,7 +319,7 @@ func readerLoop(c *Client) {
 // Verifica se la differenza tra la posizione del server (sx, sy)
 // e quella del client (cx, cy) è trascurabile.
 func isCloseEnough(sx, sy, cx, cy float32) bool {
-	const epsilon = 0.1 // Margine di errore tollerato in pixel
+	const epsilon = 5 // Margine di errore tollerato in pixel
 	dx := sx - cx
 	dy := sy - cy
 	// Utilizza il quadrato della distanza per evitare il calcolo della radice quadrata
@@ -372,7 +377,7 @@ func (s *Session) run() {
 	sendJoinAck(s.a, s.a.id, s.ax, s.ay, s.bx, s.by) // Invia a player A la sua pos e quella di B
 	sendJoinAck(s.b, s.b.id, s.bx, s.by, s.ax, s.ay) // Invia a player B la sua pos e quella di A
 	// Variabili per conservare l'ultimo dt ricevuto
-	var aDt, bDt float32 = MoveDt, MoveDt
+	//var aDt, bDt float32 = MoveDt, MoveDt
 	//var aClientX, aClientY, bClientX, bClientY float32
 	for {
 		select {
@@ -381,32 +386,79 @@ func (s *Session) run() {
 		case <-s.b.done:
 			return
 
+			// In Server/main.go (metodo run della Session)
 		case <-s.tick.C:
-			// Aggiorna maschere, sequenze e deltaTime
-			s.aMask, s.aAck, aDt, s.aClientX, s.aClientY = drainStateWithPos(s.a, s.aMask, s.aAck, aDt, s.aClientX, s.aClientY)
-			s.bMask, s.bAck, bDt, s.bClientX, s.bClientY = drainStateWithPos(s.b, s.bMask, s.bAck, bDt, s.bClientX, s.bClientY)
+			// --- Processa Player A ---
+			for {
+				select {
+				case m := <-s.a.input:
+					// Aggiorna i dati dello stato corrente
+					s.aMask = m.mask
+					s.aAck = m.seq
+					s.aClientX = m.x
+					s.aClientY = m.y
 
-			// Calcola il movimento usando i dt specifici inviati dai client
-			s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask, aDt)
-			s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask, bDt)
+					// Applica il movimento usando il deltaTime specifico di QUESTO pacchetto
+					s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask, m.dt)
+				default:
+					// Esci dal ciclo quando il canale è vuoto
+					goto doneA
+				}
+			}
+		doneA:
 
-			// RECONCILIATION: Verifica Player A
+			// --- Processa Player B ---
+			for {
+				select {
+				case m := <-s.b.input:
+					s.bMask = m.mask
+					s.bAck = m.seq
+					s.bClientX = m.x
+					s.bClientY = m.y
+
+					s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask, m.dt)
+				default:
+					goto doneB
+				}
+			}
+		doneB:
+
+			// Dopo aver processato tutti i pacchetti, esegui la riconciliazione e l'invio
 			if !isCloseEnough(s.ax, s.ay, s.aClientX, s.aClientY) {
-				// Se la differenza è troppa, inviamo la correzione al client
 				sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
 			}
-			// Inviamo sempre la posizione autoritativa all'avversario
 			sendRemoteState(s.b, s.ax, s.ay, s.aMask)
 
-			// RECONCILIATION: Verifica Player B
 			if !isCloseEnough(s.bx, s.by, s.bClientX, s.bClientY) {
 				sendAuthStateSelf(s.b, s.bAck, s.bx, s.by)
 			}
 			sendRemoteState(s.a, s.bx, s.by, s.bMask)
+			//case <-s.tick.C:
+			// Aggiorna maschere, sequenze e deltaTime
+			/*s.aMask, s.aAck, aDt, s.aClientX, s.aClientY = drainStateWithPos(s.a, s.aMask, s.aAck, aDt, s.aClientX, s.aClientY)
+			s.bMask, s.bAck, bDt, s.bClientX, s.bClientY = drainStateWithPos(s.b, s.bMask, s.bAck, bDt, s.bClientX, s.bClientY)
+			*/
+			// Calcola il movimento usando i dt specifici inviati dai client
+			/*s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask, aDt)
+			s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask, bDt)
+			*/
+			// RECONCILIATION: Verifica Player A
+			/*if !isCloseEnough(s.ax, s.ay, s.aClientX, s.aClientY) {
+				// Se la differenza è troppa, inviamo la correzione al client
+				sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
+			}*/
+			// Inviamo sempre la posizione autoritativa all'avversario
+			//sendRemoteState(s.b, s.ax, s.ay, s.aMask)
+
+			// RECONCILIATION: Verifica Player B
+			/*if !isCloseEnough(s.bx, s.by, s.bClientX, s.bClientY) {
+				sendAuthStateSelf(s.b, s.bAck, s.bx, s.by)
+			}
+			sendRemoteState(s.a, s.bx, s.by, s.bMask)*/
 
 			// forward shot events (release) subito
-			forwardShots(s.a, s.b)
-			forwardShots(s.b, s.a)
+			//forwardShots(s.a, s.b)
+			//forwardShots(s.b, s.a)
 		}
 	}
 }
