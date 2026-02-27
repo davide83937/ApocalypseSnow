@@ -319,7 +319,7 @@ func readerLoop(c *Client) {
 // Verifica se la differenza tra la posizione del server (sx, sy)
 // e quella del client (cx, cy) è trascurabile.
 func isCloseEnough(sx, sy, cx, cy float32) bool {
-	const epsilon = 15 // Margine di errore tollerato in pixel
+	const epsilon = 5 // Margine di errore tollerato in pixel
 	//fmt.Printf("sx: %f\n", sx)
 	//fmt.Printf("sy: %f\n", sy)
 	//fmt.Printf("cx: %f\n", cx)

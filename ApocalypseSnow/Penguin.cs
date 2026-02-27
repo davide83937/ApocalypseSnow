@@ -151,6 +151,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         if (_newState.IsKeyDown(Keys.P)){
             _penguinInputHandler.getMotion(ref _position.X, 200, _deltaTime);
         }
+        normalizeVelocity(ref _speed.X, ref _speed.Y);
         _penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
         _penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
         

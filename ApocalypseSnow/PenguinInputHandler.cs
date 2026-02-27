@@ -7,13 +7,14 @@ namespace ApocalypseSnow;
 public class PenguinInputHandler
 {
     public StateStruct _stateStruct;
-    private const int speed = 200;
+    private Vector2 _speed = new Vector2(200, 200);
     //private float timeTakingEgg = 0;
     //private float timePuttingEgg = 0;
     private float timeFreezing = 0;
     public AnimationManager _animationManager;
     
-    
+    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
     public PenguinInputHandler(string tag)
     {
         _stateStruct = new StateStruct();
@@ -53,9 +54,10 @@ public class PenguinInputHandler
     {
         if (_stateStruct.IsPressed(StateList.Up) && !_stateStruct.IsPressed(StateList.Reload) && !_stateStruct.IsPressed(StateList.Freezing))
         {
-            //_speed.Y = 100;
+            _speed.Y = 200;
+ 
             //Console.WriteLine("UPDATE INPUT");
-            uniform_rectilinear_motion(ref positionY, -speed, deltaTime);
+            uniform_rectilinear_motion(ref positionY, -_speed.Y, deltaTime);
             _animationManager.MoveRect(3 * _animationManager.SourceRect.Height);
         }
     }
@@ -66,9 +68,10 @@ public class PenguinInputHandler
     {
         if (_stateStruct.IsPressed(StateList.Down) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
-            //_speed.Y = 100;
+            _speed.Y = 200;
+   
             //Console.WriteLine("UPDATE INPUT");
-            uniform_rectilinear_motion(ref positionY, speed, deltaTime);
+            uniform_rectilinear_motion(ref positionY, _speed.Y, deltaTime);
             _animationManager.MoveRect(0 * _animationManager.SourceRect.Height);
         }
     }
@@ -78,9 +81,10 @@ public class PenguinInputHandler
     {
         if (_stateStruct.IsPressed(StateList.Right) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
-            //_speed.X = 100;
+            _speed.X = 200;
+          
             //Console.WriteLine("UPDATE INPUT");
-            uniform_rectilinear_motion(ref positionX, speed, deltaTime);
+            uniform_rectilinear_motion(ref positionX, _speed.X, deltaTime);
             _animationManager.MoveRect(2 * _animationManager.SourceRect.Height);
         }
     }
@@ -90,9 +94,10 @@ public class PenguinInputHandler
     {
         if (_stateStruct.IsPressed(StateList.Left) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
-            //_speed.X = 100;
+            _speed.X = 200;
+
             //Console.WriteLine("UPDATE INPUT");
-            uniform_rectilinear_motion(ref positionX, -speed, deltaTime);
+            uniform_rectilinear_motion(ref positionX, -_speed.X, deltaTime);
             _animationManager.MoveRect(1 * _animationManager.SourceRect.Height);
         }
     }
@@ -107,13 +112,14 @@ public class PenguinInputHandler
 
     public void UpdatePositionX(float deltaTime, ref float positionX)
     {
+        normalizeVelocity(ref _speed.X, ref _speed.Y);
         MoveLeft(deltaTime, ref positionX);
         MoveRight(deltaTime, ref positionX);
     }
 
     public void UpdatePositionY(float deltaTime, ref float positionY)
     {
-       
+        normalizeVelocity(ref _speed.X, ref _speed.Y);
         MoveBack(deltaTime, ref positionY);
         MoveOn(deltaTime, ref positionY);
     }
