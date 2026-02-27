@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.IO;
+using System.Threading;
 using Microsoft.Xna.Framework;
 using Encoding = System.Text.Encoding;
 
@@ -49,6 +50,7 @@ public class NetworkManager : GameComponent, IDisposable
             _tcpClient = new TcpClient();
             _tcpClient.Connect(_ip, _port);
             _stream = _tcpClient.GetStream();
+            Console.WriteLine("Connessione OK");
         }
         catch (Exception ex)
         {
@@ -229,6 +231,12 @@ public class NetworkManager : GameComponent, IDisposable
     
     public JoinAckStruct WaitForJoinAck()
     {
+        int tentativi = 0;
+        while (!_tcpClient.Connected && tentativi < 50) 
+        {
+            Thread.Sleep(100); // Aspetta 100ms
+            tentativi++;
+        }
         if (_stream == null || !_tcpClient.Connected) 
             throw new Exception("Non connesso al server");
 

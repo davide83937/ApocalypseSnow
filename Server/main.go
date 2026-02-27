@@ -44,7 +44,7 @@ const (
 const (
 	MoveHz    float32 = 30.0
 	MoveDt    float32 = 1.0 / MoveHz
-	MoveSpeed float32 = 200.0
+	MoveSpeed int32   = 200.0
 
 	ListenAddr = ":8080"
 

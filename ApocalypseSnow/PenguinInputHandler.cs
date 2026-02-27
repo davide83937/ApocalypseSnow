@@ -7,7 +7,7 @@ namespace ApocalypseSnow;
 public class PenguinInputHandler
 {
     public StateStruct _stateStruct;
-    private const int speed = 100;
+    private const int speed = 200;
     //private float timeTakingEgg = 0;
     //private float timePuttingEgg = 0;
     private float timeFreezing = 0;

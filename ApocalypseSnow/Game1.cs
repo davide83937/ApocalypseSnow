@@ -41,6 +41,8 @@ public class Game1: Game
         // 1. Crea il pinguino qui
         //CONNESSIONE ------------------------------------------------------
         networkManager = new NetworkManager(this, "127.0.0.1", 8080);
+        //networkManager = new NetworkManager(this, "2.tcp.eu.ngrok.io", 17061);
+        //networkManager = new NetworkManager(this, "18.192.93.86", 17061);
         IMovements movements = new MovementsManager(this);
         IMovements movementsRed = new MovementsManagerRed();
         CollisionManager collisionManager = new CollisionManager(this);
@@ -103,6 +105,10 @@ public class Game1: Game
         networkManager.OnAuthReceived += (ackSeq, x, y) => 
         {
             // Il server corregge il NOSTRO pinguino
+            Console.WriteLine("Mia X: "+_myPenguin._position.X);
+            Console.WriteLine("Mia Y: "+_myPenguin._position.Y);
+            Console.WriteLine("Server X: "+x);
+            Console.WriteLine("Server Y: "+y);
             _myPenguin._position.X = x;
             _myPenguin._position.Y = y;
         };

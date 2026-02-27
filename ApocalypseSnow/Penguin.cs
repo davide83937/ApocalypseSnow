@@ -143,10 +143,6 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     public override void Update(GameTime gameTime)
     {
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        
-       
-  
-    
        KeyboardState _newState = Keyboard.GetState();
         if (_newState.IsKeyDown(Keys.P)){
             _penguinInputHandler.getMotion(ref _position.X, 100, _deltaTime);
