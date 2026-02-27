@@ -41,8 +41,8 @@ public class Game1: Game
         // 1. Crea il pinguino qui
         //CONNESSIONE ------------------------------------------------------
         networkManager = new NetworkManager(this, "127.0.0.1", 8080);
-        //networkManager = new NetworkManager(this, "2.tcp.eu.ngrok.io", 17061);
-        //networkManager = new NetworkManager(this, "18.192.93.86", 17061);
+        //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
+        //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
         IMovements movements = new MovementsManager(this);
         IMovements movementsRed = new MovementsManagerRed();
         CollisionManager collisionManager = new CollisionManager(this);
