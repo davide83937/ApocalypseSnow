@@ -78,13 +78,17 @@ public class PenguinShotHandler
         return pointFinale;
     }
     
+   
+    
     public void Shot(StateStruct stateStruct, Vector2 mousePosition,  
         Vector2 position, string tagBall)
     {
         // 1. Verifichiamo se il tasto di sparo è stato rilasciato in questo frame (JustReleased)
         // 2. Verifichiamo se ci sono munizioni
-        if (!stateStruct.JustReleased(StateList.Shoot) || _ammo <= 0) return;
-        
+        if (!_tag.EndsWith("Red"))
+        {
+            if (!stateStruct.JustReleased(StateList.Shoot) || _ammo <= 0) return;
+        }
         //Vector2 mousePosition = _movementsManager.GetMousePosition();
     
         
@@ -101,14 +105,17 @@ public class PenguinShotHandler
         //string tagBall =_animationManager._ballTag+ _countBall;
         Ball b = new Ball(_gameContext, _tag, position, startSpeed, finalPosition, tagBall);
         _gameContext.Components.Add(b);
-        ShotStruct shotStruct = new ShotStruct();
-        shotStruct.mouseX = (int)mousePosition.X;
-        shotStruct.mouseY = (int)mousePosition.Y;
-        shotStruct.charge = (int)pressedTime; // Inviamo il tempo di pressione
+        if (!_tag.EndsWith("Red"))
+        {
+            ShotStruct shotStruct = new ShotStruct();
+            shotStruct.mouseX = (int)mousePosition.X;
+            shotStruct.mouseY = (int)mousePosition.Y;
+            shotStruct.charge = (int)pressedTime; // Inviamo il tempo di pressione
 
-        // NOTA: Assicurati di avere un riferimento a _networkManager in questa classe, 
-        // passandolo magari dal costruttore o tramite una Singleton/GameManager
-        NetworkManager.Instance.SendShot(shotStruct);
+            // NOTA: Assicurati di avere un riferimento a _networkManager in questa classe, 
+            // passandolo magari dal costruttore o tramite una Singleton/GameManager
+            NetworkManager.Instance.SendShot(shotStruct);
+        }
 
         pressedTime = 0;
         _ammo--;

@@ -122,6 +122,7 @@ public class Game1: Game
             _redPenguin.HandleRemoteShot(target);
         };
         
+   
         
         base.Initialize();
     }

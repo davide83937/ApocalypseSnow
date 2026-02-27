@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework.Input;
+﻿using System;
+using Microsoft.Xna.Framework.Input;
 
 namespace ApocalypseSnow;
 
@@ -103,6 +104,8 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     public void HandleRemoteShot(Vector2 target)
     {
         // Chiamiamo lo shot handler usando la posizione passata dal server invece del mouse locale
+        Console.WriteLine(target.X + ", " + target.Y);
+        Console.WriteLine("Posizione X: "+_position.X + ", " + "Posizione Y: "+_position.Y);
         _penguinShotHandler.Shot(
             _penguinInputHandler._stateStruct, 
             target, 
@@ -179,14 +182,17 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         
         _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _deltaTime);
         _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _deltaTime);
-        Vector2 mousePosition = _movementsManager.GetMousePosition();
-        _shotStruct.mouseX = (int)mousePosition.X;
-        _shotStruct.mouseY = (int)mousePosition.Y;
-        _penguinShotHandler.Shot(_penguinInputHandler._stateStruct, mousePosition,  
-            _position, _penguinInputHandler._animationManager._ballTag);
-       
-        
-        
+        if (!_tag.EndsWith("Red"))
+        {
+            Vector2 mousePosition = _movementsManager.GetMousePosition();
+            _shotStruct.mouseX = (int)mousePosition.X;
+            _shotStruct.mouseY = (int)mousePosition.Y;
+
+            _penguinShotHandler.Shot(_penguinInputHandler._stateStruct, mousePosition,
+                _position, _penguinInputHandler._animationManager._ballTag);
+
+        }
+
         //_networkManager.SendState(_movementsManager.State);------------------------------------------------------------------------------------
 
         int posCollX = (int)_position.X+ _halfTextureFractionWidth;
