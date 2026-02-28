@@ -42,13 +42,13 @@ const (
 )
 
 const (
-	MoveHz    float32 = 30.0
-	MoveDt    float32 = 1.0 / MoveHz
-	MoveSpeed int32   = 200.0
+	MoveHz     float32 = 30.0
+	MoveDt     float32 = 1.0 / MoveHz
+	MoveSpeed  float32 = 200.0
+	ListenAddr         = ":8080"
 
-	ListenAddr = ":8080"
-
-	chargeCap int32 = 200000
+	chargeCap         int32 = 200000
+	maxCatchupPerTick       = 8 // ? max step per tick per client (evita warp se backlog enorme)
 )
 
 type Client struct {
@@ -268,9 +268,9 @@ func readerLoop(c *Client) {
 			dt := math.Float32frombits(binary.LittleEndian.Uint32(pl[8:12]))
 			clientX := math.Float32frombits(binary.LittleEndian.Uint32(pl[12:16]))
 			clientY := math.Float32frombits(binary.LittleEndian.Uint32(pl[16:20]))
-			fmt.Printf("seq: %f\n", seq)
-			fmt.Printf("clientX: %f\n", clientX)
-			fmt.Printf("clientY: %f\n", clientY)
+			//fmt.Printf("seq: %f\n", seq)
+			//fmt.Printf("clientX: %f\n", clientX)
+			//fmt.Printf("clientY: %f\n", clientY)
 			msg := StateMsg{mask: mask, seq: seq, dt: dt, x: clientX, y: clientY}
 
 			select {
@@ -321,11 +321,11 @@ func readerLoop(c *Client) {
 // Verifica se la differenza tra la posizione del server (sx, sy)
 // e quella del client (cx, cy) è trascurabile.
 func isCloseEnough(sx, sy, cx, cy float32) bool {
-	const epsilon = 5 // Margine di errore tollerato in pixel
-	//fmt.Printf("sx: %f\n", sx)
-	//fmt.Printf("sy: %f\n", sy)
-	//fmt.Printf("cx: %f\n", cx)
-	//fmt.Printf("cy: %f\n", cy)
+	const epsilon = 8 // Margine di errore tollerato in pixel
+	fmt.Printf("sx: %f\n", sx)
+	fmt.Printf("sy: %f\n", sy)
+	fmt.Printf("cx: %f\n", cx)
+	fmt.Printf("cy: %f\n", cy)
 	dx := sx - cx
 	dy := sy - cy
 	// Utilizza il quadrato della distanza per evitare il calcolo della radice quadrata
@@ -373,6 +373,30 @@ func newSession(a, b *Client) *Session {
 	return s
 }
 
+func processClientTicks(c *Client, x, y float32, curMask int32, curAck uint32, lastCx, lastCy float32) (int, float32, float32, float32, float32, int32, uint32) {
+	steps := 0
+	cx, cy := lastCx, lastCy // Parti dall'ultimo valore noto
+
+	for {
+		select {
+		case m := <-c.input:
+			curMask = m.mask
+			curAck = m.seq
+			cx = m.x
+			cy = m.y
+			x, y = stepFromStateDLL(x, y, curMask, m.dt)
+			steps++
+			if steps >= maxCatchupPerTick {
+				return steps, x, y, cx, cy, curMask, curAck
+			}
+		default:
+			// Se non ci sono messaggi, restituisce x, y correnti
+			// e l'ultima posizione client nota (cx, cy)
+			return steps, x, y, cx, cy, curMask, curAck
+		}
+	}
+}
+
 func (s *Session) run() {
 	defer s.tick.Stop()
 	defer closeClient(s.a)
@@ -396,39 +420,41 @@ func (s *Session) run() {
 			// In Server/main.go (metodo run della Session)
 		case <-s.tick.C:
 			// --- Processa Player A ---
-			for {
-				select {
-				case m := <-s.a.input:
-					// Aggiorna i dati dello stato corrente
-					s.aMask = m.mask
-					s.aAck = m.seq
-					s.aClientX = m.x
-					s.aClientY = m.y
+			//for {
+			//select {
+			//case m := <-s.a.input:
+			// Aggiorna i dati dello stato corrente
+			_, s.ax, s.ay, s.aClientX, s.aClientY, s.aMask, s.aAck =
+				processClientTicks(s.a, s.ax, s.ay, s.aMask, s.aAck, s.aClientX, s.aClientY)
+			//s.aMask = m.mask
+			//s.aAck = m.seq
 
-					// Applica il movimento usando il deltaTime specifico di QUESTO pacchetto
-					s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask, m.dt)
-				default:
-					// Esci dal ciclo quando il canale è vuoto
-					goto doneA
-				}
-			}
-		doneA:
+			// Applica il movimento usando il deltaTime specifico di QUESTO pacchetto
+			//s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask)
+			_, s.bx, s.by, s.bClientX, s.bClientY, s.bMask, s.bAck =
+				processClientTicks(s.b, s.bx, s.by, s.bMask, s.bAck, s.bClientX, s.bClientY)
+			//default:
+			// Esci dal ciclo quando il canale è vuoto
+			//goto doneA
+			//}
+			//}
+			//doneA:
 
 			// --- Processa Player B ---
-			for {
-				select {
-				case m := <-s.b.input:
-					s.bMask = m.mask
-					s.bAck = m.seq
-					s.bClientX = m.x
-					s.bClientY = m.y
+			//for {
+			//select {
+			//case m := <-s.b.input:
+			/*s.bMask = m.mask
+			s.bAck = m.seq
+			s.bClientX = m.x
+			s.bClientY = m.y
 
-					s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask, m.dt)
-				default:
-					goto doneB
-				}
-			}
-		doneB:
+			s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask)*/
+			//default:
+			//goto doneB
+			//}
+			//}
+			//doneB:
 
 			// Dopo aver processato tutti i pacchetti, esegui la riconciliazione e l'invio
 			if !isCloseEnough(s.ax, s.ay, s.aClientX, s.aClientY) {
@@ -464,8 +490,8 @@ func (s *Session) run() {
 			sendRemoteState(s.a, s.bx, s.by, s.bMask)*/
 
 			// forward shot events (release) subito
-			//forwardShots(s.a, s.b)
-			//forwardShots(s.b, s.a)
+			forwardShots(s.a, s.b)
+			forwardShots(s.b, s.a)
 		}
 	}
 }

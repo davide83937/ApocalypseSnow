@@ -7,7 +7,7 @@ namespace ApocalypseSnow;
 public class PenguinInputHandler
 {
     public StateStruct _stateStruct;
-    private Vector2 _speed = new Vector2(200, 200);
+    //private Vector2 _speed = new Vector2(200, 200);
     //private float timeTakingEgg = 0;
     //private float timePuttingEgg = 0;
     private float timeFreezing = 0;
@@ -49,54 +49,70 @@ public class PenguinInputHandler
             {isFreezing = false; timeFreezing = 0;}
         }
     }
+    
+    public void UpdateMovement(float deltaTime, ref float positionX, ref float positionY)
+    {
+        float dx = 0;
+        float dy = 0;
 
-    private void MoveOn(float deltaTime, ref float positionY)
-    {
-        if (_stateStruct.IsPressed(StateList.Up) && !_stateStruct.IsPressed(StateList.Reload) && !_stateStruct.IsPressed(StateList.Freezing))
-        {
-            _speed.Y = 200;
-            //Console.WriteLine("UPDATE INPUT");
-            uniform_rectilinear_motion(ref positionY, -_speed.Y, deltaTime);
-            _animationManager.MoveRect(3 * _animationManager.SourceRect.Height);
-        }
-    }
-    
-  
+        // 1. Rilevazione direzioni (input grezzo: -1, 0, 1)
+        if (_stateStruct.IsPressed(StateList.Up))    dy -= 1;
+        if (_stateStruct.IsPressed(StateList.Down))  dy += 1;
+        if (_stateStruct.IsPressed(StateList.Left))  dx -= 1;
+        if (_stateStruct.IsPressed(StateList.Right)) dx += 1;
 
-    private void MoveBack(float deltaTime, ref float positionY)
-    {
-        if (_stateStruct.IsPressed(StateList.Down) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
+        // --- IL CONTROLLO FONDAMENTALE ---
+        // Verifichiamo se c'è almeno un input direzionale attivo.
+        // Se dx e dy sono entrambi 0, non dobbiamo normalizzare né muoverci.
+        if (dx == 0 && dy == 0) 
         {
-            _speed.Y = 200;
-            //Console.WriteLine("UPDATE INPUT");
-            uniform_rectilinear_motion(ref positionY, _speed.Y, deltaTime);
-            _animationManager.MoveRect(0 * _animationManager.SourceRect.Height);
+            return; 
         }
+
+        // 2. Controllo stati bloccanti (Ricarica o Congelamento)
+        if (_stateStruct.IsPressed(StateList.Reload) || _stateStruct.IsPressed(StateList.Freezing))
+        {
+            return;
+        }
+
+        // 3. Normalizzazione
+        // Se dx=1 e dy=1 (diagonale), dopo questa chiamata dx e dy diventeranno circa 0.707
+        normalizeVelocity(ref dx, ref dy);
+
+        // 4. Calcolo velocità finale e applicazione del moto
+        float speed = 200f;
+        float finalVx = dx * speed;
+        float finalVy = dy * speed;
+
+        uniform_rectilinear_motion(ref positionX, finalVx, deltaTime);
+        uniform_rectilinear_motion(ref positionY, finalVy, deltaTime);
+
+        // 5. Aggiorna l'animazione basandoti sulla direzione normalizzata
+        UpdateAnimationState(dx, dy);
     }
     
 
-    private void MoveRight(float deltaTime, ref float positionX)
+    
+    private void UpdateAnimationState(float vx, float vy)
     {
-        if (_stateStruct.IsPressed(StateList.Right) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
+        // Se il pinguino si muove principalmente in verticale
+        if (Math.Abs(vy) > Math.Abs(vx))
         {
-            _speed.X = 200;
-            //Console.WriteLine("UPDATE INPUT");
-            uniform_rectilinear_motion(ref positionX, _speed.X, deltaTime);
-            _animationManager.MoveRect(2 * _animationManager.SourceRect.Height);
+            if (vy < 0) // Sta andando su
+                _animationManager.MoveRect(3 * _animationManager.SourceRect.Height);
+            else // Sta andando giù
+                _animationManager.MoveRect(0 * _animationManager.SourceRect.Height);
+        }
+        // Se il pinguino si muove principalmente in orizzontale
+        else if (Math.Abs(vx) > 0)
+        {
+            if (vx > 0) // Sta andando a destra
+                _animationManager.MoveRect(2 * _animationManager.SourceRect.Height);
+            else // Sta andando a sinistra
+                _animationManager.MoveRect(1 * _animationManager.SourceRect.Height);
         }
     }
-    
-    
-    private void MoveLeft(float deltaTime, ref float positionX)
-    {
-        if (_stateStruct.IsPressed(StateList.Left) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
-        {
-            _speed.X = 200;
-            //Console.WriteLine("UPDATE INPUT");
-            uniform_rectilinear_motion(ref positionX, -_speed.X, deltaTime);
-            _animationManager.MoveRect(1 * _animationManager.SourceRect.Height);
-        }
-    }
+ 
     
     public void MoveReload(ref float reloadTime)
     {
@@ -106,21 +122,5 @@ public class PenguinInputHandler
         }
     }
 
-    public void UpdatePositionX(float deltaTime, ref float positionX)
-    {
-        _speed.X = 200;
-        normalizeVelocity(ref _speed.X, ref _speed.Y);
-        //Console.WriteLine($"X after Normalization: {positionX}");
-        MoveLeft(deltaTime, ref positionX);
-        MoveRight(deltaTime, ref positionX);
-    }
-
-    public void UpdatePositionY(float deltaTime, ref float positionY)
-    {
-        _speed.Y = 200;
-        normalizeVelocity(ref _speed.X, ref _speed.Y);
-        //Console.WriteLine($"Y after Normalization: {positionY}");
-        MoveBack(deltaTime, ref positionY);
-        MoveOn(deltaTime, ref positionY);
-    }
+    
 }

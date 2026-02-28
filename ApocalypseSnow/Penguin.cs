@@ -18,6 +18,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     public PenguinInputHandler _penguinInputHandler;
     //private Vector2 _speed;
     private float _deltaTime;
+    private float _physicsDeltaTime=1f/60f;
     //private float _reloadTime;
     //private StateStruct _stateStruct;
     private ShotStruct _shotStruct;
@@ -145,21 +146,13 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     {
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
        KeyboardState _newState = Keyboard.GetState();
-       //Console.WriteLine($"X before round: {_position.X}, Y before round: {_position.Y}");
-       //_position.X = (float)Math.Round(_position.X);
-       //_position.Y = (float)Math.Round(_position.Y);
-       //Console.WriteLine($"X after: {_position.X}, Y after: {_position.Y}");
+      
         if (_newState.IsKeyDown(Keys.P)){
-            _penguinInputHandler.getMotion(ref _position.X, 200, _deltaTime);
+            _penguinInputHandler.getMotion(ref _position.X, 200, _physicsDeltaTime);
         }
-        
-        _penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
-        _penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
-        
-        //_position.X = (float)Math.Round(_position.X);
-        //_position.Y = (float)Math.Round(_position.Y);
+        _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position.X, ref _position.Y);
         _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct, 
-            _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _deltaTime, _position);
+            _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _physicsDeltaTime, _position);
          
      
         _penguinInputHandler.MoveReload(ref _penguinShotHandler._reloadTime);
@@ -168,9 +161,8 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         resetTakingTimer();
         resetPuttingTimer();
 
-        //Console.WriteLine(_speed.X);
-        //Console.WriteLine(_speed.Y);
-        _penguinInputHandler.increaseTimeFreezing(_deltaTime, ref _penguinColliderHandler.isFrozen);
+       
+        _penguinInputHandler.increaseTimeFreezing(_physicsDeltaTime, ref _penguinColliderHandler.isFrozen);
         
         _penguinInputHandler._animationManager.Update(
             _deltaTime, 

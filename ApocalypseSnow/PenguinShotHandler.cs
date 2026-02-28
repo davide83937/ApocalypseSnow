@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Runtime.InteropServices;
 
 namespace ApocalypseSnow;
 
@@ -38,6 +39,7 @@ public class PenguinShotHandler
     {
         if (!stateStruct.IsPressed(StateList.Reload)) return;
         _reloadTime += deltaTime;
+        Console.WriteLine(_reloadTime);
         
         if (_reloadTime > FrameReload) 
         {
