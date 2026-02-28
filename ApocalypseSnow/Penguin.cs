@@ -16,7 +16,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     public PenguinColliderHandler _penguinColliderHandler;
     public PenguinShotHandler _penguinShotHandler;
     public PenguinInputHandler _penguinInputHandler;
-    private Vector2 _speed;
+    //private Vector2 _speed;
     private float _deltaTime;
     //private float _reloadTime;
     //private StateStruct _stateStruct;
@@ -35,7 +35,7 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
         IMovements movements) : base(game, tag, startPosition)
     {
         _gameContext = game;
-        _speed = startSpeed;
+        //_speed = startSpeed;
         //_animationManager = animation;
         _movementsManager = movements;
         //_stateStruct = new StateStruct();
@@ -145,31 +145,25 @@ public class Penguin: CollisionExtensions//, DrawableGameComponent
     {
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
        KeyboardState _newState = Keyboard.GetState();
-       
-       _position.X = (float)Math.Round(_position.X);
-       _position.Y = (float)Math.Round(_position.Y);
+       //Console.WriteLine($"X before round: {_position.X}, Y before round: {_position.Y}");
+       //_position.X = (float)Math.Round(_position.X);
+       //_position.Y = (float)Math.Round(_position.Y);
+       //Console.WriteLine($"X after: {_position.X}, Y after: {_position.Y}");
         if (_newState.IsKeyDown(Keys.P)){
             _penguinInputHandler.getMotion(ref _position.X, 200, _deltaTime);
         }
-        normalizeVelocity(ref _speed.X, ref _speed.Y);
+        
         _penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
         _penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
         
-        normalizeVelocity(ref _speed.X, ref _speed.Y);
         //_position.X = (float)Math.Round(_position.X);
         //_position.Y = (float)Math.Round(_position.Y);
         _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct, 
             _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _deltaTime, _position);
          
-           /* if (_tag == "penguin")
-            {
-                _networkManager.SendState(_penguinInputHandler._stateStruct, _deltaTime, _position);
-            }*/
-
-            //_penguinInputHandler.UpdatePositionX(_deltaTime, ref _position.X);
-        //_penguinInputHandler.UpdatePositionY(_deltaTime, ref _position.Y);
+     
         _penguinInputHandler.MoveReload(ref _penguinShotHandler._reloadTime);
-        //normalizeVelocity(ref _speed.X, ref _speed.Y);
+
         _penguinColliderHandler.putEgg(_penguinInputHandler._stateStruct);
         resetTakingTimer();
         resetPuttingTimer();

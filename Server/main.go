@@ -268,7 +268,9 @@ func readerLoop(c *Client) {
 			dt := math.Float32frombits(binary.LittleEndian.Uint32(pl[8:12]))
 			clientX := math.Float32frombits(binary.LittleEndian.Uint32(pl[12:16]))
 			clientY := math.Float32frombits(binary.LittleEndian.Uint32(pl[16:20]))
-
+			fmt.Printf("seq: %f\n", seq)
+			fmt.Printf("clientX: %f\n", clientX)
+			fmt.Printf("clientY: %f\n", clientY)
 			msg := StateMsg{mask: mask, seq: seq, dt: dt, x: clientX, y: clientY}
 
 			select {

@@ -114,7 +114,8 @@ public class NetworkManager : GameComponent, IDisposable
     
         // Incrementiamo il numero di sequenza per l'ordine dei pacchetti
         _stateSequence++;
-
+        Console.WriteLine(_stateSequence);
+        Console.WriteLine($"X after Normalization: {position.X}, Y after Normalization: {position.Y}");
         // 2. Inseriamo i dati nel buffer (Little Endian, come si aspetta Go)
         Buffer.BlockCopy(BitConverter.GetBytes((int)state.Current), 0, packet, 1, 4);
         Buffer.BlockCopy(BitConverter.GetBytes(_stateSequence), 0, packet, 5, 4);

@@ -55,7 +55,6 @@ public class PenguinInputHandler
         if (_stateStruct.IsPressed(StateList.Up) && !_stateStruct.IsPressed(StateList.Reload) && !_stateStruct.IsPressed(StateList.Freezing))
         {
             _speed.Y = 200;
- 
             //Console.WriteLine("UPDATE INPUT");
             uniform_rectilinear_motion(ref positionY, -_speed.Y, deltaTime);
             _animationManager.MoveRect(3 * _animationManager.SourceRect.Height);
@@ -69,7 +68,6 @@ public class PenguinInputHandler
         if (_stateStruct.IsPressed(StateList.Down) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
             _speed.Y = 200;
-   
             //Console.WriteLine("UPDATE INPUT");
             uniform_rectilinear_motion(ref positionY, _speed.Y, deltaTime);
             _animationManager.MoveRect(0 * _animationManager.SourceRect.Height);
@@ -82,7 +80,6 @@ public class PenguinInputHandler
         if (_stateStruct.IsPressed(StateList.Right) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
             _speed.X = 200;
-          
             //Console.WriteLine("UPDATE INPUT");
             uniform_rectilinear_motion(ref positionX, _speed.X, deltaTime);
             _animationManager.MoveRect(2 * _animationManager.SourceRect.Height);
@@ -95,7 +92,6 @@ public class PenguinInputHandler
         if (_stateStruct.IsPressed(StateList.Left) && !_stateStruct.IsPressed(StateList.Reload)&& !_stateStruct.IsPressed(StateList.Freezing))
         {
             _speed.X = 200;
-
             //Console.WriteLine("UPDATE INPUT");
             uniform_rectilinear_motion(ref positionX, -_speed.X, deltaTime);
             _animationManager.MoveRect(1 * _animationManager.SourceRect.Height);
@@ -112,14 +108,18 @@ public class PenguinInputHandler
 
     public void UpdatePositionX(float deltaTime, ref float positionX)
     {
+        _speed.X = 200;
         normalizeVelocity(ref _speed.X, ref _speed.Y);
+        //Console.WriteLine($"X after Normalization: {positionX}");
         MoveLeft(deltaTime, ref positionX);
         MoveRight(deltaTime, ref positionX);
     }
 
     public void UpdatePositionY(float deltaTime, ref float positionY)
     {
+        _speed.Y = 200;
         normalizeVelocity(ref _speed.X, ref _speed.Y);
+        //Console.WriteLine($"Y after Normalization: {positionY}");
         MoveBack(deltaTime, ref positionY);
         MoveOn(deltaTime, ref positionY);
     }
