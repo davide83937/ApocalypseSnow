@@ -18,6 +18,8 @@ public class NetworkManager : GameComponent, IDisposable
     public event Action<uint, float, float> OnAuthReceived;
     public event Action<float, float, int> OnRemoteReceived;
     public event Action<int, int, int> OnRemoteShotReceived; // mouseX, mouseY, charge
+    public event Action<int, float, float> OnEggReceived;
+
     private static NetworkManager _instance;
 
     
@@ -149,7 +151,15 @@ public class NetworkManager : GameComponent, IDisposable
             byte[] payload = new byte[12];
             _stream.Read(payload, 0, 12);
 
-            if (type == 4) // MsgAuthState
+         
+           if (type == 8) // MsgSpawnEgg
+            {
+                int id = BitConverter.ToInt32(payload, 0);
+                float x = BitConverter.ToSingle(payload, 4);
+                float y = BitConverter.ToSingle(payload, 8);
+                OnEggReceived?.Invoke(id, x, y);
+            }
+            else if (type == 4) // MsgAuthState
             {
                 uint ackSeq = BitConverter.ToUInt32(payload, 0);
                 float x = BitConverter.ToSingle(payload, 4);
@@ -173,6 +183,7 @@ public class NetworkManager : GameComponent, IDisposable
                 // Lancia l'evento
                 OnRemoteShotReceived?.Invoke(mx, my, charge);
             }
+            
         }
     }
     
@@ -204,6 +215,21 @@ public class NetworkManager : GameComponent, IDisposable
         }
     }*/
 
+    // Aggiungi questo metodo per inviare la richiesta
+    public void SendEggAction(int action, int eggId, uint playerId)
+    {
+        if (_stream == null || !_tcpClient.Connected) return;
+
+        byte[] packet = new byte[13];
+        packet[0] = 9; // MsgEggAction
+        Buffer.BlockCopy(BitConverter.GetBytes(action), 0, packet, 1, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(eggId), 0, packet, 5, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(playerId), 0, packet, 9, 4);
+
+        _stream.Write(packet, 0, packet.Length);
+        _stream.Flush();
+    }
+    
     public void SendShot(ShotStruct shot)
     {
         if (_stream == null || !_tcpClient.Connected) return;

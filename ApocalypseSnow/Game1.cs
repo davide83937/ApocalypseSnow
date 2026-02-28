@@ -63,8 +63,8 @@ public class Game1: Game
         Console.WriteLine($"Posizione di Spawn: X={ack.OpponentSpawnX}, Y={ack.OpponentSpawnY}");
         Console.WriteLine("-----------------------------");
  
-        _bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
-        _redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
+        _bluePlatform = new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "blueP", bluePathPlatform);
+        _redPlatform =  new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "redP", redPathPlatform);
         _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements);// <-MANCAVA ULTIMO PARAMETRO
         _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed);
         //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
@@ -73,26 +73,29 @@ public class Game1: Game
         _eggs = new List<Egg>();
      
         
-        Components.Add(collisionManager);
+        //Components.Add(collisionManager);
         Components.Add(_myPenguin);
-        Components.Add(_obstacle);
+        Components.Add(_redPenguin);
+        //Components.Add(_obstacle);
         //Components.Add(_obstacle1);
         Components.Add(_bluePlatform);
         Components.Add(_redPlatform);
+        Components.Add(_obstacle);
         //Components.Add(_myPenguin);
-        Components.Add(_redPenguin);
+        //Components.Add(_redPenguin);
+        Components.Add(collisionManager);
         random = new Random();
         
        
         
-        for(int i = 0; i < 5; i++)
+        /*for(int i = 0; i < 5; i++)
         {
             int x = random.Next(250, 500);
             int y = random.Next(0, 400);
             Egg egg = new Egg(this, new Vector2(x,y), "egg"+i);
             _eggs.Add(egg);
             Components.Add(egg);
-        }
+        }*/
         
         // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
         // l'Initialize e il LoadContent di tutti i componenti in lista.
@@ -102,13 +105,14 @@ public class Game1: Game
         _redPenguin._penguinColliderHandler.eggPutEvent += addEgg;
         _myPenguin._penguinColliderHandler.eggDeleteEvent += removeEggCompletaly;
         _redPenguin._penguinColliderHandler.eggDeleteEvent += removeEggCompletaly           ;
+        
         networkManager.OnAuthReceived += (ackSeq, x, y) => 
         {
             // Il server corregge il NOSTRO pinguino
-            Console.WriteLine("Mia X: "+_myPenguin._position.X);
-            Console.WriteLine("Mia Y: "+_myPenguin._position.Y);
-            Console.WriteLine("Server X: "+x);
-            Console.WriteLine("Server Y: "+y);
+            //Console.WriteLine("Mia X: "+_myPenguin._position.X);
+            //Console.WriteLine("Mia Y: "+_myPenguin._position.Y);
+            //Console.WriteLine("Server X: "+x);
+            //Console.WriteLine("Server Y: "+y);
             _myPenguin._position.X = x;
             _myPenguin._position.Y = y;
         };
@@ -118,6 +122,8 @@ public class Game1: Game
             // Il server ci aggiorna sulla posizione del NEMICO
             _redPenguin._position.X = x;
             _redPenguin._position.Y = y;
+            
+            //_redPenguin._penguinInputHandler._stateStruct.Current = (StateList)mask;
         };
         
         networkManager.OnRemoteShotReceived += (mx, my, charge) => 
@@ -128,7 +134,19 @@ public class Game1: Game
             _redPenguin.HandleRemoteShot(target);
         };
         
-   
+        networkManager.OnEggReceived += (id, x, y) => 
+        {
+            // Creiamo l'uovo con le coordinate fornite dal server
+            Egg egg = new Egg(this, new Vector2(x, y), "egg" + id);
+            _eggs.Add(egg);
+            Components.Add(egg);
+    
+            // Assicuriamoci che l'uovo sia registrato nel CollisionManager
+            // Nota: l'id deve essere univoco per il tag
+        };
+        
+    
+        
         
         base.Initialize();
     }

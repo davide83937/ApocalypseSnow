@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"net"
 	"sync/atomic"
 	"time"
@@ -25,6 +26,8 @@ const (
 	MsgJoinAck     = 5 // 13B [type][playerId:uint32][spawnX:float32][spawnY:float32]
 	MsgRemoteState = 6 // 13B [type][x:float32][y:float32][mask:int32]                (OTHER)
 	MsgRemoteShot  = 7 // 13B [type][a:int32][b:int32][charge:int32]                  (OTHER)
+	MsgSpawnEgg    = 8 // 13B [type][id:int32][x:float32][y:float32]
+
 )
 
 const (
@@ -56,9 +59,10 @@ type Client struct {
 	send  chan []byte
 	input chan StateMsg // latest-wins
 	shot  chan ShotMsg  // latest-wins (release event)
-	done  chan struct{}
-	id    uint32
-	slot  int
+
+	done chan struct{}
+	id   uint32
+	slot int
 }
 
 type StateMsg struct {
@@ -107,6 +111,16 @@ func sanitizeMask(m int32) int32 {
 		m &^= (Up | Down)
 	}
 	return m
+}
+
+// Funzione per inviare lo spawn dell'uovo
+func sendSpawnEgg(c *Client, id int, x, y float32) {
+	buf := make([]byte, 13)
+	buf[0] = MsgSpawnEgg
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(id))
+	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(x))
+	binary.LittleEndian.PutUint32(buf[9:13], math.Float32bits(y))
+	trySend(c, buf, true)
 }
 
 func stepFromStateDLL(x, y float32, mask int32, dt float32) (float32, float32) {
@@ -172,8 +186,8 @@ func sendRemoteState(c *Client, x, y float32, mask int32) {
 	buf := make([]byte, 13)
 	buf[0] = MsgRemoteState
 	// Arrotondiamo anche qui per la posizione dell'avversario
-	x = float32(math.Round(float64(x)))
-	y = float32(math.Round(float64(y)))
+	//x = float32(math.Round(float64(x)))
+	//y = float32(math.Round(float64(y)))
 	binary.LittleEndian.PutUint32(buf[1:5], math.Float32bits(x))
 	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(y))
 	binary.LittleEndian.PutUint32(buf[9:13], uint32(mask))
@@ -256,6 +270,8 @@ func readerLoop(c *Client) {
 			if _, err := readExactly(c.conn, 8); err != nil {
 				return
 			}
+			// Nel readerLoop del server, gestisci il nuovo tipo 9
+			// (Assicurati di aggiungere il caso nel selettore switch typ)
 
 		case MsgState:
 			pl, err := readExactly(c.conn, 20)
@@ -322,10 +338,10 @@ func readerLoop(c *Client) {
 // e quella del client (cx, cy) è trascurabile.
 func isCloseEnough(sx, sy, cx, cy float32) bool {
 	const epsilon = 8 // Margine di errore tollerato in pixel
-	fmt.Printf("sx: %f\n", sx)
-	fmt.Printf("sy: %f\n", sy)
-	fmt.Printf("cx: %f\n", cx)
-	fmt.Printf("cy: %f\n", cy)
+	//fmt.Printf("sx: %f\n", sx)
+	//fmt.Printf("sy: %f\n", sy)
+	//fmt.Printf("cx: %f\n", cx)
+	//fmt.Printf("cy: %f\n", cy)
 	dx := sx - cx
 	dy := sy - cy
 	// Utilizza il quadrato della distanza per evitare il calcolo della radice quadrata
@@ -407,6 +423,14 @@ func (s *Session) run() {
 
 	sendJoinAck(s.a, s.a.id, s.ax, s.ay, s.bx, s.by) // Invia a player A la sua pos e quella di B
 	sendJoinAck(s.b, s.b.id, s.bx, s.by, s.ax, s.ay) // Invia a player B la sua pos e quella di A
+
+	for i := 0; i < 5; i++ {
+		ex := float32(250 + rand.Intn(250)) // Range X: 250-500
+		ey := float32(rand.Intn(400))       // Range Y: 0-400
+		sendSpawnEgg(s.a, i, ex, ey)
+		sendSpawnEgg(s.b, i, ex, ey)
+	}
+
 	// Variabili per conservare l'ultimo dt ricevuto
 	//var aDt, bDt float32 = MoveDt, MoveDt
 	//var aClientX, aClientY, bClientX, bClientY float32
@@ -561,16 +585,15 @@ func main() {
 		c := &Client{
 			conn:  conn,
 			send:  make(chan []byte, 256),
-			input: make(chan StateMsg, 8),
+			input: make(chan StateMsg, 64),
 			shot:  make(chan ShotMsg, 8),
-			done:  make(chan struct{}),
+
+			done: make(chan struct{}),
 		}
 
 		fmt.Println("[ACCEPT]", conn.RemoteAddr())
-
 		go writerLoop(c)
 		go readerLoop(c)
-
 		join <- c
 	}
 }
