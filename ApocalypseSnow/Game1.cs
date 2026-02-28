@@ -63,8 +63,8 @@ public class Game1: Game
         Console.WriteLine($"Posizione di Spawn: X={ack.OpponentSpawnX}, Y={ack.OpponentSpawnY}");
         Console.WriteLine("-----------------------------");
  
-        _bluePlatform = new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "blueP", bluePathPlatform);
-        _redPlatform =  new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "redP", redPathPlatform);
+        _bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
+        _redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
         _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements);// <-MANCAVA ULTIMO PARAMETRO
         _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed);
         //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;

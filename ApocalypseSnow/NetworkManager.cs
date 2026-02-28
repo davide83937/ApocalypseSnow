@@ -60,7 +60,7 @@ public class NetworkManager : GameComponent, IDisposable
         }
     }
     
-    public void SendJoin(JoinStruct join)
+    /*public void SendJoin(JoinStruct join)
     {
         if (_stream == null || !_tcpClient.Connected) return;
 
@@ -78,8 +78,25 @@ public class NetworkManager : GameComponent, IDisposable
             _stream.Write(packet, 0, packet.Length);
             _stream.Flush();
         }
-    }
+    }*/
 
+    public void SendJoin(JoinStruct join)
+    {
+        if (_stream == null || !_tcpClient.Connected) return;
+
+        // Creiamo un pacchetto fisso di 9 byte (1 tipo + 8 dati)
+        byte[] packet = new byte[9];
+        packet[0] = (byte)join.Type;
+
+        // Copiamo il nome nel buffer a partire dall'indice 1 (max 8 caratteri)
+        byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(join.playerName);
+        int length = Math.Min(nameBytes.Length, 8);
+        Buffer.BlockCopy(nameBytes, 0, packet, 1, length);
+
+        _stream.Write(packet, 0, packet.Length);
+        _stream.Flush();
+    }
+    
     /*public void SendState(StateStruct state)
     {
         if (_stream == null || !_tcpClient.Connected) return;
@@ -141,15 +158,28 @@ public class NetworkManager : GameComponent, IDisposable
         }
     }
     
-    public void Receive()
+    // Aggiungi questo metodo in NetworkManager.cs
+    private byte[] ReadExactly(int count)
+    {
+        byte[] buffer = new byte[count];
+        int offset = 0;
+        while (offset < count)
+        {
+            int read = _stream.Read(buffer, offset, count - offset);
+            if (read <= 0) throw new Exception("Connessione persa");
+            offset += read;
+        }
+        return buffer;
+    }
+    
+    /*public void Receive()
     {
         while (_tcpClient.Connected && _stream.DataAvailable)
         {
             int type = _stream.ReadByte();
             if (type == -1) break;
 
-            byte[] payload = new byte[12];
-            _stream.Read(payload, 0, 12);
+            byte[] payload = ReadExactly(12);
 
          
            if (type == 8) // MsgSpawnEgg
@@ -184,6 +214,54 @@ public class NetworkManager : GameComponent, IDisposable
                 OnRemoteShotReceived?.Invoke(mx, my, charge);
             }
             
+        }
+    }*/
+    
+    public void Receive()
+    {
+        // Verifichiamo se ci sono abbastanza byte per ALMENO un messaggio (1 + 12 = 13 byte)
+        // Questo evita che ReadExactly blocchi il thread principale (e quindi la finestra)
+        while (_tcpClient.Connected && _tcpClient.Available >= 13)
+        {
+            int type = _stream.ReadByte();
+            if (type == -1) break;
+
+            // Ora siamo sicuri che i 12 byte del payload siano già nel buffer di rete
+            byte[] payload = new byte[12];
+            int read = 0;
+            while (read < 12)
+            {
+                read += _stream.Read(payload, read, 12 - read);
+            }
+
+            if (type == 8) // MsgSpawnEgg
+            {
+                int id = BitConverter.ToInt32(payload, 0);
+                float x = BitConverter.ToSingle(payload, 4);
+                float y = BitConverter.ToSingle(payload, 8);
+                OnEggReceived?.Invoke(id, x, y);
+            }
+            else if (type == 4) // MsgAuthState
+            {
+                uint ackSeq = BitConverter.ToUInt32(payload, 0);
+                float x = BitConverter.ToSingle(payload, 4);
+                float y = BitConverter.ToSingle(payload, 8);
+                OnAuthReceived?.Invoke(ackSeq, x, y);
+            }
+            else if (type == 6) // MsgRemoteState
+            {
+                float x = BitConverter.ToSingle(payload, 0);
+                float y = BitConverter.ToSingle(payload, 4);
+                int mask = BitConverter.ToInt32(payload, 8);
+                OnRemoteReceived?.Invoke(x, y, mask);
+            }
+            else if (type == 7) // MsgRemoteShot
+            {
+                int mx = BitConverter.ToInt32(payload, 0);
+                int my = BitConverter.ToInt32(payload, 4);
+                int charge = BitConverter.ToInt32(payload, 8);
+                OnRemoteShotReceived?.Invoke(mx, my, charge);
+            }
         }
     }
     
