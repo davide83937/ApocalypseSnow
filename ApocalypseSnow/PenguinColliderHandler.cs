@@ -50,6 +50,10 @@ public class PenguinColliderHandler
  
     public void HandleHitByBall()
     {
+        if (isWithEgg)
+        {
+            eggPutEvent?.Invoke(this, EventArgs.Empty);
+        }
         isFrozen = true;
         timeTakingEgg = 0;
         timePuttingEgg = 0;
