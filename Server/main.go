@@ -103,7 +103,30 @@ func nextID() uint32 {
 	return atomic.AddUint32(&globalID, 1)
 }
 
+// In Server/main.go
 func sanitizeMask(m int32) int32 {
+	// Pulizia direzioni opposte
+	if (m&Left) != 0 && (m&Right) != 0 {
+		m &^= (Left | Right)
+	}
+	if (m&Up) != 0 && (m&Down) != 0 {
+		m &^= (Up | Down)
+	}
+
+	// Validazione logica: se non hai l'uovo (WithEgg), non puoi inviare PuttingEgg
+	if (m&WithEgg) == 0 && (m&PuttingEgg) != 0 {
+		m &^= PuttingEgg
+	}
+
+	// Se stai raccogliendo (TakingEgg), non puoi stare già portando un uovo
+	if (m&WithEgg) != 0 && (m&TakingEgg) != 0 {
+		m &^= TakingEgg
+	}
+
+	return m
+}
+
+/*func sanitizeMask(m int32) int32 {
 	if (m&Left) != 0 && (m&Right) != 0 {
 		m &^= (Left | Right)
 	}
@@ -111,7 +134,7 @@ func sanitizeMask(m int32) int32 {
 		m &^= (Up | Down)
 	}
 	return m
-}
+}*/
 
 // Funzione per inviare lo spawn dell'uovo
 func sendSpawnEgg(c *Client, id int, x, y float32) {
@@ -124,7 +147,7 @@ func sendSpawnEgg(c *Client, id int, x, y float32) {
 }
 
 func stepFromStateDLL(x, y float32, mask int32, dt float32) (float32, float32) {
-	if (mask&Reload) != 0 || (mask&Freezing) != 0 {
+	if (mask&Reload) != 0 || (mask&Freezing) != 0 || (mask&TakingEgg) != 0 || (mask&PuttingEgg) != 0 {
 		return x, y
 	}
 
@@ -413,6 +436,15 @@ func processClientTicks(c *Client, x, y float32, curMask int32, curAck uint32, l
 	}
 }
 
+func createEggs(s *Session) {
+	for i := 0; i < 5; i++ {
+		ex := float32(250 + rand.Intn(250)) // Range X: 250-500
+		ey := float32(rand.Intn(400))       // Range Y: 0-400
+		sendSpawnEgg(s.a, i, ex, ey)
+		sendSpawnEgg(s.b, i, ex, ey)
+	}
+}
+
 func (s *Session) run() {
 	defer s.tick.Stop()
 	defer closeClient(s.a)
@@ -424,12 +456,7 @@ func (s *Session) run() {
 	sendJoinAck(s.a, s.a.id, s.ax, s.ay, s.bx, s.by) // Invia a player A la sua pos e quella di B
 	sendJoinAck(s.b, s.b.id, s.bx, s.by, s.ax, s.ay) // Invia a player B la sua pos e quella di A
 
-	for i := 0; i < 5; i++ {
-		ex := float32(250 + rand.Intn(250)) // Range X: 250-500
-		ey := float32(rand.Intn(400))       // Range Y: 0-400
-		sendSpawnEgg(s.a, i, ex, ey)
-		sendSpawnEgg(s.b, i, ex, ey)
-	}
+	createEggs(s)
 
 	// Variabili per conservare l'ultimo dt ricevuto
 	//var aDt, bDt float32 = MoveDt, MoveDt
