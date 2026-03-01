@@ -26,6 +26,8 @@ public class Game1: Game
     private List<Egg>  _eggs;
     private Random random;
     private NetworkManager networkManager;
+    private Reconciler _reconciler = new();
+    private float NetDt = 1f / 30f;
     
     public Game1()
     {
@@ -110,12 +112,14 @@ public class Game1: Game
         networkManager.OnAuthReceived += (ackSeq, x, y) => 
         {
             // Il server corregge il NOSTRO pinguino
-            //Console.WriteLine("Mia X: "+_myPenguin._position.X);
-            //Console.WriteLine("Mia Y: "+_myPenguin._position.Y);
-            //Console.WriteLine("Server X: "+x);
-            //Console.WriteLine("Server Y: "+y);
-            _myPenguin._position.X = x;
-            _myPenguin._position.Y = y;
+            Console.WriteLine("Mia X: "+_myPenguin._position.X);
+            Console.WriteLine("Mia Y: "+_myPenguin._position.Y);
+            Console.WriteLine("Server X: "+x);
+            Console.WriteLine("Server Y: "+y);
+            Vector2 position = new Vector2(x, y);
+            _reconciler.Apply(ref position, 200f, NetDt);
+            _myPenguin._position = position;
+           
         };
 
         networkManager.OnRemoteReceived += (x, y, mask) => 
@@ -123,7 +127,6 @@ public class Game1: Game
             // Il server ci aggiorna sulla posizione del NEMICO
             _redPenguin._position.X = x;
             _redPenguin._position.Y = y;
-            
             //_redPenguin._penguinInputHandler._stateStruct.Current = (StateList)mask;
         };
         
@@ -218,23 +221,7 @@ public class Game1: Game
         }
     }
 
-    /*private void addEgg(object sender, EventArgs e)
-    {
-        foreach (Egg egg in _eggs)
-        {
-            if (sender is Penguin penguin)
-            {
-                if (egg._tag ==penguin._myEgg)
-                {
-                    Components.Add(egg);
-                    egg._position.X = penguin._position.X+48;
-                    egg._position.Y = penguin._position.Y+100;
-                    CollisionManager.Instance.addObject(egg._tag, egg._position.X, egg._position.Y, egg._texture.Width,
-                        egg._texture.Height);
-                }
-            }
-        }
-    }*/
+
     
     private void addEgg(object sender, EventArgs e)
     {

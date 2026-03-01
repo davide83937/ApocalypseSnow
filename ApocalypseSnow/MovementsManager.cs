@@ -66,7 +66,7 @@ public class MovementsManager:IMovements
         //_networkManager.SendState(stateStruct, _deltaTime);
         //_networkManager.Receive();
         //Console.WriteLine($"X after Normalization: {_position.X}, Y after Normalization: {_position.Y}");
-        NetworkManager.Instance.SendState(stateStruct, _deltaTime, _position);
+        NetworkManager.Instance.SendState(stateStruct);
         // 2. Ricevi gli aggiornamenti dal server
        // return vector2;
     }

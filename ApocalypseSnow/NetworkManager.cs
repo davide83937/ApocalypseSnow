@@ -119,14 +119,14 @@ public class NetworkManager : GameComponent, IDisposable
     }*/
     
 
-    public void SendState(StateStruct state, float deltaTime, Vector2 position)
+    public void SendState(StateStruct state)
     {
         // Se non siamo connessi, non inviamo nulla
         if (_stream == null || !_tcpClient.Connected) return;
 
         // La dimensione del pacchetto passa da 13 a 21 byte per includere X e Y
         // Pacchetto: 1 (Tipo) + 4 (Mask) + 4 (Seq) + 4 (DeltaTime) + 4 (X) + 4 (Y) = 21 byte
-        byte[] packet = new byte[21];
+        byte[] packet = new byte[9];
     
         // 1. Inseriamo il tipo di messaggio (1 byte)
         packet[0] = (byte)MessageType.State; 
@@ -138,11 +138,6 @@ public class NetworkManager : GameComponent, IDisposable
         // 2. Inseriamo i dati nel buffer (Little Endian, come si aspetta Go)
         Buffer.BlockCopy(BitConverter.GetBytes((int)state.Current), 0, packet, 1, 4);
         Buffer.BlockCopy(BitConverter.GetBytes(_stateSequence), 0, packet, 5, 4);
-        Buffer.BlockCopy(BitConverter.GetBytes(deltaTime), 0, packet, 9, 4);
-    
-        // 3. Aggiungiamo le coordinate appena calcolate localmente
-        Buffer.BlockCopy(BitConverter.GetBytes(position.X), 0, packet, 13, 4);
-        Buffer.BlockCopy(BitConverter.GetBytes(position.Y), 0, packet, 17, 4);
 
         try 
         {
@@ -236,6 +231,7 @@ public class NetworkManager : GameComponent, IDisposable
 
             if (type == 8) // MsgSpawnEgg
             {
+                
                 int id = BitConverter.ToInt32(payload, 0);
                 float x = BitConverter.ToSingle(payload, 4);
                 float y = BitConverter.ToSingle(payload, 8);
@@ -293,20 +289,7 @@ public class NetworkManager : GameComponent, IDisposable
         }
     }*/
 
-    // Aggiungi questo metodo per inviare la richiesta
-    public void SendEggAction(int action, int eggId, uint playerId)
-    {
-        if (_stream == null || !_tcpClient.Connected) return;
 
-        byte[] packet = new byte[13];
-        packet[0] = 9; // MsgEggAction
-        Buffer.BlockCopy(BitConverter.GetBytes(action), 0, packet, 1, 4);
-        Buffer.BlockCopy(BitConverter.GetBytes(eggId), 0, packet, 5, 4);
-        Buffer.BlockCopy(BitConverter.GetBytes(playerId), 0, packet, 9, 4);
-
-        _stream.Write(packet, 0, packet.Length);
-        _stream.Flush();
-    }
     
     public void SendShot(ShotStruct shot)
     {

@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	MsgState       = 1 // 21B [type][mask:int32][seq:uint32][dt:float32][x:float32][y:float32]
+	MsgState       = 1 // 9B [type][mask:int32][seq:uint32][dt:float32][x:float32][y:float32]
 	MsgShot        = 2 // 13B [type][a:int32][b:int32][charge:int32]  (EVENT: release)
 	MsgJoin        = 3 // 9B  [type][0][0]
 	MsgAuthState   = 4 // 13B [type][ack:uint32][x:float32][y:float32]                 (SELF)
@@ -68,9 +68,6 @@ type Client struct {
 type StateMsg struct {
 	mask int32
 	seq  uint32
-	dt   float32 // Aggiungi questo campo
-	x    float32 // Posizione calcolata dal client
-	y    float32 // Posizione calcolata dal client
 }
 
 type ShotMsg struct {
@@ -297,20 +294,18 @@ func readerLoop(c *Client) {
 			// (Assicurati di aggiungere il caso nel selettore switch typ)
 
 		case MsgState:
-			pl, err := readExactly(c.conn, 20)
+			pl, err := readExactly(c.conn, 8)
 			if err != nil {
 				return
 			}
 			mask := int32(binary.LittleEndian.Uint32(pl[0:4]))
 			mask = sanitizeMask(mask)
 			seq := binary.LittleEndian.Uint32(pl[4:8])
-			dt := math.Float32frombits(binary.LittleEndian.Uint32(pl[8:12]))
-			clientX := math.Float32frombits(binary.LittleEndian.Uint32(pl[12:16]))
-			clientY := math.Float32frombits(binary.LittleEndian.Uint32(pl[16:20]))
+
 			//fmt.Printf("seq: %f\n", seq)
 			//fmt.Printf("clientX: %f\n", clientX)
 			//fmt.Printf("clientY: %f\n", clientY)
-			msg := StateMsg{mask: mask, seq: seq, dt: dt, x: clientX, y: clientY}
+			msg := StateMsg{mask: mask, seq: seq}
 
 			select {
 			case c.input <- msg:
@@ -359,7 +354,7 @@ func readerLoop(c *Client) {
 
 // Verifica se la differenza tra la posizione del server (sx, sy)
 // e quella del client (cx, cy) è trascurabile.
-func isCloseEnough(sx, sy, cx, cy float32) bool {
+/*func isCloseEnough(sx, sy, cx, cy float32) bool {
 	const epsilon = 8 // Margine di errore tollerato in pixel
 	//fmt.Printf("sx: %f\n", sx)
 	//fmt.Printf("sy: %f\n", sy)
@@ -370,7 +365,7 @@ func isCloseEnough(sx, sy, cx, cy float32) bool {
 	// Utilizza il quadrato della distanza per evitare il calcolo della radice quadrata
 	return math.Abs(float64(dx)) < epsilon &&
 		math.Abs(float64(dy)) < epsilon
-}
+}*/
 
 // ============== MATCHMAKER ==============
 
@@ -421,9 +416,7 @@ func processClientTicks(c *Client, x, y float32, curMask int32, curAck uint32, l
 		case m := <-c.input:
 			curMask = m.mask
 			curAck = m.seq
-			cx = m.x
-			cy = m.y
-			x, y = stepFromStateDLL(x, y, curMask, m.dt)
+			x, y = stepFromStateDLL(x, y, curMask, MoveDt)
 			steps++
 			if steps >= maxCatchupPerTick {
 				return steps, x, y, cx, cy, curMask, curAck
@@ -508,14 +501,14 @@ func (s *Session) run() {
 			//doneB:
 
 			// Dopo aver processato tutti i pacchetti, esegui la riconciliazione e l'invio
-			if !isCloseEnough(s.ax, s.ay, s.aClientX, s.aClientY) {
-				sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
-			}
+			//if !isCloseEnough(s.ax, s.ay, s.aClientX, s.aClientY) {
+			sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
+			//}
 			sendRemoteState(s.b, s.ax, s.ay, s.aMask)
 
-			if !isCloseEnough(s.bx, s.by, s.bClientX, s.bClientY) {
-				sendAuthStateSelf(s.b, s.bAck, s.bx, s.by)
-			}
+			//if !isCloseEnough(s.bx, s.by, s.bClientX, s.bClientY) {
+			sendAuthStateSelf(s.b, s.bAck, s.bx, s.by)
+			//}
 			sendRemoteState(s.a, s.bx, s.by, s.bMask)
 			//case <-s.tick.C:
 			// Aggiorna maschere, sequenze e deltaTime
@@ -553,9 +546,6 @@ func drainStateWithPos(c *Client, curMask int32, curAck uint32, curDt float32, c
 		case m := <-c.input:
 			curMask = m.mask
 			curAck = m.seq
-			curDt = m.dt
-			curX = m.x
-			curY = m.y
 		default:
 			return curMask, curAck, curDt, curX, curY
 		}
@@ -568,7 +558,6 @@ func drainState(c *Client, curMask int32, curAck uint32, curDt float32) (int32, 
 		case m := <-c.input:
 			curMask = m.mask
 			curAck = m.seq
-			curDt = m.dt // Salva l'ultimo dt ricevuto
 		default:
 			return curMask, curAck, curDt
 		}

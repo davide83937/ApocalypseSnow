@@ -12,9 +12,12 @@ public class PenguinInputHandler
     //private float timePuttingEgg = 0;
     private float timeFreezing = 0;
     public AnimationManager _animationManager;
+    float dx = 0;
+    float dy = 0;
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
+    
     public PenguinInputHandler(string tag)
     {
         _stateStruct = new StateStruct();
@@ -50,42 +53,17 @@ public class PenguinInputHandler
         }
     }
     
-    public void UpdateMovement(float deltaTime, ref float positionX, ref float positionY)
+    public void UpdateMovement(float deltaTime, ref Vector2 position)
     {
-        float dx = 0;
-        float dy = 0;
-
-        // 1. Rilevazione direzioni (input grezzo: -1, 0, 1)
-        if (_stateStruct.IsPressed(StateList.Up))    dy -= 1;
-        if (_stateStruct.IsPressed(StateList.Down))  dy += 1;
-        if (_stateStruct.IsPressed(StateList.Left))  dx -= 1;
-        if (_stateStruct.IsPressed(StateList.Right)) dx += 1;
-
-        // --- IL CONTROLLO FONDAMENTALE ---
-        // Verifichiamo se c'è almeno un input direzionale attivo.
-        // Se dx e dy sono entrambi 0, non dobbiamo normalizzare né muoverci.
-        if (dx == 0 && dy == 0) 
-        {
-            return; 
-        }
-
+        dx = 0;
+        dy = 0;
         // 2. Controllo stati bloccanti (Ricarica o Congelamento)
         if (_stateStruct.IsPressed(StateList.Reload) || _stateStruct.IsPressed(StateList.Freezing))
         {
             return;
         }
-
-        // 3. Normalizzazione
-        // Se dx=1 e dy=1 (diagonale), dopo questa chiamata dx e dy diventeranno circa 0.707
-        normalizeVelocity(ref dx, ref dy);
-
-        // 4. Calcolo velocità finale e applicazione del moto
-        float speed = 200f;
-        float finalVx = dx * speed;
-        float finalVy = dy * speed;
-
-        uniform_rectilinear_motion(ref positionX, finalVx, deltaTime);
-        uniform_rectilinear_motion(ref positionY, finalVy, deltaTime);
+        
+        PhysicsWrapper.StepFromState(ref position, _stateStruct.Current, 200f, deltaTime, ref dx, ref dy);
 
         // 5. Aggiorna l'animazione basandoti sulla direzione normalizzata
         UpdateAnimationState(dx, dy);

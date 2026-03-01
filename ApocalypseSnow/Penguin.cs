@@ -156,7 +156,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
         if (_accumulator >= _physicsDeltaTime)
         {
-            _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position.X, ref _position.Y);
+            _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
             _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct,
                 _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _physicsDeltaTime, _position);
             _penguinInputHandler.MoveReload(ref _penguinShotHandler._reloadTime);
