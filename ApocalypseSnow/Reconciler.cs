@@ -27,6 +27,28 @@ public sealed class Reconciler
     private Vector2 _authPos;
     float dx = 0;
     float dy = 0;
+    
+    private static Reconciler _instance;
+
+    
+    public static Reconciler Instance
+    {
+        get
+        {
+            if (_instance == null)
+                throw new Exception("NetworkManager deve essere inizializzato in Game1 prima dell'uso!");
+            return _instance;
+        }
+    }
+
+    // Il costruttore deve accettare 'Game' e passarlo al padre tramite base(game)
+    public Reconciler(Game game) 
+    {
+        if (_instance != null)
+            throw new Exception("Puoi creare solo una istanza di Reconcilier!");
+        _instance = this;
+     
+    }
 
     /// <summary>Resetta stato e buffer (utile a inizio partita o dopo reconnessione).</summary>
     public void Reset()

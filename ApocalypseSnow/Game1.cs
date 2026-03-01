@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System.Collections.Concurrent;
 
 namespace ApocalypseSnow;
 
@@ -26,8 +27,13 @@ public class Game1: Game
     private List<Egg>  _eggs;
     private Random random;
     private NetworkManager networkManager;
-    private Reconciler _reconciler = new();
+    private Reconciler _reconciler;
     private float NetDt = 1f / 30f;
+    private readonly ConcurrentQueue<JoinSnapshot> _joinQueue = new();
+    private readonly ConcurrentQueue<AuthSnapshot> _authQueue = new();
+    private readonly ConcurrentQueue<RemoteSnapshot> _remoteStateQueue = new();
+    private readonly ConcurrentQueue<ShotStruct> _shotQueue = new();
+    
     
     public Game1()
     {
@@ -44,6 +50,7 @@ public class Game1: Game
         //CONNESSIONE ------------------------------------------------------
         //networkManager = new NetworkManager(this, "127.0.0.1", 8080);
         networkManager = new NetworkManager(this, "192.168.1.27", 8080);
+        _reconciler  = new Reconciler(this);
         //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
         //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
         IMovements movements = new MovementsManager(this);
@@ -112,14 +119,16 @@ public class Game1: Game
         networkManager.OnAuthReceived += (ackSeq, x, y) => 
         {
             // Il server corregge il NOSTRO pinguino
-            Console.WriteLine("Mia X: "+_myPenguin._position.X);
-            Console.WriteLine("Mia Y: "+_myPenguin._position.Y);
-            Console.WriteLine("Server X: "+x);
-            Console.WriteLine("Server Y: "+y);
+            //Console.WriteLine("Mia X: "+_myPenguin._position.X);
+            //Console.WriteLine("Mia Y: "+_myPenguin._position.Y);
+            //Console.WriteLine("Server X: "+x);
+            //Console.WriteLine("Server Y: "+y);
             Vector2 position = new Vector2(x, y);
-            _reconciler.Apply(ref position, 200f, NetDt);
-            _myPenguin._position = position;
-           
+            // reconcile only on auth
+            
+            _authQueue.Enqueue(new AuthSnapshot(ackSeq, position));
+                //_myPenguin._position = position;
+
         };
 
         networkManager.OnRemoteReceived += (x, y, mask) => 
@@ -156,6 +165,20 @@ public class Game1: Game
         base.Initialize();
     }
     
+    private void GetLatest<T>(ConcurrentQueue<T> queue, Action<T> action)
+    {
+        T? latest = default;
+        bool hasData = false;
+
+        while (queue.TryDequeue(out T? item))
+        {
+            latest = item;
+            hasData = true;
+        }
+
+        if (hasData && latest != null) action(latest);
+    }
+    
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
@@ -163,6 +186,8 @@ public class Game1: Game
         load_texture("Content/images/environment.png");
         base.LoadContent();
     }
+    
+    //GetLatest(_remoteStateQueue, HandleRemoteUpdate);
     
     private void removeEgg(object sender, string tagEgg)
     {
@@ -334,6 +359,14 @@ public class Game1: Game
         _height = GraphicsDevice.Viewport.Height;
         
         networkManager?.Receive();
+
+        // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
+        GetLatest(_authQueue, auth =>
+        {
+            _reconciler.OnServerAuth(auth.Ack, auth.Position);
+            _reconciler.Apply(ref _myPenguin._position, 200f, NetDt);
+        });
+        
         if (_eggs.Count == 0)
         {
             if (_myPenguinScore > _redPenguinScore)

@@ -11,6 +11,7 @@ public class MovementsManager:IMovements
     private bool movementKeyPressed = false;
     private Game _game;
     ShotStruct _shotStruct;
+    private uint i = 0;
 
     
     public MovementsManager(Game game)
@@ -66,6 +67,8 @@ public class MovementsManager:IMovements
         //_networkManager.SendState(stateStruct, _deltaTime);
         //_networkManager.Receive();
         //Console.WriteLine($"X after Normalization: {_position.X}, Y after Normalization: {_position.Y}");
+        i = Reconciler.Instance.NextSeq();
+        Reconciler.Instance.Record(i, stateStruct.Current);
         NetworkManager.Instance.SendState(stateStruct);
         // 2. Ricevi gli aggiornamenti dal server
        // return vector2;
