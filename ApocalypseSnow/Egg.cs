@@ -69,4 +69,10 @@ public class Egg:CollisionExtensions
             case 4: _position.X -= bounceDistance; break; // RIGHT
         }
     }
+
+    public override void Update(GameTime gameTime)
+    {
+        CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height);
+        base.Update(gameTime);
+    }
 }

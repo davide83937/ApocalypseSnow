@@ -40,7 +40,8 @@ public class Game1: Game
     {
         // 1. Crea il pinguino qui
         //CONNESSIONE ------------------------------------------------------
-        networkManager = new NetworkManager(this, "127.0.0.1", 8080);
+        //networkManager = new NetworkManager(this, "127.0.0.1", 8080);
+        networkManager = new NetworkManager(this, "192.168.1.27", 8080);
         //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
         //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
         IMovements movements = new MovementsManager(this);
@@ -132,6 +133,7 @@ public class Game1: Game
             // verso le coordinate ricevute
             Vector2 target = new Vector2(mx, my);
             _redPenguin.HandleRemoteShot(target);
+            _redPenguin._myEgg = null;
         };
         
         networkManager.OnEggReceived += (id, x, y) => 
@@ -161,6 +163,7 @@ public class Game1: Game
     
     private void removeEgg(object sender, string tagEgg)
     {
+        Console.WriteLine("Removing egg " + tagEgg);
         foreach (Egg egg in _eggs)
         {
             if (egg._tag == tagEgg)

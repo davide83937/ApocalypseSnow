@@ -34,26 +34,49 @@ public class PenguinColliderHandler
     public void HandleEggPickup(string eggTag, StateStruct stateStruct, 
         float deltaTime, ref string myEgg)
     {
+        
+        // NOVITÀ: Se è il pinguino remoto e il server dice che ha l'uovo, 
+        // completiamo la raccolta immediatamente senza aspettare il timer locale.
+        if (_tag.EndsWith("Red") && stateStruct.IsPressed(StateList.WithEgg)&& myEgg == null)
+        {
+            isWithEgg = true;
+            timeTakingEgg = 0;
+            myEgg = eggTag;
+            eggTakenEventFunction(eggTag);
+            return;
+        } 
+        
+        //Console.WriteLine("HandleEggPickup scatenato");
         if (stateStruct.IsPressed(StateList.TakingEgg) && !stateStruct.IsPressed(StateList.WithEgg))
         {
+            //Console.WriteLine("HandleEggPickup conteggio in corso");
+            Console.WriteLine("HandleEggPickup conteggio in corso dt: "+deltaTime);
             timeTakingEgg += deltaTime;
+            Console.WriteLine("HandleEggPickup conteggio in corso tt: "+timeTakingEgg);
             //Console.WriteLine(t);
             if (timeTakingEgg > 1)
             {
+                Console.WriteLine("HandleEggPickup uovo settato: "+eggTag);
                 isWithEgg = true;
                 timeTakingEgg = 0;
                 myEgg = eggTag;
+                Console.WriteLine(eggTag);
                 eggTakenEventFunction(eggTag);
             }
         }
     }
  
-    public void HandleHitByBall()
+    public void HandleHitByBall(ref string myEgg)
     {
+        if (isWithEgg)
+        {
+            eggPutEvent?.Invoke(this, EventArgs.Empty);
+        }
         isFrozen = true;
         timeTakingEgg = 0;
         timePuttingEgg = 0;
         isWithEgg = false;
+        myEgg = null;
     }
     
     public bool IsEnemyBall(string otherTag)
@@ -64,7 +87,7 @@ public class PenguinColliderHandler
     }
     
     public void HandleEggDelivery(string platformTag,
-        StateStruct stateStruct, float deltaTime, string myEgg)
+        StateStruct stateStruct, float deltaTime, ref string myEgg)
     {
         // Verifica se il pinguino sta consegnando l'uovo alla piattaforma corretta
         bool isCorrectPlatform = (_tag == "penguin" && platformTag == "blueP") || 
@@ -73,12 +96,13 @@ public class PenguinColliderHandler
         if (isCorrectPlatform && stateStruct.IsPressed(StateList.WithEgg) && stateStruct.IsPressed(StateList.PuttingEgg))
         {
             timePuttingEgg += deltaTime;
-            Console.WriteLine(timePuttingEgg);
+            //Console.WriteLine(timePuttingEgg);
             if (timePuttingEgg > 1)
             {
                 deleteEgg(myEgg);
                 timePuttingEgg = 0;
                 isWithEgg = false;
+                myEgg = null;
             }
         }
     }
@@ -100,13 +124,14 @@ public class PenguinColliderHandler
         eggTakenEvent?.Invoke(this, tagEgg);
     }
     
-    public void putEgg(StateStruct stateStruct)
+    public void putEgg(StateStruct stateStruct, ref string tagEgg)
     {
         if ((stateStruct.IsPressed(StateList.WithEgg)&&stateStruct.JustPressed(StateList.TakingEgg))
             || (stateStruct.JustReleased(StateList.WithEgg)&&stateStruct.JustPressed(StateList.Freezing)))
         {
             eggPutEvent?.Invoke(this, EventArgs.Empty);
             isWithEgg = false;
+            tagEgg = null;
         }
     }
 

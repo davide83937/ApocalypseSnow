@@ -32,10 +32,8 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
     private int _textureFractionHeight;
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
-
-
-
-    public string _myEgg;
+    
+    public string _myEgg=null;
 
 
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed,
@@ -56,11 +54,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
     }
 
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void uniform_rectilinear_motion(ref float position, float velocity, float deltaTime);
 
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
 
 
 
@@ -137,11 +131,11 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                     _deltaTime, ref _myEgg);
                 break;
             case string t when _penguinColliderHandler.IsEnemyBall(t):
-                _penguinColliderHandler.HandleHitByBall();
+                _penguinColliderHandler.HandleHitByBall(ref _myEgg);
                 break;
             case "blueP" or "redP":
                 _penguinColliderHandler.HandleEggDelivery(otherTag,
-                    _penguinInputHandler._stateStruct, _deltaTime, _myEgg);
+                    _penguinInputHandler._stateStruct, _deltaTime, ref _myEgg);
                 break;
             case "obstacle":
                 _penguinColliderHandler.HandleObstacleCollision(collisionRecordOut._type, ref _position);
@@ -166,7 +160,8 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct,
                 _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _physicsDeltaTime, _position);
             _penguinInputHandler.MoveReload(ref _penguinShotHandler._reloadTime);
-            _penguinColliderHandler.putEgg(_penguinInputHandler._stateStruct);
+            _penguinColliderHandler.putEgg(_penguinInputHandler._stateStruct, ref _myEgg);
+           
             resetTakingTimer();
             resetPuttingTimer();
             _penguinInputHandler.increaseTimeFreezing(_physicsDeltaTime, ref _penguinColliderHandler.isFrozen);
@@ -174,6 +169,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _physicsDeltaTime);
             _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _physicsDeltaTime);
 
+            
             if (!_tag.EndsWith("Red"))
             {
                 Vector2 mousePosition = _movementsManager.GetMousePosition();
@@ -182,6 +178,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
                 _penguinShotHandler.Shot(_penguinInputHandler._stateStruct, mousePosition,
                     _position, _penguinInputHandler._animationManager._ballTag);
+                
 
             }
 
