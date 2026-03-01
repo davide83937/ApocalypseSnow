@@ -50,13 +50,13 @@ public class PenguinColliderHandler
         if (stateStruct.IsPressed(StateList.TakingEgg) && !stateStruct.IsPressed(StateList.WithEgg))
         {
             //Console.WriteLine("HandleEggPickup conteggio in corso");
-            Console.WriteLine("HandleEggPickup conteggio in corso dt: "+deltaTime);
+            //Console.WriteLine("HandleEggPickup conteggio in corso dt: "+deltaTime);
             timeTakingEgg += deltaTime;
-            Console.WriteLine("HandleEggPickup conteggio in corso tt: "+timeTakingEgg);
+            //Console.WriteLine("HandleEggPickup conteggio in corso tt: "+timeTakingEgg);
             //Console.WriteLine(t);
             if (timeTakingEgg > 1)
             {
-                Console.WriteLine("HandleEggPickup uovo settato: "+eggTag);
+                //Console.WriteLine("HandleEggPickup uovo settato: "+eggTag);
                 isWithEgg = true;
                 timeTakingEgg = 0;
                 myEgg = eggTag;
