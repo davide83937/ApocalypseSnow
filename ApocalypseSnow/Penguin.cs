@@ -11,12 +11,9 @@ using Microsoft.Xna.Framework.Graphics;
 public class Penguin : CollisionExtensions //, DrawableGameComponent
 {
     private readonly Game _gameContext;
-
-    //private readonly IAnimation  _animationManager;
     private readonly IMovements _movementsManager;
     public PenguinColliderHandler _penguinColliderHandler;
     public PenguinShotHandler _penguinShotHandler;
-
     public PenguinInputHandler _penguinInputHandler;
 
     //private Vector2 _speed;
@@ -24,15 +21,12 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
     private float _physicsDeltaTime = 1f / 30f;
 
     private float _accumulator = 0f;
-
-    //private float _reloadTime;
-    //private StateStruct _stateStruct;
+    
     private ShotStruct _shotStruct;
     private int _textureFractionWidth;
     private int _textureFractionHeight;
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
-    
     public string _myEgg=null;
 
 
@@ -40,23 +34,13 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         IMovements movements) : base(game, tag, startPosition)
     {
         _gameContext = game;
-        //_speed = startSpeed;
-        //_animationManager = animation;
         _movementsManager = movements;
-        //_stateStruct = new StateStruct();
         _shotStruct = new ShotStruct();
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
         _penguinInputHandler = new PenguinInputHandler(_tag);
-
-
-        //_networkManager = new NetworkManager("127.0.0.1", 8080);
-
     }
-
-
-
-
+    
 
     private void resetTakingTimer()
     {

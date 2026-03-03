@@ -6,7 +6,7 @@ namespace ApocalypseSnow;
 using Microsoft.Xna.Framework;
 public class PenguinShotHandler
 {
-    private readonly Game _gameContext;
+    public readonly Game _gameContext;
     private string _tag;
     private int _ammo;
     public int Ammo{ get => _ammo; set => _ammo = value; }
@@ -24,15 +24,7 @@ public class PenguinShotHandler
     {
         FrameReload = 3;
     }
-    
-    
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
-    
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void parabolic_motion(float gravity, float startPositionX, float startPositionY, 
-        out float positionX, out float positionY, float startVelocityX,
-        float startVelocityY, float gameTime);
+ 
     
     
     public void Reload(StateStruct stateStruct, float deltaTime)
@@ -67,7 +59,7 @@ public class PenguinShotHandler
     
     private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition)
     {
-        parabolic_motion(100f,
+        PhysicsOtherAPI.parabolic_motion(100f,
             startPosition.X + 48, 
             startPosition.Y, 
             out float x, out float y,
@@ -97,7 +89,7 @@ public class PenguinShotHandler
         float differenceX = position.X+48 - mousePosition.X;
         float differenceY = position.Y - mousePosition.Y;
         
-        normalizeVelocity(ref differenceX, ref differenceY);
+        PhysicsAPI.normalizeVelocity(ref differenceX, ref differenceY);
         
         float coX = (differenceX / 150) * (-1);
         Vector2 startSpeed = new Vector2(coX, differenceY / 100) * pressedTime;

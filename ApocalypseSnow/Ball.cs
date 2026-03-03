@@ -23,48 +23,28 @@ public class Ball:CollisionExtensions
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
     private string tagPenguin;
-  
-    
     
 
-    public Ball(Game game,string tagPenguin, Vector2 startPosition, Vector2 startSpeed, 
+    public Ball(Game game, string tagPenguin, Vector2 startPosition, Vector2 startSpeed, 
         Vector2 finalPosition, string tag) : base(game, tag, startPosition)
     {
-        this._startPosition = startPosition;
+        _startPosition = startPosition;
         //this._position = startPosition;
-        this._startSpeed = startSpeed;
+        _startSpeed = startSpeed;
         _ballTime = 0.0f;
-        this._finalPosition = finalPosition;
+        _finalPosition = finalPosition;
         //_tag = tag;
-        this._scale = 1.0f;
+        _scale = 1.0f;
         this.tagPenguin = tagPenguin;
     }
-
-
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void calculate_ball_scale(
-        float startX, float startY,
-        float finalX, float finalY,
-        float posX, float posY,
-        float startSpeedX,
-        float L, float K,
-        ref float scale,
-        out bool reachedTarget
-    );
     
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern float calculate_ball_scale_only(
-        float startX, float startY, float finalX, float finalY, float posX, 
-        float startSpeedX, float L, float K, float currentScale);
-
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern bool check_target_reached(float posX, float finalX, float startSpeedX);
+  
     
     private void FinalPointCalculous()
     {
        
         // 1. Calcoliamo il nuovo scale delegando al C++
-        _scale = calculate_ball_scale_only(
+        _scale = PhysicsAPI.calculate_ball_scale_only(
             _startPosition.X, _startPosition.Y, 
             _finalPosition.X, _finalPosition.Y, 
             _position.X, 
@@ -102,10 +82,6 @@ public class Ball:CollisionExtensions
         this._texture = Texture2D.FromStream(GraphicsDevice, stream);
     }
 
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void parabolic_motion(float gravity, float startPositionX, float startPositionY, ref float positionX, ref float positionY, float startVelocityX,
-        float startVelocityY, float gameTime);
-    
  
     
     protected override void LoadContent()
@@ -151,7 +127,7 @@ public class Ball:CollisionExtensions
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _ballTime += deltaTime;
-        parabolic_motion(100,_startPosition.X+48, _startPosition.Y, ref _position.X, ref _position.Y,
+        PhysicsAPI.parabolic_motion(100,_startPosition.X+48, _startPosition.Y, ref _position.X, ref _position.Y,
             _startSpeed.X, -_startSpeed.Y, _ballTime);
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
         //Console.WriteLine($"Scale: {_scale}");
