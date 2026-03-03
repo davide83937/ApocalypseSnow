@@ -124,7 +124,10 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 			targetY := int32(binary.LittleEndian.Uint32(shotPayloadBuffer[4:8]))
 			chargeValue := int32(binary.LittleEndian.Uint32(shotPayloadBuffer[8:12]))
 
-			shotEvent := ShotEvent{X: targetX, Y: targetY, Charge: chargeValue}
+			shotEvent := ShotEvent{
+				Position: Position{X: float32(targetX), Y: float32(targetY)},
+				Charge:   float32(chargeValue),
+			}
 
 			// latest-wins
 			select {
