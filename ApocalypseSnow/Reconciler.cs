@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 
@@ -74,6 +75,19 @@ public sealed class Reconciler
         _hasAuth = true;
     }
 
+    public void GetLatest<T>(ConcurrentQueue<T> queue, Action<T> action)
+    {
+        T? latest = default;
+        bool hasData = false;
+
+        while (queue.TryDequeue(out T? item))
+        {
+            latest = item;
+            hasData = true;
+        }
+        if (hasData && latest != null) action(latest);
+    }
+    
     /// <summary>
     /// Applica reconcile alla posizione locale.
     /// Va chiamato sul main thread (Update), dopo aver eventualmente ricevuto auth.
@@ -109,13 +123,13 @@ public sealed class Reconciler
         {
             // Piccolo errore (es. float drift), correzione invisibile
             pos = Vector2.Lerp(pos, replayPos, SoftLerp);
-            Console.WriteLine(SoftLerp);
-            Console.WriteLine($"PosX : {pos.X}, PosY: {pos.Y}");   
-            Console.WriteLine($"ReplayPosX : {replayPos.X}, ReplayPosY : {replayPos.Y}");
+            //Console.WriteLine(SoftLerp);
+            //Console.WriteLine($"PosX : {pos.X}, PosY: {pos.Y}");   
+            //Console.WriteLine($"ReplayPosX : {replayPos.X}, ReplayPosY : {replayPos.Y}");
             return;
         }
-        Console.WriteLine($"After if, PosX : {pos.X}, PosY: {pos.Y}");   
-        Console.WriteLine($"After if,,ReplayPosX : {replayPos.X}, ReplayPosY : {replayPos.Y}");
+        //Console.WriteLine($"After if, PosX : {pos.X}, PosY: {pos.Y}");   
+        //Console.WriteLine($"After if,,ReplayPosX : {replayPos.X}, ReplayPosY : {replayPos.Y}");
 
         // Errore grave (es. il server ti ha visto sbattere contro un muro)
         pos = replayPos;

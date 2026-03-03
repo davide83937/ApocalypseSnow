@@ -8,7 +8,7 @@ using Encoding = System.Text.Encoding;
 
 namespace ApocalypseSnow;
 
-public class NetworkManager : GameComponent, IDisposable
+public class NetworkManager : GameComponent
 {
     private TcpClient _tcpClient;
     private NetworkStream _stream;
@@ -60,25 +60,7 @@ public class NetworkManager : GameComponent, IDisposable
         }
     }
     
-    /*public void SendJoin(JoinStruct join)
-    {
-        if (_stream == null || !_tcpClient.Connected) return;
-
-        using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
-        using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(ms, System.Text.Encoding.UTF8))
-        {
-            // 1. Scriviamo il tipo (1 byte)
-            writer.Write((byte)join.Type);
-
-            // 2. Scriviamo la stringa
-            // BinaryWriter aggiunge automaticamente un prefisso con la lunghezza
-            writer.Write(join.playerName);
-
-            byte[] packet = ms.ToArray();
-            _stream.Write(packet, 0, packet.Length);
-            _stream.Flush();
-        }
-    }*/
+    
 
     public void SendJoin(JoinStruct join)
     {
@@ -96,27 +78,6 @@ public class NetworkManager : GameComponent, IDisposable
         _stream.Write(packet, 0, packet.Length);
         _stream.Flush();
     }
-    
-    /*public void SendState(StateStruct state)
-    {
-        if (_stream == null || !_tcpClient.Connected) return;
-
-        byte[] packet = new byte[9];
-        packet[0] = (byte)state.Type;
-        Buffer.BlockCopy(BitConverter.GetBytes((int)state.Current), 0, packet, 0, 4);
-        Buffer.BlockCopy(BitConverter.GetBytes((int)state.Old), 0, packet, 4, 4);
-
-        try
-        {
-            _stream.Write(packet, 0, packet.Length);
-            _stream.Flush(); // Assicura che i dati vengano inviati subito
-        }
-        catch (IOException)
-        {
-            // Gestione eventuale disconnessione
-            Connect(); 
-        }
-    }*/
     
 
     public void SendState(StateStruct state)
@@ -167,51 +128,8 @@ public class NetworkManager : GameComponent, IDisposable
         return buffer;
     }
     
-    /*public void Receive()
-    {
-        while (_tcpClient.Connected && _stream.DataAvailable)
-        {
-            int type = _stream.ReadByte();
-            if (type == -1) break;
 
-            byte[] payload = ReadExactly(12);
-
-         
-           if (type == 8) // MsgSpawnEgg
-            {
-                int id = BitConverter.ToInt32(payload, 0);
-                float x = BitConverter.ToSingle(payload, 4);
-                float y = BitConverter.ToSingle(payload, 8);
-                OnEggReceived?.Invoke(id, x, y);
-            }
-            else if (type == 4) // MsgAuthState
-            {
-                uint ackSeq = BitConverter.ToUInt32(payload, 0);
-                float x = BitConverter.ToSingle(payload, 4);
-                float y = BitConverter.ToSingle(payload, 8);
-                // Lancia l'evento a chiunque sia in ascolto
-                OnAuthReceived?.Invoke(ackSeq, x, y);
-            }
-            else if (type == 6) // MsgRemoteState
-            {
-                float x = BitConverter.ToSingle(payload, 0);
-                float y = BitConverter.ToSingle(payload, 4);
-                int mask = BitConverter.ToInt32(payload, 8);
-                // Lancia l'evento a chiunque sia in ascolto
-                OnRemoteReceived?.Invoke(x, y, mask);
-            }
-            else if (type == 7) // MsgRemoteShot (Ricevuto dal server per l'avversario)
-            {
-                int mx = BitConverter.ToInt32(payload, 0);
-                int my = BitConverter.ToInt32(payload, 4);
-                int charge = BitConverter.ToInt32(payload, 8);
-                // Lancia l'evento
-                OnRemoteShotReceived?.Invoke(mx, my, charge);
-            }
-            
-        }
-    }*/
-    
+   
     public void Receive()
     {
         // Verifichiamo se ci sono abbastanza byte per ALMENO un messaggio (1 + 12 = 13 byte)
@@ -260,35 +178,6 @@ public class NetworkManager : GameComponent, IDisposable
             }
         }
     }
-    
-    /*public void Receive(Action<uint, float, float> onAuth, Action<float, float, int> onRemote)
-    {
-        // Verifichiamo se ci sono dati pronti nello stream
-        while (_tcpClient.Connected && _stream.DataAvailable)
-        {
-            int type = _stream.ReadByte();
-            if (type == -1) break;
-
-            byte[] payload = new byte[12]; // La maggior parte dei messaggi sono 1+12 byte
-            _stream.Read(payload, 0, 12);
-
-            if (type == 4) // MsgAuthState (Il mio pinguino autoritativo)
-            {
-                uint ackSeq = BitConverter.ToUInt32(payload, 0);
-                float x = BitConverter.ToSingle(payload, 4);
-                float y = BitConverter.ToSingle(payload, 8);
-                onAuth?.Invoke(ackSeq, x, y);
-            }
-            else if (type == 6) // MsgRemoteState (Il pinguino avversario)
-            {
-                float x = BitConverter.ToSingle(payload, 0);
-                float y = BitConverter.ToSingle(payload, 4);
-                int mask = BitConverter.ToInt32(payload, 8);
-                onRemote?.Invoke(x, y, mask);
-            }
-        }
-    }*/
-
 
     
     public void SendShot(ShotStruct shot)

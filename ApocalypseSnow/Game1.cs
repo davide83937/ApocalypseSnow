@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace ApocalypseSnow;
 
@@ -10,12 +11,8 @@ public class Game1: Game
 {
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
-    
-    // Dichiariamo il nostro pinguino qui!
     private Penguin _myPenguin;
     private Penguin _redPenguin;
-    private int _myPenguinScore = 0;
-    private int _redPenguinScore = 0;
     private Obstacle _obstacle;
     private Obstacle _obstacle1;
     private BasePlatform _bluePlatform;
@@ -24,16 +21,15 @@ public class Game1: Game
     private int _width;
     private int _height;
     private Texture2D _backgroundTexture;
-    private List<Egg>  _eggs;
-    private Random random;
     private NetworkManager networkManager;
     private Reconciler _reconciler;
     private float NetDt = 1f / 30f;
-    private readonly ConcurrentQueue<JoinSnapshot> _joinQueue = new();
-    private readonly ConcurrentQueue<AuthSnapshot> _authQueue = new();
-    private readonly ConcurrentQueue<RemoteSnapshot> _remoteStateQueue = new();
-    private readonly ConcurrentQueue<ShotStruct> _shotQueue = new();
-    
+    //private readonly ConcurrentQueue<JoinSnapshot> _joinQueue = new();
+    //private readonly ConcurrentQueue<AuthSnapshot> _authQueue = new();
+    //private readonly ConcurrentQueue<RemoteSnapshot> _remoteStateQueue = new();
+    //private readonly ConcurrentQueue<ShotStruct> _shotQueue = new();
+    private EggsEvent _eggsEvent;
+    private Events _events;
     
     public Game1()
     {
@@ -46,139 +42,59 @@ public class Game1: Game
     
     protected override void Initialize()
     {
-        // 1. Crea il pinguino qui
         //CONNESSIONE ------------------------------------------------------
         //networkManager = new NetworkManager(this, "127.0.0.1", 8080);
         networkManager = new NetworkManager(this, "192.168.1.27", 8080);
-        _reconciler  = new Reconciler(this);
         //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
         //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
-        IMovements movements = new MovementsManager(this);
-        IMovements movementsRed = new MovementsManagerRed();
-        CollisionManager collisionManager = new CollisionManager(this);
-        
-        
-        string bluePathPlatform = "Content/images/green_logo.png";
-        string redPathPlatform = "Content/images/red_logo.png";
         
         string playerName = "Davide";
         JoinStruct joinStruct = new JoinStruct(playerName);
         networkManager.SendJoin(joinStruct);
         // 2. Attendi la risposta (il gioco si fermerà qui finché non arriva il secondo player)
         JoinAckStruct ack = networkManager.WaitForJoinAck();
-        Console.WriteLine("--- Connessione Stabilita ---");
-        Console.WriteLine($"Messaggio Tipo: {ack.Type}");
-        Console.WriteLine($"ID Giocatore assegnato: {ack.PlayerId}");
-        Console.WriteLine($"Posizione di Spawn: X={ack.SpawnX}, Y={ack.SpawnY}");
-        Console.WriteLine($"Posizione di Spawn: X={ack.OpponentSpawnX}, Y={ack.OpponentSpawnY}");
-        Console.WriteLine("-----------------------------");
- 
+        //Console.WriteLine("--- Connessione Stabilita ---");
+        //Console.WriteLine($"Messaggio Tipo: {ack.Type}");
+        //Console.WriteLine($"ID Giocatore assegnato: {ack.PlayerId}");
+        //Console.WriteLine($"Posizione di Spawn: X={ack.SpawnX}, Y={ack.SpawnY}");
+        //Console.WriteLine($"Posizione di Spawn: X={ack.OpponentSpawnX}, Y={ack.OpponentSpawnY}");
+        //Console.WriteLine("-----------------------------");
+        
+        _width = GraphicsDevice.Viewport.Width;
+        _height = GraphicsDevice.Viewport.Height;
+        
+        _reconciler  = new Reconciler(this);
+       
+        IMovements movements = new MovementsManager(this);
+        IMovements movementsRed = new MovementsManagerRed();
+        CollisionManager collisionManager = new CollisionManager(this);
+        
+        string bluePathPlatform = "Content/images/green_logo.png";
+        string redPathPlatform = "Content/images/red_logo.png";
+        
         _bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
         _redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
-        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements);// <-MANCAVA ULTIMO PARAMETRO
+        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements);
         _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed);
-        //collisionManager.sendCollisionEvent += _myPenguin.OnColliderEnter;
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
         _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
-        _eggs = new List<Egg>();
-     
-        
-        //Components.Add(collisionManager);
+        _eggsEvent = new EggsEvent(this, _myPenguin, _redPenguin);
+        _events = new Events(this, _redPenguin);
+       
         Components.Add(_myPenguin);
         Components.Add(_redPenguin);
-        //Components.Add(_obstacle);
-        //Components.Add(_obstacle1);
         Components.Add(_bluePlatform);
         Components.Add(_redPlatform);
         Components.Add(_obstacle);
-        //Components.Add(_myPenguin);
-        //Components.Add(_redPenguin);
         Components.Add(collisionManager);
-        random = new Random();
-        
-       
-        
-        /*for(int i = 0; i < 5; i++)
-        {
-            int x = random.Next(250, 500);
-            int y = random.Next(0, 400);
-            Egg egg = new Egg(this, new Vector2(x,y), "egg"+i);
-            _eggs.Add(egg);
-            Components.Add(egg);
-        }*/
-        
-        // 3. FONDAMENTALE: base.Initialize() chiamerà automaticamente 
-        // l'Initialize e il LoadContent di tutti i componenti in lista.
-        _myPenguin._penguinColliderHandler.eggTakenEvent += removeEgg;
-        _redPenguin._penguinColliderHandler.eggTakenEvent += removeEgg;
-        _myPenguin._penguinColliderHandler.eggPutEvent += addEgg;
-        _redPenguin._penguinColliderHandler.eggPutEvent += addEgg;
-        _myPenguin._penguinColliderHandler.eggDeleteEvent += removeEggCompletaly;
-        _redPenguin._penguinColliderHandler.eggDeleteEvent += removeEggCompletaly           ;
-        
-        networkManager.OnAuthReceived += (ackSeq, x, y) => 
-        {
-            // Il server corregge il NOSTRO pinguino
-            //Console.WriteLine("Mia X: "+_myPenguin._position.X);
-            //Console.WriteLine("Mia Y: "+_myPenguin._position.Y);
-            //Console.WriteLine("Server X: "+x);
-            //Console.WriteLine("Server Y: "+y);
-            Vector2 position = new Vector2(x, y);
-            // reconcile only on auth
-            
-            _authQueue.Enqueue(new AuthSnapshot(ackSeq, position));
-                //_myPenguin._position = position;
-
-        };
-
-        networkManager.OnRemoteReceived += (x, y, mask) => 
-        {
-            // Il server ci aggiorna sulla posizione del NEMICO
-            _redPenguin._position.X = x;
-            _redPenguin._position.Y = y;
-            //_redPenguin._penguinInputHandler._stateStruct.Current = (StateList)mask;
-        };
-        
-        networkManager.OnRemoteShotReceived += (mx, my, charge) => 
-        {
-            // Quando l'avversario spara, il pinguino rosso deve eseguire l'azione
-            // verso le coordinate ricevute
-            Vector2 target = new Vector2(mx, my);
-            _redPenguin.HandleRemoteShot(target);
-            _redPenguin._myEgg = null;
-        };
-        
-        networkManager.OnEggReceived += (id, x, y) => 
-        {
-            // Creiamo l'uovo con le coordinate fornite dal server
-            Egg egg = new Egg(this, new Vector2(x, y), "egg" + id);
-            _eggs.Add(egg);
-            Components.Add(egg);
-    
-            // Assicuriamoci che l'uovo sia registrato nel CollisionManager
-            // Nota: l'id deve essere univoco per il tag
-        };
-        
-    
-        
+        Components.Add(_eggsEvent);
+        Components.Add(_events);
         
         base.Initialize();
     }
     
-    private void GetLatest<T>(ConcurrentQueue<T> queue, Action<T> action)
-    {
-        T? latest = default;
-        bool hasData = false;
-
-        while (queue.TryDequeue(out T? item))
-        {
-            latest = item;
-            hasData = true;
-        }
-
-        if (hasData && latest != null) action(latest);
-    }
     
+   
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
@@ -187,91 +103,6 @@ public class Game1: Game
         base.LoadContent();
     }
     
-    //GetLatest(_remoteStateQueue, HandleRemoteUpdate);
-    
-    private void removeEgg(object sender, string tagEgg)
-    {
-        Console.WriteLine("Removing egg " + tagEgg);
-        foreach (Egg egg in _eggs)
-        {
-            if (egg._tag == tagEgg)
-            {
-                CollisionManager.Instance.removeObject(egg._tag);
-                Components.Remove(egg);
-            }
-        }
-    }
-    
-    private void removeEggCompletaly(object sender, string tagEgg)
-    {
-        Egg eggToRemove = null;
-
-        // 1. Cerchiamo l'uovo senza rimuoverlo subito
-        foreach (Egg egg in _eggs)
-        {
-            if (egg._tag == tagEgg)
-            {
-                eggToRemove = egg;
-                break; // Una volta trovato, usciamo dal ciclo
-            }
-        }
-
-        // 2. Eseguiamo la rimozione fuori dal ciclo foreach
-        if (eggToRemove != null)
-        {
-            // Rimuoviamo dalla logica delle collisioni
-            CollisionManager.Instance.removeObject(eggToRemove._tag);
-        
-            // Rimuoviamo dai componenti di MonoGame
-            Components.Remove(eggToRemove);
-        
-            // Rimuoviamo dalla nostra lista privata (ORA è SICURO)
-            _eggs.Remove(eggToRemove);
-
-            // 3. Aggiorniamo il punteggio
-            Penguin penguin = null;
-            if (sender == _myPenguin._penguinColliderHandler) penguin = _myPenguin;
-            else if (sender == _redPenguin._penguinColliderHandler) penguin = _redPenguin;
-
-            if (penguin._tag == "penguin")
-                {
-                    _myPenguinScore++;
-                }
-                else
-                {
-                    _redPenguinScore++;
-                }
-            
-        
-        }
-    }
-
-
-    
-    private void addEgg(object sender, EventArgs e)
-    {
-        // Determiniamo quale pinguino ha lanciato l'evento tramite il suo handler
-        Penguin penguin = null;
-        if (sender == _myPenguin._penguinColliderHandler) penguin = _myPenguin;
-        else if (sender == _redPenguin._penguinColliderHandler) penguin = _redPenguin;
-
-        if (penguin != null)
-        {
-            foreach (Egg egg in _eggs)
-            {
-                if (egg._tag == penguin._myEgg)
-                {
-                    if (!Components.Contains(egg)) Components.Add(egg); // Evita duplicati
-                    egg._position.X = penguin._position.X + 48;
-                    egg._position.Y = penguin._position.Y + 100;
-                
-                    CollisionManager.Instance.addObject(egg._tag, egg._position.X, egg._position.Y, 
-                        egg._texture.Width, egg._texture.Height);
-                    break; 
-                }
-            }
-        }
-    }
     
     private void load_texture(string path)
     {
@@ -279,59 +110,17 @@ public class Game1: Game
         // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
         this._backgroundTexture = Texture2D.FromStream(GraphicsDevice, stream);
     }
-    
-    protected override void Draw(GameTime gameTime)
+
+    public void DrawComponentsOfType<T>(IEnumerable<T> allComponents)
     {
-        // 1. Pulisce lo schermo (il "famoso" azzurro CornflowerBlue)
-        GraphicsDevice.Clear(Color.White);
-
-        // 2. Inizia la coda di disegno
-        _spriteBatch.Begin();
-
-        _spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), Color.White);
-        // 3. Chiama il disegno del pinguino
-        // 2. SECONDO STRATO: Ambiente (Ostacoli e Uova)
-        // Cicliamo prima solo gli oggetti che devono stare "sotto"
-        foreach (var component in Components)
+        foreach (var component in allComponents.OfType<T>())
         {
-            if (component is BasePlatform plat)
-            {
-                plat.Draw(_spriteBatch);
-            }
-            else if (component is Obstacle obstacle)
-            {
-                obstacle.Draw(_spriteBatch);
-            }
+            ((dynamic)component).Draw(_spriteBatch);
         }
-        
-        foreach (var component in Components)
-        {
-            if (component is Obstacle obstacle)
-            {
-                obstacle.Draw(_spriteBatch);
-            }
-            else if (component is Egg egg)
-            {
-                egg.Draw(_spriteBatch);
-            }
-        }
+    }
 
-        // 3. TERZO STRATO: Entità dinamiche (Pinguini e Palle)
-        // Disegniamo i pinguini e i proiettili sopra le piattaforme
-        foreach (var component in Components)
-        {
-            if (component is Penguin penguin)
-            {
-                penguin.Draw(_spriteBatch);
-            }
-            else if (component is Ball ball)
-            {
-                ball.Draw(_spriteBatch);
-            }
-        }
-
-        // 4. QUARTO STRATO: UI (Le scritte)
-        // Sempre per ultime, così nulla può coprirle
+    private void drawUI()
+    {
         if (_myPenguin != null && _redPenguin != null)
         {
             // Testo Munizioni (in basso a sinistra come lo avevi)
@@ -339,15 +128,33 @@ public class Game1: Game
             _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(_width / 10f, _height * 0.85f), Color.Black);
 
             // Punteggio Player Blu (in alto a sinistra)
-            string blueScoreText = $"Punteggio Blu: {_myPenguinScore}";
+            string blueScoreText = $"Punteggio Blu: {_eggsEvent._myPenguinScore}";
             _spriteBatch.DrawString(_uiFont, blueScoreText, new Vector2(20, 20), Color.Blue);
 
             // Punteggio Player Rosso (in alto a destra)
-            string redScoreText = $"Punteggio Rosso: {_redPenguinScore}";
+            string redScoreText = $"Punteggio Rosso: {_eggsEvent._redPenguinScore}";
             Vector2 redScoreSize = _uiFont.MeasureString(redScoreText); // Misuriamo la scritta per allinearla a destra
             _spriteBatch.DrawString(_uiFont, redScoreText, new Vector2(_width - redScoreSize.X - 20, 20), Color.Red);
         }
-        // 4. Invia tutto alla scheda video
+    }
+    
+    protected override void Draw(GameTime gameTime)
+    {
+        // 1. Pulisce lo schermo (il "famoso" azzurro CornflowerBlue)
+        GraphicsDevice.Clear(Color.White);
+        
+        _spriteBatch.Begin();
+
+        _spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), Color.White);
+  
+        DrawComponentsOfType<BasePlatform>(Components.OfType<BasePlatform>());
+        DrawComponentsOfType<Obstacle>(Components.OfType<Obstacle>());
+        DrawComponentsOfType<Egg>(Components.OfType<Egg>());
+        DrawComponentsOfType<Penguin>(Components.OfType<Penguin>());
+        DrawComponentsOfType<Ball>(Components.OfType<Ball>());
+        
+        drawUI();
+        
         _spriteBatch.End();
 
         base.Draw(gameTime);
@@ -355,21 +162,19 @@ public class Game1: Game
     
     protected override void Update(GameTime gameTime)
     {
-        _width = GraphicsDevice.Viewport.Width;
-        _height = GraphicsDevice.Viewport.Height;
         
         networkManager?.Receive();
 
         // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
-        GetLatest(_authQueue, auth =>
+        _reconciler.GetLatest(_events._authQueue, auth =>
         {
             _reconciler.OnServerAuth(auth.Ack, auth.Position);
             _reconciler.Apply(ref _myPenguin._position, 200f, NetDt);
         });
         
-        if (_eggs.Count == 0)
+        if (_eggsEvent._eggs.Count == 0)
         {
-            if (_myPenguinScore > _redPenguinScore)
+            if (_eggsEvent._myPenguinScore > _eggsEvent._redPenguinScore)
             {
                 Console.WriteLine("Pinguino BLU ha vinto!!!!!!!!!!!");
             }
