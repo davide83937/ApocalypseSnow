@@ -104,7 +104,7 @@ public class Game1: Game
     }
     
     
-    private void load_texture(string path)
+    public void load_texture(string path)
     {
         using var stream = System.IO.File.OpenRead(path);
         // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)

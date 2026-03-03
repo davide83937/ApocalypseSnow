@@ -47,6 +47,11 @@ extern "C" {
         COLLISION_RIGHT = 4   // Impatto dal lato destro
     };
 
+    struct Vector2 {
+        float x;
+        float y;
+    };
+
     PHYSICS_API const char* PhysicsBuildInfo();
     PHYSICS_API void uniform_rectilinear_motion(float *position, float velocity, float deltaTime);
     PHYSICS_API void normalizeVelocity(float* velX, float* velY);
@@ -68,6 +73,9 @@ extern "C" {
         float L, float K,
         float currentScale
     );
+
+    PHYSICS_API float Distance(Vector2 a, Vector2 b);
+    PHYSICS_API Vector2 Lerp(Vector2 a, Vector2 b, float t);
 
 
     //PHYSICS_API void check_collisions2(CollisionDataIn* data, CollisionDataOut2* dataOut, int count);

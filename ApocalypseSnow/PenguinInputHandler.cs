@@ -12,8 +12,7 @@ public class PenguinInputHandler
     //private float timePuttingEgg = 0;
     private float timeFreezing = 0;
     public AnimationManager _animationManager;
-    float dx = 0;
-    float dy = 0;
+ 
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
@@ -55,17 +54,8 @@ public class PenguinInputHandler
     
     public void UpdateMovement(float deltaTime, ref Vector2 position)
     {
-        dx = 0;
-        dy = 0;
-        // 2. Controllo stati bloccanti (Ricarica o Congelamento)
-        if (_stateStruct.IsPressed(StateList.Reload) || _stateStruct.IsPressed(StateList.Freezing))
-        {
-            return;
-        }
-        
-        PhysicsWrapper.StepFromState(ref position, _stateStruct.Current, 200f, deltaTime, ref dx, ref dy);
-
-        // 5. Aggiorna l'animazione basandoti sulla direzione normalizzata
+        if (_stateStruct.IsPressed(StateList.Reload) || _stateStruct.IsPressed(StateList.Freezing)) { return; }
+        PhysicsWrapper.StepFromStateRef(ref position, _stateStruct.Current, 200f, deltaTime, out float dx, out float dy);
         UpdateAnimationState(dx, dy);
     }
     
