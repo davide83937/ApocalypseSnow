@@ -17,7 +17,7 @@ public class NetworkManager : GameComponent
     private uint _stateSequence = 0;
     public event Action<uint, float, float> OnAuthReceived;
     public event Action<float, float, int> OnRemoteReceived;
-    public event Action<int, int, int> OnRemoteShotReceived; // mouseX, mouseY, charge
+    public event Action<float, float, int> OnRemoteShotReceived; // mouseX, mouseY, charge
     public event Action<int, float, float> OnEggReceived;
 
     private static NetworkManager _instance;
@@ -171,8 +171,9 @@ public class NetworkManager : GameComponent
             }
             else if (type == 7) // MsgRemoteShot
             {
-                int mx = BitConverter.ToInt32(payload, 0);
-                int my = BitConverter.ToInt32(payload, 4);
+             
+                float mx = BitConverter.ToSingle(payload, 0);
+                float my = BitConverter.ToSingle(payload, 4);
                 int charge = BitConverter.ToInt32(payload, 8);
                 OnRemoteShotReceived?.Invoke(mx, my, charge);
             }

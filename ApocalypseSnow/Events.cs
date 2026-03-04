@@ -31,7 +31,7 @@ public class Events:GameComponent
         //_redPenguin._penguinInputHandler._stateStruct.Current = (StateList)mask;
     }
     
-    private void HandleRemoteShot(int mx, int my, int charge)
+    private void HandleRemoteShot(float mx, float my, int charge)
     {
         Vector2 target = new Vector2(mx, my);
         _redPenguin.HandleRemoteShot(target);

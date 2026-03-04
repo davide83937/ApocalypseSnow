@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"sync"
 )
@@ -120,8 +121,8 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 				return
 			}
 
-			targetX := int32(binary.LittleEndian.Uint32(shotPayloadBuffer[0:4]))
-			targetY := int32(binary.LittleEndian.Uint32(shotPayloadBuffer[4:8]))
+			targetX := math.Float32frombits(binary.LittleEndian.Uint32(shotPayloadBuffer[0:4]))
+			targetY := math.Float32frombits(binary.LittleEndian.Uint32(shotPayloadBuffer[4:8]))
 			chargeValue := int32(binary.LittleEndian.Uint32(shotPayloadBuffer[8:12]))
 
 			shotEvent := ShotEvent{

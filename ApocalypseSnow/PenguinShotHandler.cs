@@ -86,7 +86,7 @@ public class PenguinShotHandler
         //Vector2 mousePosition = _movementsManager.GetMousePosition();
     
         
-        float differenceX = position.X+48 - mousePosition.X;
+        float differenceX = position.X + 48 - mousePosition.X;
         float differenceY = position.Y - mousePosition.Y;
         
         PhysicsAPI.normalizeVelocity(ref differenceX, ref differenceY);
@@ -102,8 +102,8 @@ public class PenguinShotHandler
         if (!_tag.EndsWith("Red"))
         {
             ShotStruct shotStruct = new ShotStruct();
-            shotStruct.mouseX = (int)mousePosition.X;
-            shotStruct.mouseY = (int)mousePosition.Y;
+            shotStruct.mouseX = mousePosition.X;
+            shotStruct.mouseY = mousePosition.Y;
             shotStruct.charge = (int)pressedTime; // Inviamo il tempo di pressione
 
             // NOTA: Assicurati di avere un riferimento a _networkManager in questa classe, 

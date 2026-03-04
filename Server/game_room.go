@@ -273,8 +273,8 @@ func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnectio
 
 	packet := make([]byte, 13)
 	packet[0] = MsgRemoteShot
-	binary.LittleEndian.PutUint32(packet[1:5], uint32(shot.X))
-	binary.LittleEndian.PutUint32(packet[5:9], uint32(shot.Y))
+	binary.LittleEndian.PutUint32(packet[1:5], math.Float32bits(shot.X))
+	binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(shot.Y))
 	binary.LittleEndian.PutUint32(packet[9:13], uint32(charge))
 
 	targetConn.TryEnqueueOutgoingPacket(packet, false)

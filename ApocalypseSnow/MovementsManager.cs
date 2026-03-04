@@ -52,8 +52,8 @@ public class MovementsManager:IMovements
             if (stateStruct.JustReleased(StateList.Shoot))
             {
                 Vector2 mousePosition = GetMousePosition();
-                _shotStruct.mouseX= (int)mousePosition.X;
-                _shotStruct.mouseY= (int)mousePosition.Y;
+                _shotStruct.mouseX = mousePosition.X;
+                _shotStruct.mouseY = mousePosition.Y;
                 //NetworkManager.Instance.SendShot(_shotStruct);
             }
         }
