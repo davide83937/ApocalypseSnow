@@ -47,9 +47,9 @@ public class PenguinShotHandler
         deltaTime *= 100000;
         pressedTime += deltaTime;
         
-        if (pressedTime > 200000)
+        if (pressedTime > 250000)
         {
-            pressedTime = 200000;
+            pressedTime = 250000;
         }
         //Console.WriteLine(pressedTime);
     }

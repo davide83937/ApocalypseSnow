@@ -44,9 +44,10 @@ public class Game1: Game
     {
         //CONNESSIONE ------------------------------------------------------
         //networkManager = new NetworkManager(this, "127.0.0.1", 8080);
-        networkManager = new NetworkManager(this, "192.168.1.27", 8080);
+        //networkManager = new NetworkManager(this, "192.168.1.27", 8080);
         //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
         //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
+        networkManager = new NetworkManager(this, "18.192.31.30", 11179);
         
         string playerName = "Davide";
         JoinStruct joinStruct = new JoinStruct(playerName);

@@ -2,8 +2,6 @@
 using Microsoft.Xna.Framework.Input;
 
 namespace ApocalypseSnow;
-
-using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -131,12 +129,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
     {
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _accumulator += _deltaTime;
-        KeyboardState _newState = Keyboard.GetState();
-
-        if (_newState.IsKeyDown(Keys.P))
-        {
-            _penguinInputHandler.getMotion(ref _position.X, 200f, _physicsDeltaTime);
-        }
+       
 
         if (_accumulator >= _physicsDeltaTime)
         {
@@ -156,14 +149,19 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             
             if (!_tag.EndsWith("Red"))
             {
+                KeyboardState _newState = Keyboard.GetState();
+
+                if (_newState.IsKeyDown(Keys.P))
+                {
+                    _penguinInputHandler.getMotion(ref _position.X, 200f, _physicsDeltaTime);
+                }
+                
                 Vector2 mousePosition = _movementsManager.GetMousePosition();
                 _shotStruct.mouseX = (int)mousePosition.X;
                 _shotStruct.mouseY = (int)mousePosition.Y;
 
                 _penguinShotHandler.Shot(_penguinInputHandler._stateStruct, mousePosition,
                     _position, _penguinInputHandler._animationManager._ballTag);
-                
-
             }
 
             //_networkManager.SendState(_movementsManager.State);------------------------------------------------------------------------------------

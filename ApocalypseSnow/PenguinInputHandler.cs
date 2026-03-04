@@ -12,10 +12,7 @@ public class PenguinInputHandler
     //private float timePuttingEgg = 0;
     private float timeFreezing = 0;
     public AnimationManager _animationManager;
- 
     
-    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
     
     public PenguinInputHandler(string tag)
     {
