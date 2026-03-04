@@ -138,7 +138,11 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             _penguinInputHandler.getMotion(ref _position.X, 200f, _physicsDeltaTime);
         }
 
-        if (_accumulator >= _physicsDeltaTime)
+        // - Il while serve quando c’è un frame lento (spike/lag/GC):
+        //   se dt è grande, _accumulator può contenere più di un passo fisico e dobbiamo
+        //   eseguire più tick nello stesso frame per “recuperare” e mantenere la fisica a 30 Hz.
+        //   Con un semplice if invece droppiamo tick (fisica rallenta sotto carico).
+        while (_accumulator >= _physicsDeltaTime)
         {
             _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
             _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct,
