@@ -17,11 +17,12 @@ public class Game1: Game
     private SpriteFont _uiFont;
     private int _width;
     private int _height;
-    private Texture2D _backgroundTexture;
+    private Texture2D _backgroundTextureGaming;
+    private Texture2D _backgroundTextureMenu;
     //private NetworkManager networkManager;
     private Reconciler _reconciler;
 
-    private string state = "Premi invio per iniziare...";
+    private string state = "PREMI INVIO PER INIZIARE...";
     //private float NetDt = 0;
     
     //private readonly ConcurrentQueue<JoinSnapshot> _joinQueue = new();
@@ -67,16 +68,20 @@ public class Game1: Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _uiFont = Content.Load<SpriteFont>("UIAmmo");
-        load_texture("Content/images/environment.png");
+        load_texture("Content/images/environment.png", "Content/images/start.png");
+   
+        
         base.LoadContent();
     }
     
     
-    public void load_texture(string path)
+    public void load_texture(string path, string path2)
     {
         using var stream = System.IO.File.OpenRead(path);
         // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
-        this._backgroundTexture = Texture2D.FromStream(GraphicsDevice, stream);
+        this._backgroundTextureGaming = Texture2D.FromStream(GraphicsDevice, stream);
+        using var stream2 = System.IO.File.OpenRead(path2);
+        this._backgroundTextureMenu = Texture2D.FromStream(GraphicsDevice, stream2);
     }
 
     public void DrawComponentsOfType<T>(IEnumerable<T> allComponents)
@@ -91,6 +96,10 @@ public class Game1: Game
     {
         if (gameSession._myPenguin != null && gameSession._redPenguin != null)
         {
+            string esc = "Premi Esc per uscire (ma perdi)";
+            _spriteBatch.DrawString(_uiFont, esc, new Vector2(_width / 15f, _height * 0.95f), Color.Chocolate);
+            
+            
             // Testo Munizioni (in basso a sinistra come lo avevi)
             string ammoText = $"Munizioni: {gameSession._myPenguin._penguinShotHandler.Ammo}";
             _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(_width / 10f, _height * 0.85f), Color.Black);
@@ -112,17 +121,19 @@ public class Game1: Game
         _spriteBatch.Begin();
 
         // Disegna sempre lo sfondo
-        _spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, _width, _height), Color.White);
+        //_spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, _width, _height), Color.White);
 
         if (gameSession != null)
         {
             // Se stiamo aspettando l'avversario
             if (gameSession.state != null)
             {
-                DrawFancyText(gameSession.state, new Vector2(_width / 2f, _height / 2f), Color.Red, gameTime, true, 1.2f);
+                _spriteBatch.Draw(_backgroundTextureMenu, new Rectangle(0, 0, _width, _height), Color.White);
+                DrawFancyText(gameSession.state, new Vector2(_width / 1.5f, _height / 1.2f), Color.Red, gameTime, true, 1.7f);
             }
             else 
             {
+                _spriteBatch.Draw(_backgroundTextureGaming, new Rectangle(0, 0, _width, _height), Color.White);
                 // Se la partita è iniziata (state è null), disegna i componenti
                 DrawComponentsOfType<BasePlatform>(Components.OfType<BasePlatform>());
                 DrawComponentsOfType<Obstacle>(Components.OfType<Obstacle>());
@@ -134,7 +145,8 @@ public class Game1: Game
         }
         else
         {
-            DrawFancyText(state, new Vector2(_width / 2f, _height / 2f), Color.Black, gameTime, true, 1.1f);
+            _spriteBatch.Draw(_backgroundTextureMenu, new Rectangle(0, 0, _width, _height), Color.White);
+            DrawFancyText(state, new Vector2(_width / 1.5f, _height / 1.2f), Color.YellowGreen, gameTime, true, 1.6f);
         }
 
         _spriteBatch.End();
@@ -142,28 +154,39 @@ public class Game1: Game
     }
     
   
-    private void DrawFancyText(string text, Vector2 screenPos, Color color, GameTime gameTime, bool pulse = false, float baseScale = 1.0f)
+    private void DrawFancyText(string text, Vector2 screenPos, Color textColor, GameTime gameTime, bool pulse = false, float baseScale = 1.0f)
     {
         if (string.IsNullOrEmpty(text)) return;
 
-        // Misuriamo la dimensione per determinare l'origine (il centro della scritta)
+        // 1. Calcolo dimensioni e origine (centro)
         Vector2 size = _uiFont.MeasureString(text);
         Vector2 origin = size / 2;
-
         float finalScale = baseScale;
 
+        // 2. Effetto pulsante (opzionale)
         if (pulse)
         {
-            // Effetto pulsante: varia la scala tra 0.95 e 1.05 basandosi sui secondi totali
             float pulseDelta = (float)Math.Sin(gameTime.TotalGameTime.TotalSeconds * 4f) * 0.05f;
             finalScale += pulseDelta;
         }
 
-        // 1. Disegna l'ombra (Nera, leggermente trasparente, spostata di 3 pixel)
-        _spriteBatch.DrawString(_uiFont, text, screenPos + new Vector2(3, 3), Color.Black * 0.5f, 0f, origin, finalScale, SpriteEffects.None, 0f);
+        // 3. DISEGNO DEL BORDO (Outline)
+        // Disegniamo il testo in nero spostato di 2 pixel in tutte le direzioni principali
+        // Moltiplichiamo l'offset per la scala così il bordo rimane proporzionato
+        float outlineDist = 2f * finalScale; 
+        Color outlineColor = Color.Black * 0.8f; // Nero leggermente trasparente per morbidezza
 
-        // 2. Disegna il testo principale
-        _spriteBatch.DrawString(_uiFont, text, screenPos, color, 0f, origin, finalScale, SpriteEffects.None, 0f);
+        // Disegno a croce (Sopra, Sotto, Sinistra, Destra)
+        _spriteBatch.DrawString(_uiFont, text, screenPos + new Vector2(outlineDist, 0), outlineColor, 0f, origin, finalScale, SpriteEffects.None, 0f);
+        _spriteBatch.DrawString(_uiFont, text, screenPos + new Vector2(-outlineDist, 0), outlineColor, 0f, origin, finalScale, SpriteEffects.None, 0f);
+        _spriteBatch.DrawString(_uiFont, text, screenPos + new Vector2(0, outlineDist), outlineColor, 0f, origin, finalScale, SpriteEffects.None, 0f);
+        _spriteBatch.DrawString(_uiFont, text, screenPos + new Vector2(0, -outlineDist), outlineColor, 0f, origin, finalScale, SpriteEffects.None, 0f);
+
+        // 4. DISEGNO OMBRA PROFONDA (Opzionale, per dare profondità)
+        _spriteBatch.DrawString(_uiFont, text, screenPos + new Vector2(3, 3) * finalScale, Color.Black * 0.5f, 0f, origin, finalScale, SpriteEffects.None, 0f);
+
+        // 5. DISEGNO TESTO PRINCIPALE
+        _spriteBatch.DrawString(_uiFont, text, screenPos, textColor, 0f, origin, finalScale, SpriteEffects.None, 0f);
     }
     
     protected override void Update(GameTime gameTime)

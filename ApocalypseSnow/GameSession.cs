@@ -39,7 +39,7 @@ public sealed class GameSession : GameComponent
         //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
         //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
         //networkManager = new NetworkManager(this, "18.192.31.30", 11179);
-        state = "In attesa di un avversario...";
+        state = "IN ATTESA DI UN AVVERSARIO...";
  
         System.Threading.Tasks.Task.Run(() =>
         {
