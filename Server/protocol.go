@@ -28,7 +28,13 @@ const (
 )
 
 const (
-	ListenAddr                = ":8080"
-	chargeCap         float32 = 200000
-	maxCatchupPerTick         = 8 // ? max step per tick per client (evita warp se backlog enorme)
+	ListenAddr         = ":8080"
+	chargeCap  float32 = 200000
+
+	// Quanti MsgState al massimo dreniamo (per player) in UN server-tick.
+	// Noi teniamo SOLO l'ultimo input ricevuto (latest-wins) e poi facciamo 1 step fisico per tick.
+	maxDrainInputsPerTick = 64
+
+	// Se non arrivano input da troppo, stoppiamo il player (anti "ghiaccio" quando si perde il release).
+	inputStaleTimeoutMs = 150
 )

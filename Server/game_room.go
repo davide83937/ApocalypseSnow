@@ -16,6 +16,8 @@ type GameRoom struct {
 	secondPlayer Player
 
 	tickRateHz int
+	// Contatore tick (solo per debug/log).
+	tickNo uint64
 }
 
 func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection) *GameRoom {
@@ -30,12 +32,18 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 			Position: Position{X: 100, Y: 300},
 			LastMask: 0,
 			LastSeqN: 0,
+			RecvMask: 0,
+			RecvSeqN: 0,
+			LastRx:   time.Time{},
 		},
 		secondPlayer: Player{
 			ID:       2,
 			Position: Position{X: 550, Y: 25},
 			LastMask: 0,
 			LastSeqN: 0,
+			RecvMask: 0,
+			RecvSeqN: 0,
+			LastRx:   time.Time{},
 		},
 	}
 }
@@ -44,7 +52,7 @@ func (gameRoom *GameRoom) Run() {
 	// JoinAck (blocca il client se manca)
 	gameRoom.SendJoinAcknowledgements()
 
-	// Parità col vecchio server: 5 uova subito
+	// Parità col vecchio old_main.go: 5 uova subito
 	gameRoom.CreateInitialEggs(5)
 
 	ticker := time.NewTicker(time.Second / time.Duration(gameRoom.tickRateHz))
@@ -68,67 +76,69 @@ func (gameRoom *GameRoom) Run() {
 	}
 }
 
-// Tick compatibile con old_main:
-// - processa fino a maxCatchupPerTick input per player, facendo uno step fisico per input
-// - se non arriva input, fa 1 step con l'ultima mask (dead reckoning)
+// Tick (server authoritative, tick-based):
+// - drena gli input arrivati (anche in burst) e tiene SOLO l'ultimo (latest-wins)
+// - fa SEMPRE 1 step fisico per tick usando l'ultima mask ricevuta
+// - se non arriva input da troppo, stoppa il player (anti "ghiaccio")
 func (gameRoom *GameRoom) Tick() {
+	gameRoom.tickNo++
 	deltaTime := float32(1.0 / float32(gameRoom.tickRateHz))
+	now := time.Now()
+	staleTimeout := time.Duration(inputStaleTimeoutMs) * time.Millisecond
 
-	// =======================
-	// PLAYER 1: catch-up bounded
-	// =======================
-	processedFramesFirstPlayer := 0
-drainFirstPlayerInputs:
-	for {
-		select {
-		case inputState := <-gameRoom.firstPlayerConnection.InputChannel:
-			gameRoom.firstPlayer.LastMask = inputState.Mask
-			gameRoom.firstPlayer.LastSeqN = inputState.SeqN
-
-			gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y = stepFromStateDLL(
-				gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y, gameRoom.firstPlayer.LastMask, deltaTime)
-
-			processedFramesFirstPlayer++
-			if processedFramesFirstPlayer >= maxCatchupPerTick {
-				break drainFirstPlayerInputs
+	// helper: drena fino a maxDrainInputsPerTick e ritorna l'ultimo letto + quanti drenati
+	drainLatest := func(ch <-chan InputState) (InputState, bool, int) {
+		var last InputState
+		has := false
+		count := 0
+		for n := 0; n < maxDrainInputsPerTick; n++ {
+			select {
+			case s := <-ch:
+				last = s
+				has = true
+				count++
+			default:
+				return last, has, count
 			}
-		default:
-			break drainFirstPlayerInputs
 		}
-	}
-
-	if processedFramesFirstPlayer == 0 {
-		gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y = stepFromStateDLL(
-			gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y, gameRoom.firstPlayer.LastMask, deltaTime)
+		return last, has, count
 	}
 
 	// =======================
-	// PLAYER 2: catch-up bounded
+	// PLAYER 1: latest-wins + 1 step per tick
 	// =======================
-	processedFramesSecondPlayer := 0
-drainSecondPlayerInputs:
-	for {
-		select {
-		case inputState := <-gameRoom.secondPlayerConnection.InputChannel:
-			gameRoom.secondPlayer.LastMask = inputState.Mask
-			gameRoom.secondPlayer.LastSeqN = inputState.SeqN
-
-			gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y = stepFromStateDLL(
-				gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y, gameRoom.secondPlayer.LastMask, deltaTime)
-
-			processedFramesSecondPlayer++
-			if processedFramesSecondPlayer >= maxCatchupPerTick {
-				break drainSecondPlayerInputs
-			}
-		default:
-			break drainSecondPlayerInputs
-		}
+	in1, ok1, drain1 := drainLatest(gameRoom.firstPlayerConnection.InputChannel)
+	if ok1 {
+		gameRoom.firstPlayer.RecvMask = in1.Mask
+		gameRoom.firstPlayer.RecvSeqN = in1.SeqN
+		gameRoom.firstPlayer.LastRx = now
 	}
-
-	if processedFramesSecondPlayer == 0 {
-		gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y = stepFromStateDLL(
-			gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y, gameRoom.secondPlayer.LastMask, deltaTime)
+	mask1 := gameRoom.firstPlayer.RecvMask
+	if gameRoom.firstPlayer.LastRx.IsZero() || now.Sub(gameRoom.firstPlayer.LastRx) > staleTimeout {
+		mask1 = 0
 	}
+	gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y = stepFromStateDLL(
+		gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y, mask1, deltaTime)
+	gameRoom.firstPlayer.LastMask = mask1
+	gameRoom.firstPlayer.LastSeqN = gameRoom.firstPlayer.RecvSeqN
+
+	// =======================
+	// PLAYER 2: latest-wins + 1 step per tick
+	// =======================
+	in2, ok2, drain2 := drainLatest(gameRoom.secondPlayerConnection.InputChannel)
+	if ok2 {
+		gameRoom.secondPlayer.RecvMask = in2.Mask
+		gameRoom.secondPlayer.RecvSeqN = in2.SeqN
+		gameRoom.secondPlayer.LastRx = now
+	}
+	mask2 := gameRoom.secondPlayer.RecvMask
+	if gameRoom.secondPlayer.LastRx.IsZero() || now.Sub(gameRoom.secondPlayer.LastRx) > staleTimeout {
+		mask2 = 0
+	}
+	gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y = stepFromStateDLL(
+		gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y, mask2, deltaTime)
+	gameRoom.secondPlayer.LastMask = mask2
+	gameRoom.secondPlayer.LastSeqN = gameRoom.secondPlayer.RecvSeqN
 
 	// =======================
 	// BROADCAST STATO
@@ -138,6 +148,25 @@ drainSecondPlayerInputs:
 
 	gameRoom.sendAuthStateToPlayer(gameRoom.secondPlayerConnection, gameRoom.secondPlayer)
 	gameRoom.sendRemoteStateToPlayer(gameRoom.secondPlayerConnection, gameRoom.firstPlayer)
+
+	// =======================
+	// DEBUG LOG (1 volta al secondo)
+	// =======================
+	if gameRoom.tickNo%uint64(gameRoom.tickRateHz) == 0 {
+		age1 := int64(-1)
+		if !gameRoom.firstPlayer.LastRx.IsZero() {
+			age1 = now.Sub(gameRoom.firstPlayer.LastRx).Milliseconds()
+		}
+		age2 := int64(-1)
+		if !gameRoom.secondPlayer.LastRx.IsZero() {
+			age2 = now.Sub(gameRoom.secondPlayer.LastRx).Milliseconds()
+		}
+
+		log.Printf("[TICK] P1 drain=%d ok=%v ageMs=%d recvSeq=%d usedMask=%d pos=(%.0f,%.0f) | P2 drain=%d ok=%v ageMs=%d recvSeq=%d usedMask=%d pos=(%.0f,%.0f)",
+			drain1, ok1, age1, gameRoom.firstPlayer.RecvSeqN, gameRoom.firstPlayer.LastMask, gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y,
+			drain2, ok2, age2, gameRoom.secondPlayer.RecvSeqN, gameRoom.secondPlayer.LastMask, gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y,
+		)
+	}
 
 	// =======================
 	// FORWARD SHOTS
@@ -230,7 +259,7 @@ func (gameRoom *GameRoom) sendRemoteStateToPlayer(targetConn *PlayerConnection, 
 }
 
 func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnection, shot ShotEvent) {
-	// Parità old_main: clamp charge
+	// clamp charge
 	charge := shot.Charge
 	if charge < 0 {
 		charge = 0
