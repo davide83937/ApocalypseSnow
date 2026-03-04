@@ -9,7 +9,7 @@ public record struct RemoteSnapshot(Vector2 Position, StateList Mask);
 
 public sealed class GameSession : GameComponent
 {
-    //private NetworkManager networkManager;
+    private NetworkManager networkManager;
     public Penguin _myPenguin;
     public Penguin _redPenguin;
     private Obstacle _obstacle;
@@ -20,7 +20,7 @@ public sealed class GameSession : GameComponent
     public EggsEvent _eggsEvent;
     public Events _events;
     private Game _game;
-    
+  
     public GameSession(Game game) : base(game)
     {
         _game = game;
@@ -33,16 +33,18 @@ public sealed class GameSession : GameComponent
 
     public override void Initialize()
     {
-        //networkManager = new NetworkManager(_game, "127.0.0.1", 8080);
+        networkManager = new NetworkManager(_game, "127.0.0.1", 8080);
         //networkManager = new NetworkManager(this, "192.168.1.27", 8080);
         //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
         //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
         //networkManager = new NetworkManager(this, "18.192.31.30", 11179);
         string playerName = "Davide";
         JoinStruct joinStruct = new JoinStruct(playerName);
+    
         NetworkManager.Instance.SendJoin(joinStruct);
         // 2. Attendi la risposta (il gioco si fermerà qui finché non arriva il secondo player)
         JoinAckStruct ack = NetworkManager.Instance.WaitForJoinAck();
+
         IMovements movements = new MovementsManager(_game);
         IMovements movementsRed = new MovementsManagerRed();
         string bluePathPlatform = "Content/images/green_logo.png";
@@ -68,6 +70,60 @@ public sealed class GameSession : GameComponent
         
         base.Initialize();
     }
+
+    public void EndSession()
+    {
+        // 1. Rimuovi tutti i componenti che la sessione ha aggiunto al gioco
+        CollisionManager.Instance.ClearAll();
+        Reconciler.Instance.Reset();
+        
+        if (_eggsEvent != null)
+        {
+            _eggsEvent.RemoveAllEggs();
+            _game.Components.Remove(_eggsEvent);
+        }
+        _game.Components.Remove(_myPenguin);
+        _game.Components.Remove(_redPenguin);
+        _game.Components.Remove(_bluePlatform);
+        _game.Components.Remove(_redPlatform);
+        _game.Components.Remove(_obstacle);
+        _game.Components.Remove(_eggsEvent);
+        _game.Components.Remove(_events);
+
+        // 2. Rimuovi la sessione stessa dai componenti del gioco
+        _game.Components.Remove(this);
+
+        // 3. Chiudi la connessione di rete (fondamentale!)
+        // Se il tuo NetworkManager ha un metodo Close o Dispose, chiamalo qui
+        // Altrimenti, assicurati che il socket venga rilasciato.
+        NetworkManager.Instance.Disconnect(); 
+
+        Console.WriteLine("Partita terminata e risorse pulite.");
+    }
     
-    
+    public override void Update(GameTime gameTime)
+    {
+        NetworkManager.Instance?.Receive();
+
+      
+        // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
+        Reconciler.Instance.GetLatest(_events._authQueue, auth =>
+        {
+            Reconciler.Instance.OnServerAuth(auth.Ack, auth.Position);
+            Reconciler.Instance.Apply(ref _myPenguin._position, 200f, NetDt);
+        });
+        
+        if (_eggsEvent._eggs.Count == 0)
+        {
+            if (_eggsEvent._myPenguinScore > _eggsEvent._redPenguinScore)
+            {
+                Console.WriteLine("Pinguino BLU ha vinto!!!!!!!!!!");
+            }
+            else
+            {
+                Console.WriteLine("Pinguino ROSSO ha vinto!!!!!!!!!");
+            }
+        }
+        base.Update(gameTime);
+    }
 }

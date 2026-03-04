@@ -97,5 +97,20 @@ namespace ApocalypseSnow
         {
             sendCollisionEvent?.Invoke(this, collisionRecordOut);
         }
+        
+        public void ClearAll()
+        {
+            // Svuota la lista dei record di input
+            _collisionRecordIns?.Clear();
+
+            // Opzionale: pulisci il buffer dei risultati resettandolo 
+            // (non è strettamente necessario perché viene sovrascritto, ma è più pulito)
+            if (resultsBuffer != null)
+            {
+                Array.Clear(resultsBuffer, 0, resultsBuffer.Length);
+            }
+
+            Console.WriteLine("CollisionManager: Liste pulite per la nuova partita.");
+        }
     }
 }

@@ -27,10 +27,9 @@ public class NetworkManager : GameComponent
     {
         get
         {
-            if (_instance == null)
-                throw new Exception("NetworkManager deve essere inizializzato in Game1 prima dell'uso!");
             return _instance;
         }
+        private set => _instance = value; // Permettiamo di scriverlo internamente
     }
 
     // Il costruttore deve accettare 'Game' e passarlo al padre tramite base(game)
@@ -245,13 +244,31 @@ public class NetworkManager : GameComponent
             Heartz =  BitConverter.ToUInt32(buffer, 21)
         };
     }
+    
+  
 
+    public void Disconnect()
+    {
+        try
+        {
+            _stream?.Close();
+            _tcpClient?.Close();
+            Console.WriteLine("Connessione TCP chiusa correttamente.");
+            _instance = null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Errore durante la disconnessione: {ex.Message}");
+        }
+    }
+    
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
             _stream?.Close();
             _tcpClient?.Close();
+            _instance = null;
         }
         base.Dispose(disposing);
     }

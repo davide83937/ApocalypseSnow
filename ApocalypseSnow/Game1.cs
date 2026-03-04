@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System.Collections.Concurrent;
 using System.Linq;
+using Microsoft.Xna.Framework.Input;
 
 namespace ApocalypseSnow;
 
@@ -11,19 +12,16 @@ public class Game1: Game
 {
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
-    //private Penguin _myPenguin;
-    //private Penguin _redPenguin;
-    //private Obstacle _obstacle;
-    //private Obstacle _obstacle1;
-    //private BasePlatform _bluePlatform;
-    //private BasePlatform _redPlatform;
+
     private GameSession gameSession;
     private SpriteFont _uiFont;
     private int _width;
     private int _height;
     private Texture2D _backgroundTexture;
-    private NetworkManager networkManager;
+    //private NetworkManager networkManager;
     private Reconciler _reconciler;
+
+    private string state = "Premi invio per iniziare...";
     //private float NetDt = 0;
     
     //private readonly ConcurrentQueue<JoinSnapshot> _joinQueue = new();
@@ -45,55 +43,20 @@ public class Game1: Game
     protected override void Initialize()
     {
         //CONNESSIONE ------------------------------------------------------
-        networkManager = new NetworkManager(this, "127.0.0.1", 8080);
-        //networkManager = new NetworkManager(this, "192.168.1.27", 8080);
-        //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
-        //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
-        //networkManager = new NetworkManager(this, "18.192.31.30", 11179);//
-        
-       // string playerName = "Davide";
-        //JoinStruct joinStruct = new JoinStruct(playerName);
-        //networkManager.SendJoin(joinStruct);
-        // 2. Attendi la risposta (il gioco si fermerà qui finché non arriva il secondo player)
-        //JoinAckStruct ack = networkManager.WaitForJoinAck();
-        //Console.WriteLine("--- Connessione Stabilita ---");
-        //Console.WriteLine($"Messaggio Tipo: {ack.Type}");
-        //Console.WriteLine($"ID Giocatore assegnato: {ack.PlayerId}");
-        //Console.WriteLine($"Posizione di Spawn: X={ack.SpawnX}, Y={ack.SpawnY}");
-        //Console.WriteLine($"Posizione di Spawn: X={ack.OpponentSpawnX}, Y={ack.OpponentSpawnY}");
-        //Console.WriteLine("-----------------------------");
-        
+        //networkManager = new NetworkManager(this, "127.0.0.1", 8080);
         _width = GraphicsDevice.Viewport.Width;
         _height = GraphicsDevice.Viewport.Height;
-        
         _reconciler  = new Reconciler(this);
-       
         //IMovements movements = new MovementsManager(this);
         //IMovements movementsRed = new MovementsManagerRed();
         CollisionManager collisionManager = new CollisionManager(this);
         
-        //string bluePathPlatform = "Content/images/green_logo.png";
-        //string redPathPlatform = "Content/images/red_logo.png";
-        //NetDt = 1f / (float)ack.Heartz;
-        //Console.WriteLine($"Delta time: {NetDt}");
-        //_bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
-        //_redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
-        //_myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt);
-        //_redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt);
-        //_obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
-        //_obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
-        //_eggsEvent = new EggsEvent(this, _myPenguin, _redPenguin);
-        //_events = new Events(this, _redPenguin);
-       
-        //Components.Add(_myPenguin);
-        //Components.Add(_redPenguin);
-        //Components.Add(_bluePlatform);
-        //Components.Add(_redPlatform);
-        //Components.Add(_obstacle);
+        
         Components.Add(collisionManager);
         //Components.Add(_eggsEvent);
         //Components.Add(_events);
-        gameSession = new GameSession(this);
+        //gameSession = new GameSession(this);
+        //Components.Add(gameSession);
         
         base.Initialize();
     }
@@ -151,15 +114,22 @@ public class Game1: Game
         _spriteBatch.Begin();
 
         _spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), Color.White);
-  
-        DrawComponentsOfType<BasePlatform>(Components.OfType<BasePlatform>());
-        DrawComponentsOfType<Obstacle>(Components.OfType<Obstacle>());
-        DrawComponentsOfType<Egg>(Components.OfType<Egg>());
-        DrawComponentsOfType<Penguin>(Components.OfType<Penguin>());
-        DrawComponentsOfType<Ball>(Components.OfType<Ball>());
-        
-        drawUI();
-        
+
+        if (gameSession != null)
+        {
+            DrawComponentsOfType<BasePlatform>(Components.OfType<BasePlatform>());
+            DrawComponentsOfType<Obstacle>(Components.OfType<Obstacle>());
+            DrawComponentsOfType<Egg>(Components.OfType<Egg>());
+            DrawComponentsOfType<Penguin>(Components.OfType<Penguin>());
+            DrawComponentsOfType<Ball>(Components.OfType<Ball>());
+            drawUI();
+        }
+        else
+        {
+            
+            _spriteBatch.DrawString(_uiFont, state, new Vector2(100, 100), Color.Black);
+        }
+
         _spriteBatch.End();
 
         base.Draw(gameTime);
@@ -167,33 +137,28 @@ public class Game1: Game
     
     protected override void Update(GameTime gameTime)
     {
-        
-        networkManager?.Receive();
-
-        // Controlla se gameSession e i suoi componenti interni sono pronti
-        if (gameSession == null || gameSession._events == null || gameSession._myPenguin == null)
+        if (Keyboard.GetState().IsKeyDown(Keys.Escape) && gameSession != null)
         {
-            base.Update(gameTime);
+            
+            gameSession.EndSession();
+            gameSession = null; // Portiamo a null per indicare che non c'è una partita attiva
             return;
         }
-        
-        // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
-        _reconciler.GetLatest(gameSession._events._authQueue, auth =>
+
+        //bool enterState = Keyboard.GetState().IsKeyDown(Keys.Enter);
+        if (Keyboard.GetState().IsKeyDown(Keys.Enter) && gameSession == null)
         {
-            _reconciler.OnServerAuth(auth.Ack, auth.Position);
-            _reconciler.Apply(ref gameSession._myPenguin._position, 200f, gameSession.NetDt);
-        });
-        
-        if (gameSession._eggsEvent._eggs.Count == 0)
+            gameSession = new GameSession(this);
+            Components.Add(gameSession);
+            return;
+        }
+
+        // Se non c'è una sessione, potresti voler mostrare di nuovo il messaggio in console
+        if (gameSession == null)
         {
-            if (gameSession._eggsEvent._myPenguinScore > gameSession._eggsEvent._redPenguinScore)
-            {
-                Console.WriteLine("Pinguino BLU ha vinto!!!!!!!!!!");
-            }
-            else
-            {
-                Console.WriteLine("Pinguino ROSSO ha vinto!!!!!!!!!");
-            }
+            // Qui potresti rimettere la logica per far ripartire una nuova partita
+            // Console.WriteLine("Premi Invio per una nuova partita...");
+            return;
         }
         base.Update(gameTime);
     }

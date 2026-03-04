@@ -115,5 +115,14 @@ public class EggsEvent:GameComponent
         Game.Components.Add(egg);
     }
     
+    public void RemoveAllEggs()
+    {
+        foreach (var egg in _eggs)
+        {
+            Game.Components.Remove(egg);
+        }
+        _eggs.Clear();
+    }
+    
     
 }
