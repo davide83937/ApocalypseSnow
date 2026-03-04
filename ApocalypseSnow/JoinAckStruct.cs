@@ -8,4 +8,5 @@ public struct JoinAckStruct
     public float SpawnY;        // 4 byte
     public float OpponentSpawnX;  // 4 byte (Nuovo)
     public float OpponentSpawnY;  // 4 byte (Nuovo)
+    public uint Heartz;
 }

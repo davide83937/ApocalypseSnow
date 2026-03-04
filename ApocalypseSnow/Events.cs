@@ -7,6 +7,7 @@ public class Events:GameComponent
 {
     Penguin _myPenguin;
     Penguin _redPenguin;
+    public record struct AuthSnapshot(uint Ack, Vector2 Position);
     public readonly ConcurrentQueue<AuthSnapshot> _authQueue = new();
     
     public Events(Game game, Penguin redPenguin) : base(game)

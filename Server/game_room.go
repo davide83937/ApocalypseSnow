@@ -167,7 +167,6 @@ func (gameRoom *GameRoom) Tick() {
 			drain2, ok2, age2, gameRoom.secondPlayer.RecvSeqN, gameRoom.secondPlayer.LastMask, gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y,
 		)
 	}
-
 	// =======================
 	// FORWARD SHOTS
 	// =======================
@@ -194,23 +193,27 @@ drainSecondPlayerShots:
 
 func (gameRoom *GameRoom) SendJoinAcknowledgements() {
 	// P1 JoinAck
-	packetP1 := make([]byte, 21)
+	packetP1 := make([]byte, 25)
 	packetP1[0] = MsgJoinAck
 	binary.LittleEndian.PutUint32(packetP1[1:5], gameRoom.firstPlayer.ID)
 	binary.LittleEndian.PutUint32(packetP1[5:9], math.Float32bits(gameRoom.firstPlayer.X))
 	binary.LittleEndian.PutUint32(packetP1[9:13], math.Float32bits(gameRoom.firstPlayer.Y))
 	binary.LittleEndian.PutUint32(packetP1[13:17], math.Float32bits(gameRoom.secondPlayer.X))
 	binary.LittleEndian.PutUint32(packetP1[17:21], math.Float32bits(gameRoom.secondPlayer.Y))
+	// Nuovo campo: TickRate (frequenza intera, es: 30)
+	binary.LittleEndian.PutUint32(packetP1[21:25], uint32(gameRoom.tickRateHz))
 	gameRoom.firstPlayerConnection.TryEnqueueOutgoingPacket(packetP1, true)
 
 	// P2 JoinAck
-	packetP2 := make([]byte, 21)
+	packetP2 := make([]byte, 25)
 	packetP2[0] = MsgJoinAck
 	binary.LittleEndian.PutUint32(packetP2[1:5], gameRoom.secondPlayer.ID)
 	binary.LittleEndian.PutUint32(packetP2[5:9], math.Float32bits(gameRoom.secondPlayer.X))
 	binary.LittleEndian.PutUint32(packetP2[9:13], math.Float32bits(gameRoom.secondPlayer.Y))
 	binary.LittleEndian.PutUint32(packetP2[13:17], math.Float32bits(gameRoom.firstPlayer.X))
 	binary.LittleEndian.PutUint32(packetP2[17:21], math.Float32bits(gameRoom.firstPlayer.Y))
+	// Nuovo campo: TickRate (frequenza intera, es: 30)
+	binary.LittleEndian.PutUint32(packetP2[21:25], uint32(gameRoom.tickRateHz))
 	gameRoom.secondPlayerConnection.TryEnqueueOutgoingPacket(packetP2, true)
 }
 

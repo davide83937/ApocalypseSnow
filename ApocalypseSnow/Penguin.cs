@@ -16,7 +16,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
     //private Vector2 _speed;
     private float _deltaTime;
-    private float _physicsDeltaTime = 1f / 30f;
+    private float _physicsDeltaTime;
 
     private float _accumulator = 0f;
     
@@ -29,7 +29,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
 
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed,
-        IMovements movements) : base(game, tag, startPosition)
+        IMovements movements, float physicsDeltaTime) : base(game, tag, startPosition)
     {
         _gameContext = game;
         _movementsManager = movements;
@@ -37,6 +37,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
         _penguinInputHandler = new PenguinInputHandler(_tag);
+        _physicsDeltaTime = physicsDeltaTime;
     }
     
 

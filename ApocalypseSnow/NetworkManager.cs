@@ -217,13 +217,13 @@ public class NetworkManager : GameComponent
         if (_stream == null || !_tcpClient.Connected) 
             throw new Exception("Non connesso al server");
 
-        byte[] buffer = new byte[21];
+        byte[] buffer = new byte[25];
         int totalRead = 0;
     
         // Leggiamo fino a riempire il buffer da 13 byte
-        while (totalRead < 21)
+        while (totalRead < 25)
         {
-            int read = _stream.Read(buffer, totalRead, 21 - totalRead);
+            int read = _stream.Read(buffer, totalRead, 25 - totalRead);
             if (read <= 0) throw new Exception("Server disconnesso durante l'attesa del JoinAck");
             totalRead += read;
         }
@@ -240,7 +240,8 @@ public class NetworkManager : GameComponent
             SpawnX = BitConverter.ToSingle(buffer, 5),
             SpawnY = BitConverter.ToSingle(buffer, 9),
             OpponentSpawnX = BitConverter.ToSingle(buffer, 13), // Lettura nuovi dati
-            OpponentSpawnY = BitConverter.ToSingle(buffer, 17)  // Lettura nuovi dati
+            OpponentSpawnY = BitConverter.ToSingle(buffer, 17),  // Lettura nuovi dati
+            Heartz =  BitConverter.ToUInt32(buffer, 21)
         };
     }
 

@@ -23,7 +23,7 @@ public class Game1: Game
     private Texture2D _backgroundTexture;
     private NetworkManager networkManager;
     private Reconciler _reconciler;
-    private float NetDt = 1f / 30f;
+    
     //private readonly ConcurrentQueue<JoinSnapshot> _joinQueue = new();
     //private readonly ConcurrentQueue<AuthSnapshot> _authQueue = new();
     //private readonly ConcurrentQueue<RemoteSnapshot> _remoteStateQueue = new();
@@ -43,11 +43,11 @@ public class Game1: Game
     protected override void Initialize()
     {
         //CONNESSIONE ------------------------------------------------------
-        //networkManager = new NetworkManager(this, "127.0.0.1", 8080);
+        networkManager = new NetworkManager(this, "127.0.0.1", 8080);
         //networkManager = new NetworkManager(this, "192.168.1.27", 8080);
         //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
         //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
-        networkManager = new NetworkManager(this, "18.192.31.30", 11179);
+        //networkManager = new NetworkManager(this, "18.192.31.30", 11179);
         
         string playerName = "Davide";
         JoinStruct joinStruct = new JoinStruct(playerName);
@@ -72,11 +72,11 @@ public class Game1: Game
         
         string bluePathPlatform = "Content/images/green_logo.png";
         string redPathPlatform = "Content/images/red_logo.png";
-        
+        private float NetDt = 1f / (float)ack.Heartz;
         _bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
         _redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
-        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements);
-        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed);
+        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt);
+        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt);
         _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
         _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
         _eggsEvent = new EggsEvent(this, _myPenguin, _redPenguin);
