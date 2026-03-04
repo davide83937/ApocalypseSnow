@@ -20,6 +20,7 @@ public sealed class GameSession : GameComponent
     public EggsEvent _eggsEvent;
     public Events _events;
     private Game _game;
+    public string state = null;
   
     public GameSession(Game game) : base(game)
     {
@@ -38,39 +39,66 @@ public sealed class GameSession : GameComponent
         //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
         //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
         //networkManager = new NetworkManager(this, "18.192.31.30", 11179);
-        string playerName = "Davide";
-        JoinStruct joinStruct = new JoinStruct(playerName);
-    
-        NetworkManager.Instance.SendJoin(joinStruct);
-        // 2. Attendi la risposta (il gioco si fermerà qui finché non arriva il secondo player)
-        JoinAckStruct ack = NetworkManager.Instance.WaitForJoinAck();
+        state = "In attesa di un avversario...";
+ 
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try 
+            {
+                string playerName = "Davide";
+                JoinStruct joinStruct = new JoinStruct(playerName);
+                NetworkManager.Instance.SendJoin(joinStruct);
 
+                // Questa riga BLOCCHEREBBE il gioco, ma qui è dentro un Task, 
+                // quindi la finestra di gioco continua a girare!
+                JoinAckStruct ack = NetworkManager.Instance.WaitForJoinAck();
+
+                // Una volta ricevuto l'ACK, creiamo i pinguini e gli oggetti
+                // Usiamo un metodo di supporto
+                StartMatch(ack);
+            
+                // Togliamo il messaggio di attesa
+                state = null;
+            }
+            catch (Exception ex)
+            {
+                state = "Errore di connessione!";
+                Console.WriteLine(ex.Message);
+            }
+        });
+        
+        base.Initialize();
+    }
+
+    private void StartMatch(JoinAckStruct ack)
+    {
         IMovements movements = new MovementsManager(_game);
         IMovements movementsRed = new MovementsManagerRed();
         string bluePathPlatform = "Content/images/green_logo.png";
         string redPathPlatform = "Content/images/red_logo.png";
+    
         NetDt = 1f / (float)ack.Heartz;
-        Console.WriteLine($"Delta time: {NetDt}");
+
         _bluePlatform = new BasePlatform(_game, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
         _redPlatform =  new BasePlatform(_game, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
         _myPenguin = new Penguin(_game,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt);
         _redPenguin = new Penguin(_game,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt);
         _obstacle = new Obstacle(_game, new Vector2(100, 100), 1, 1);
-        //_obstacle1 = new Obstacle(_game, new Vector2(100, 50), 1, 1);
         _eggsEvent = new EggsEvent(_game, _myPenguin, _redPenguin);
         _events = new Events(_game, _redPenguin);
+
+        // AGGIUNTA AI COMPONENTI
+        // Nota: MonoGame è solitamente thread-safe per Components.Add, 
+        // ma è buona norma farlo qui appena ricevuti i dati.
         _game.Components.Add(_myPenguin);
         _game.Components.Add(_redPenguin);
         _game.Components.Add(_bluePlatform);
         _game.Components.Add(_redPlatform);
         _game.Components.Add(_obstacle);
-        //_game.Components.Add(collisionManager);
         _game.Components.Add(_eggsEvent);
         _game.Components.Add(_events);
-        
-        base.Initialize();
     }
-
+    
     public void EndSession()
     {
         // 1. Rimuovi tutti i componenti che la sessione ha aggiunto al gioco
@@ -103,8 +131,12 @@ public sealed class GameSession : GameComponent
     
     public override void Update(GameTime gameTime)
     {
+        if (state != null || _myPenguin == null || _events == null)
+        {
+            return; 
+        }
+        
         NetworkManager.Instance?.Receive();
-
       
         // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
         Reconciler.Instance.GetLatest(_events._authQueue, auth =>

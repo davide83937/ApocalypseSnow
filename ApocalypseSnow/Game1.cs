@@ -108,31 +108,62 @@ public class Game1: Game
     
     protected override void Draw(GameTime gameTime)
     {
-        // 1. Pulisce lo schermo (il "famoso" azzurro CornflowerBlue)
         GraphicsDevice.Clear(Color.White);
-        
         _spriteBatch.Begin();
 
-        _spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), Color.White);
+        // Disegna sempre lo sfondo
+        _spriteBatch.Draw(_backgroundTexture, new Rectangle(0, 0, _width, _height), Color.White);
 
         if (gameSession != null)
         {
-            DrawComponentsOfType<BasePlatform>(Components.OfType<BasePlatform>());
-            DrawComponentsOfType<Obstacle>(Components.OfType<Obstacle>());
-            DrawComponentsOfType<Egg>(Components.OfType<Egg>());
-            DrawComponentsOfType<Penguin>(Components.OfType<Penguin>());
-            DrawComponentsOfType<Ball>(Components.OfType<Ball>());
-            drawUI();
+            // Se stiamo aspettando l'avversario
+            if (gameSession.state != null)
+            {
+                DrawFancyText(gameSession.state, new Vector2(_width / 2f, _height / 2f), Color.Red, gameTime, true, 1.2f);
+            }
+            else 
+            {
+                // Se la partita è iniziata (state è null), disegna i componenti
+                DrawComponentsOfType<BasePlatform>(Components.OfType<BasePlatform>());
+                DrawComponentsOfType<Obstacle>(Components.OfType<Obstacle>());
+                DrawComponentsOfType<Egg>(Components.OfType<Egg>());
+                DrawComponentsOfType<Penguin>(Components.OfType<Penguin>());
+                DrawComponentsOfType<Ball>(Components.OfType<Ball>());
+                drawUI();
+            }
         }
         else
         {
-            
-            _spriteBatch.DrawString(_uiFont, state, new Vector2(100, 100), Color.Black);
+            DrawFancyText(state, new Vector2(_width / 2f, _height / 2f), Color.Black, gameTime, true, 1.1f);
         }
 
         _spriteBatch.End();
-
         base.Draw(gameTime);
+    }
+    
+  
+    private void DrawFancyText(string text, Vector2 screenPos, Color color, GameTime gameTime, bool pulse = false, float baseScale = 1.0f)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+
+        // Misuriamo la dimensione per determinare l'origine (il centro della scritta)
+        Vector2 size = _uiFont.MeasureString(text);
+        Vector2 origin = size / 2;
+
+        float finalScale = baseScale;
+
+        if (pulse)
+        {
+            // Effetto pulsante: varia la scala tra 0.95 e 1.05 basandosi sui secondi totali
+            float pulseDelta = (float)Math.Sin(gameTime.TotalGameTime.TotalSeconds * 4f) * 0.05f;
+            finalScale += pulseDelta;
+        }
+
+        // 1. Disegna l'ombra (Nera, leggermente trasparente, spostata di 3 pixel)
+        _spriteBatch.DrawString(_uiFont, text, screenPos + new Vector2(3, 3), Color.Black * 0.5f, 0f, origin, finalScale, SpriteEffects.None, 0f);
+
+        // 2. Disegna il testo principale
+        _spriteBatch.DrawString(_uiFont, text, screenPos, color, 0f, origin, finalScale, SpriteEffects.None, 0f);
     }
     
     protected override void Update(GameTime gameTime)
