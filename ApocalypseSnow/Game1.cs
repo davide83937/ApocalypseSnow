@@ -11,26 +11,27 @@ public class Game1: Game
 {
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
-    private Penguin _myPenguin;
-    private Penguin _redPenguin;
-    private Obstacle _obstacle;
-    private Obstacle _obstacle1;
-    private BasePlatform _bluePlatform;
-    private BasePlatform _redPlatform;
+    //private Penguin _myPenguin;
+    //private Penguin _redPenguin;
+    //private Obstacle _obstacle;
+    //private Obstacle _obstacle1;
+    //private BasePlatform _bluePlatform;
+    //private BasePlatform _redPlatform;
+    private GameSession gameSession;
     private SpriteFont _uiFont;
     private int _width;
     private int _height;
     private Texture2D _backgroundTexture;
     private NetworkManager networkManager;
     private Reconciler _reconciler;
-    private float NetDt = 0;
+    //private float NetDt = 0;
     
     //private readonly ConcurrentQueue<JoinSnapshot> _joinQueue = new();
     //private readonly ConcurrentQueue<AuthSnapshot> _authQueue = new();
     //private readonly ConcurrentQueue<RemoteSnapshot> _remoteStateQueue = new();
     //private readonly ConcurrentQueue<ShotStruct> _shotQueue = new();
-    private EggsEvent _eggsEvent;
-    private Events _events;
+    //private EggsEvent _eggsEvent;
+    //private Events _events;
     
     public Game1()
     {
@@ -48,13 +49,13 @@ public class Game1: Game
         //networkManager = new NetworkManager(this, "192.168.1.27", 8080);
         //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
         //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
-        //networkManager = new NetworkManager(this, "18.192.31.30", 11179);
+        //networkManager = new NetworkManager(this, "18.192.31.30", 11179);//
         
-        string playerName = "Davide";
-        JoinStruct joinStruct = new JoinStruct(playerName);
-        networkManager.SendJoin(joinStruct);
+       // string playerName = "Davide";
+        //JoinStruct joinStruct = new JoinStruct(playerName);
+        //networkManager.SendJoin(joinStruct);
         // 2. Attendi la risposta (il gioco si fermerà qui finché non arriva il secondo player)
-        JoinAckStruct ack = networkManager.WaitForJoinAck();
+        //JoinAckStruct ack = networkManager.WaitForJoinAck();
         //Console.WriteLine("--- Connessione Stabilita ---");
         //Console.WriteLine($"Messaggio Tipo: {ack.Type}");
         //Console.WriteLine($"ID Giocatore assegnato: {ack.PlayerId}");
@@ -67,31 +68,32 @@ public class Game1: Game
         
         _reconciler  = new Reconciler(this);
        
-        IMovements movements = new MovementsManager(this);
-        IMovements movementsRed = new MovementsManagerRed();
+        //IMovements movements = new MovementsManager(this);
+        //IMovements movementsRed = new MovementsManagerRed();
         CollisionManager collisionManager = new CollisionManager(this);
         
-        string bluePathPlatform = "Content/images/green_logo.png";
-        string redPathPlatform = "Content/images/red_logo.png";
-        NetDt = 1f / (float)ack.Heartz;
-        Console.WriteLine($"Delta time: {NetDt}");
-        _bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
-        _redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
-        _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt);
-        _redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt);
-        _obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
-        _obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
-        _eggsEvent = new EggsEvent(this, _myPenguin, _redPenguin);
-        _events = new Events(this, _redPenguin);
+        //string bluePathPlatform = "Content/images/green_logo.png";
+        //string redPathPlatform = "Content/images/red_logo.png";
+        //NetDt = 1f / (float)ack.Heartz;
+        //Console.WriteLine($"Delta time: {NetDt}");
+        //_bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
+        //_redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
+        //_myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt);
+        //_redPenguin = new Penguin(this,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt);
+        //_obstacle = new Obstacle(this, new Vector2(100, 100), 1, 1);
+        //_obstacle1 = new Obstacle(this, new Vector2(100, 50), 1, 1);
+        //_eggsEvent = new EggsEvent(this, _myPenguin, _redPenguin);
+        //_events = new Events(this, _redPenguin);
        
-        Components.Add(_myPenguin);
-        Components.Add(_redPenguin);
-        Components.Add(_bluePlatform);
-        Components.Add(_redPlatform);
-        Components.Add(_obstacle);
+        //Components.Add(_myPenguin);
+        //Components.Add(_redPenguin);
+        //Components.Add(_bluePlatform);
+        //Components.Add(_redPlatform);
+        //Components.Add(_obstacle);
         Components.Add(collisionManager);
-        Components.Add(_eggsEvent);
-        Components.Add(_events);
+        //Components.Add(_eggsEvent);
+        //Components.Add(_events);
+        gameSession = new GameSession(this);
         
         base.Initialize();
     }
@@ -124,18 +126,18 @@ public class Game1: Game
 
     private void drawUI()
     {
-        if (_myPenguin != null && _redPenguin != null)
+        if (gameSession._myPenguin != null && gameSession._redPenguin != null)
         {
             // Testo Munizioni (in basso a sinistra come lo avevi)
-            string ammoText = $"Munizioni: {_myPenguin._penguinShotHandler.Ammo}";
+            string ammoText = $"Munizioni: {gameSession._myPenguin._penguinShotHandler.Ammo}";
             _spriteBatch.DrawString(_uiFont, ammoText, new Vector2(_width / 10f, _height * 0.85f), Color.Black);
 
             // Punteggio Player Blu (in alto a sinistra)
-            string blueScoreText = $"Punteggio Blu: {_eggsEvent._myPenguinScore}";
+            string blueScoreText = $"Punteggio Blu: {gameSession._eggsEvent._myPenguinScore}";
             _spriteBatch.DrawString(_uiFont, blueScoreText, new Vector2(20, 20), Color.Blue);
 
             // Punteggio Player Rosso (in alto a destra)
-            string redScoreText = $"Punteggio Rosso: {_eggsEvent._redPenguinScore}";
+            string redScoreText = $"Punteggio Rosso: {gameSession._eggsEvent._redPenguinScore}";
             Vector2 redScoreSize = _uiFont.MeasureString(redScoreText); // Misuriamo la scritta per allinearla a destra
             _spriteBatch.DrawString(_uiFont, redScoreText, new Vector2(_width - redScoreSize.X - 20, 20), Color.Red);
         }
@@ -168,16 +170,23 @@ public class Game1: Game
         
         networkManager?.Receive();
 
+        // Controlla se gameSession e i suoi componenti interni sono pronti
+        if (gameSession == null || gameSession._events == null || gameSession._myPenguin == null)
+        {
+            base.Update(gameTime);
+            return;
+        }
+        
         // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
-        _reconciler.GetLatest(_events._authQueue, auth =>
+        _reconciler.GetLatest(gameSession._events._authQueue, auth =>
         {
             _reconciler.OnServerAuth(auth.Ack, auth.Position);
-            _reconciler.Apply(ref _myPenguin._position, 200f, NetDt);
+            _reconciler.Apply(ref gameSession._myPenguin._position, 200f, gameSession.NetDt);
         });
         
-        if (_eggsEvent._eggs.Count == 0)
+        if (gameSession._eggsEvent._eggs.Count == 0)
         {
-            if (_eggsEvent._myPenguinScore > _eggsEvent._redPenguinScore)
+            if (gameSession._eggsEvent._myPenguinScore > gameSession._eggsEvent._redPenguinScore)
             {
                 Console.WriteLine("Pinguino BLU ha vinto!!!!!!!!!!");
             }
