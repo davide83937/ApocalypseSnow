@@ -29,7 +29,7 @@ public class MovementsManager:IMovements
 
     public void UpdateInput(ref StateStruct stateStruct, bool isFreezing, bool isWithEgg, 
         float _deltaTime, Vector2 _position)
-    {
+        {
         
         stateStruct.Update();
         

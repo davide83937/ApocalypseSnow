@@ -1,0 +1,580 @@
+// +build legacy
+
+package main
+
+/*
+#cgo CFLAGS: -I../Shared
+#cgo LDFLAGS: -L../Shared -l:libPhysicsDll.dll
+#include "library.h"
+*/
+import "C"
+
+import (
+	"encoding/binary"
+	"fmt"
+	"io"
+	"math"
+	"math/rand"
+	"net"
+	"sync/atomic"
+	"time"
+)
+
+type Client struct {
+	conn  net.Conn
+	send  chan []byte
+	input chan StateMsg // latest-wins
+	shot  chan ShotMsg  // latest-wins (release event)
+
+	done chan struct{}
+	id   uint32
+	slot int
+}
+
+type StateMsg struct {
+	mask int32
+	seq  uint32
+}
+
+type ShotMsg struct {
+	a      int32
+	b      int32
+	charge int32
+}
+
+type Session struct {
+	a, b *Client
+
+	ax, ay float32
+	bx, by float32
+
+	aMask int32
+	bMask int32
+
+	aAck uint32
+	bAck uint32
+
+	aClientX, aClientY float32 // Aggiungi queste
+	bClientX, bClientY float32 // Aggiungi queste
+
+	tick *time.Ticker
+}
+
+var globalID uint32 = 0
+
+func nextID() uint32 {
+	return atomic.AddUint32(&globalID, 1)
+}
+
+func sanitizeMask(m int32) int32 {
+	// Pulizia direzioni opposte
+	if (m&Left) != 0 && (m&Right) != 0 {
+		m &^= (Left | Right)
+	}
+	if (m&Up) != 0 && (m&Down) != 0 {
+		m &^= (Up | Down)
+	}
+
+	// Validazione logica: se non hai l'uovo (WithEgg), non puoi inviare PuttingEgg
+	if (m&WithEgg) == 0 && (m&PuttingEgg) != 0 {
+		m &^= PuttingEgg
+	}
+
+	// Se stai raccogliendo (TakingEgg), non puoi stare già portando un uovo
+	if (m&WithEgg) != 0 && (m&TakingEgg) != 0 {
+		m &^= TakingEgg
+	}
+
+	return m
+}
+
+/*func sanitizeMask(m int32) int32 {
+	if (m&Left) != 0 && (m&Right) != 0 {
+		m &^= (Left | Right)
+	}
+	if (m&Up) != 0 && (m&Down) != 0 {
+		m &^= (Up | Down)
+	}
+	return m
+}*/
+
+// Funzione per inviare lo spawn dell'uovo
+func sendSpawnEgg(c *Client, id int, x, y float32) {
+	buf := make([]byte, 13)
+	buf[0] = MsgSpawnEgg
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(id))
+	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(x))
+	binary.LittleEndian.PutUint32(buf[9:13], math.Float32bits(y))
+	trySend(c, buf, true)
+}
+
+func stepFromStateDLL(x, y float32, mask int32, dt float32) (float32, float32) {
+	if (mask&Reload) != 0 || (mask&Freezing) != 0 || (mask&TakingEgg) != 0 || (mask&PuttingEgg) != 0 {
+		return x, y
+	}
+
+	var vx C.float = 0
+	var vy C.float = 0
+
+	if (mask & Up) != 0 {
+		vy -= 1
+	}
+	if (mask & Down) != 0 {
+		vy += 1
+	}
+	if (mask & Left) != 0 {
+		vx -= 1
+	}
+	if (mask & Right) != 0 {
+		vx += 1
+	}
+
+	if vx != 0 || vy != 0 {
+		C.normalizeVelocity(&vx, &vy)
+	}
+
+	vx *= C.float(MoveSpeed)
+	vy *= C.float(MoveSpeed)
+
+	cx := C.float(x)
+	cy := C.float(y)
+
+	C.uniform_rectilinear_motion(&cx, vx, C.float(dt))
+	C.uniform_rectilinear_motion(&cy, vy, C.float(dt))
+
+	return float32(cx), float32(cy)
+}
+
+func sendJoinAck(c *Client, playerId uint32, spawnX, spawnY, oppX, oppY float32) {
+	buf := make([]byte, 21)
+	buf[0] = MsgJoinAck
+	binary.LittleEndian.PutUint32(buf[1:5], playerId)
+	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(spawnX))
+	binary.LittleEndian.PutUint32(buf[9:13], math.Float32bits(spawnY))
+	binary.LittleEndian.PutUint32(buf[13:17], math.Float32bits(oppX)) // Nuova coordinata X avversario
+	binary.LittleEndian.PutUint32(buf[17:21], math.Float32bits(oppY)) // Nuova coordinata Y avversario
+	trySend(c, buf, true)
+}
+
+func sendAuthStateSelf(c *Client, ackSeq uint32, x, y float32) {
+	buf := make([]byte, 13)
+	buf[0] = MsgAuthState
+	x = float32(math.Round(float64(x)))
+	y = float32(math.Round(float64(y)))
+	binary.LittleEndian.PutUint32(buf[1:5], ackSeq)
+	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(x))
+	binary.LittleEndian.PutUint32(buf[9:13], math.Float32bits(y))
+	trySend(c, buf, false)
+}
+
+func sendRemoteState(c *Client, x, y float32, mask int32) {
+	buf := make([]byte, 13)
+	buf[0] = MsgRemoteState
+	// Arrotondiamo anche qui per la posizione dell'avversario
+	//x = float32(math.Round(float64(x)))
+	//y = float32(math.Round(float64(y)))
+	binary.LittleEndian.PutUint32(buf[1:5], math.Float32bits(x))
+	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(y))
+	binary.LittleEndian.PutUint32(buf[9:13], uint32(mask))
+	trySend(c, buf, false)
+}
+
+func sendRemoteShot(c *Client, a, b, charge int32) {
+	// clamp minimo (per robustezza)
+	if charge < 0 {
+		charge = 0
+	}
+	if charge > chargeCap {
+		charge = chargeCap
+	}
+
+	buf := make([]byte, 13)
+	buf[0] = MsgRemoteShot
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(a))
+	binary.LittleEndian.PutUint32(buf[5:9], uint32(b))
+	binary.LittleEndian.PutUint32(buf[9:13], uint32(charge))
+	trySend(c, buf, false)
+}
+
+func trySend(c *Client, pkt []byte, mustSend bool) {
+	select {
+	case c.send <- pkt:
+	default:
+		if mustSend {
+			closeClient(c)
+		}
+	}
+}
+
+func closeClient(c *Client) {
+	select {
+	case <-c.done:
+		return
+	default:
+		close(c.done)
+		_ = c.conn.Close()
+	}
+}
+
+func writerLoop(c *Client) {
+	defer closeClient(c)
+	for {
+		select {
+		case <-c.done:
+			return
+		case pkt := <-c.send:
+			if pkt == nil {
+				return
+			}
+			_, err := c.conn.Write(pkt)
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func readExactly(conn net.Conn, n int) ([]byte, error) {
+	buf := make([]byte, n)
+	_, err := io.ReadFull(conn, buf)
+	return buf, err
+}
+
+func readerLoop(c *Client) {
+	defer closeClient(c)
+
+	for {
+		h, err := readExactly(c.conn, 1)
+		if err != nil {
+			return
+		}
+		typ := h[0]
+
+		switch typ {
+		case MsgJoin:
+			if _, err := readExactly(c.conn, 8); err != nil {
+				return
+			}
+			// Nel readerLoop del server, gestisci il nuovo tipo 9
+			// (Assicurati di aggiungere il caso nel selettore switch typ)
+
+		case MsgState:
+			pl, err := readExactly(c.conn, 8)
+			if err != nil {
+				return
+			}
+			mask := int32(binary.LittleEndian.Uint32(pl[0:4]))
+			mask = sanitizeMask(mask)
+			seq := binary.LittleEndian.Uint32(pl[4:8])
+
+			//fmt.Printf("seq: %f\n", seq)
+			//fmt.Printf("clientX: %f\n", clientX)
+			//fmt.Printf("clientY: %f\n", clientY)
+			msg := StateMsg{mask: mask, seq: seq}
+
+			select {
+			case c.input <- msg:
+			default:
+				select {
+				case <-c.input:
+				default:
+				}
+				select {
+				case c.input <- msg:
+				default:
+				}
+			}
+
+		case MsgShot:
+			// 12 bytes: [a][b][charge]  (EVENT: release)
+			pl, err := readExactly(c.conn, 12)
+			if err != nil {
+				return
+			}
+			a := int32(binary.LittleEndian.Uint32(pl[0:4]))
+			b := int32(binary.LittleEndian.Uint32(pl[4:8]))
+			ch := int32(binary.LittleEndian.Uint32(pl[8:12]))
+
+			msg := ShotMsg{a: a, b: b, charge: ch}
+
+			select {
+			case c.shot <- msg:
+			default:
+				select {
+				case <-c.shot:
+				default:
+				}
+				select {
+				case c.shot <- msg:
+				default:
+				}
+			}
+
+		default:
+			fmt.Printf("[WARN] unknown type=%d from %v\n", typ, c.conn.RemoteAddr())
+			return
+		}
+	}
+}
+
+// Verifica se la differenza tra la posizione del server (sx, sy)
+// e quella del client (cx, cy) è trascurabile.
+/*func isCloseEnough(sx, sy, cx, cy float32) bool {
+	const epsilon = 8 // Margine di errore tollerato in pixel
+	//fmt.Printf("sx: %f\n", sx)
+	//fmt.Printf("sy: %f\n", sy)
+	//fmt.Printf("cx: %f\n", cx)
+	//fmt.Printf("cy: %f\n", cy)
+	dx := sx - cx
+	dy := sy - cy
+	// Utilizza il quadrato della distanza per evitare il calcolo della radice quadrata
+	return math.Abs(float64(dx)) < epsilon &&
+		math.Abs(float64(dy)) < epsilon
+}*/
+
+// ============== MATCHMAKER ==============
+
+func matchmaker(join <-chan *Client) {
+	var waiting *Client
+
+	for c := range join {
+		if waiting == nil {
+			waiting = c
+			continue
+		}
+
+		a := waiting
+		b := c
+		waiting = nil
+
+		s := newSession(a, b)
+		go s.run()
+	}
+}
+
+// ============== SESSION ==============
+
+func newSession(a, b *Client) *Session {
+	s := &Session{
+		a:    a,
+		b:    b,
+		tick: time.NewTicker(time.Second / time.Duration(MoveHz)),
+	}
+
+	s.ax, s.ay = 100, 300
+	s.bx, s.by = 550, 25
+
+	a.id = nextID()
+	b.id = nextID()
+	a.slot = 0
+	b.slot = 1
+
+	return s
+}
+
+func processClientTicks(c *Client, x, y float32, curMask int32, curAck uint32, lastCx, lastCy float32) (int, float32, float32, float32, float32, int32, uint32) {
+	steps := 0
+	cx, cy := lastCx, lastCy // Parti dall'ultimo valore noto
+
+	for {
+		select {
+		case m := <-c.input:
+			curMask = m.mask
+			curAck = m.seq
+			x, y = stepFromStateDLL(x, y, curMask, MoveDt)
+			steps++
+			if steps >= maxCatchupPerTick {
+				return steps, x, y, cx, cy, curMask, curAck
+			}
+		default:
+			// Se non ci sono messaggi, restituisce x, y correnti
+			// e l'ultima posizione client nota (cx, cy)
+			return steps, x, y, cx, cy, curMask, curAck
+		}
+	}
+}
+
+func createEggs(s *Session) {
+	for i := 0; i < 5; i++ {
+		ex := float32(250 + rand.Intn(250)) // Range X: 250-500
+		ey := float32(rand.Intn(400))       // Range Y: 0-400
+		sendSpawnEgg(s.a, i, ex, ey)
+		sendSpawnEgg(s.b, i, ex, ey)
+	}
+}
+
+func (s *Session) run() {
+	defer s.tick.Stop()
+	defer closeClient(s.a)
+	defer closeClient(s.b)
+
+	fmt.Printf("[SESSION] start A=%v id=%d | B=%v id=%d\n",
+		s.a.conn.RemoteAddr(), s.a.id, s.b.conn.RemoteAddr(), s.b.id)
+
+	sendJoinAck(s.a, s.a.id, s.ax, s.ay, s.bx, s.by) // Invia a player A la sua pos e quella di B
+	sendJoinAck(s.b, s.b.id, s.bx, s.by, s.ax, s.ay) // Invia a player B la sua pos e quella di A
+
+	createEggs(s)
+
+	// Variabili per conservare l'ultimo dt ricevuto
+	//var aDt, bDt float32 = MoveDt, MoveDt
+	//var aClientX, aClientY, bClientX, bClientY float32
+	for {
+		select {
+		case <-s.a.done:
+			return
+		case <-s.b.done:
+			return
+
+			// (metodo run della Session)
+		case <-s.tick.C:
+			// --- Processa Player A ---
+			//for {
+			//select {
+			//case m := <-s.a.input:
+			// Aggiorna i dati dello stato corrente
+			_, s.ax, s.ay, s.aClientX, s.aClientY, s.aMask, s.aAck =
+				processClientTicks(s.a, s.ax, s.ay, s.aMask, s.aAck, s.aClientX, s.aClientY)
+			//s.aMask = m.mask
+			//s.aAck = m.seq
+
+			// Applica il movimento usando il deltaTime specifico di QUESTO pacchetto
+			//s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask)
+			_, s.bx, s.by, s.bClientX, s.bClientY, s.bMask, s.bAck =
+				processClientTicks(s.b, s.bx, s.by, s.bMask, s.bAck, s.bClientX, s.bClientY)
+			//default:
+			// Esci dal ciclo quando il canale è vuoto
+			//goto doneA
+			//}
+			//}
+			//doneA:
+
+			// --- Processa Player B ---
+			//for {
+			//select {
+			//case m := <-s.b.input:
+			/*s.bMask = m.mask
+			s.bAck = m.seq
+			s.bClientX = m.x
+			s.bClientY = m.y
+
+			s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask)*/
+			//default:
+			//goto doneB
+			//}
+			//}
+			//doneB:
+
+			// Dopo aver processato tutti i pacchetti, esegui la riconciliazione e l'invio
+			//if !isCloseEnough(s.ax, s.ay, s.aClientX, s.aClientY) {
+			sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
+			//}
+			sendRemoteState(s.b, s.ax, s.ay, s.aMask)
+
+			//if !isCloseEnough(s.bx, s.by, s.bClientX, s.bClientY) {
+			sendAuthStateSelf(s.b, s.bAck, s.bx, s.by)
+			//}
+			sendRemoteState(s.a, s.bx, s.by, s.bMask)
+			//case <-s.tick.C:
+			// Aggiorna maschere, sequenze e deltaTime
+			/*s.aMask, s.aAck, aDt, s.aClientX, s.aClientY = drainStateWithPos(s.a, s.aMask, s.aAck, aDt, s.aClientX, s.aClientY)
+			s.bMask, s.bAck, bDt, s.bClientX, s.bClientY = drainStateWithPos(s.b, s.bMask, s.bAck, bDt, s.bClientX, s.bClientY)
+			*/
+			// Calcola il movimento usando i dt specifici inviati dai client
+			/*s.ax, s.ay = stepFromStateDLL(s.ax, s.ay, s.aMask, aDt)
+			s.bx, s.by = stepFromStateDLL(s.bx, s.by, s.bMask, bDt)
+			*/
+			// RECONCILIATION: Verifica Player A
+			/*if !isCloseEnough(s.ax, s.ay, s.aClientX, s.aClientY) {
+				// Se la differenza è troppa, inviamo la correzione al client
+				sendAuthStateSelf(s.a, s.aAck, s.ax, s.ay)
+			}*/
+			// Inviamo sempre la posizione autoritativa all'avversario
+			//sendRemoteState(s.b, s.ax, s.ay, s.aMask)
+
+			// RECONCILIATION: Verifica Player B
+			/*if !isCloseEnough(s.bx, s.by, s.bClientX, s.bClientY) {
+				sendAuthStateSelf(s.b, s.bAck, s.bx, s.by)
+			}
+			sendRemoteState(s.a, s.bx, s.by, s.bMask)*/
+
+			// forward shot events (release) subito
+			forwardShots(s.a, s.b)
+			forwardShots(s.b, s.a)
+		}
+	}
+}
+
+func drainStateWithPos(c *Client, curMask int32, curAck uint32, curDt float32, curX, curY float32) (int32, uint32, float32, float32, float32) {
+	for {
+		select {
+		case m := <-c.input:
+			curMask = m.mask
+			curAck = m.seq
+		default:
+			return curMask, curAck, curDt, curX, curY
+		}
+	}
+}
+
+func drainState(c *Client, curMask int32, curAck uint32, curDt float32) (int32, uint32, float32) {
+	for {
+		select {
+		case m := <-c.input:
+			curMask = m.mask
+			curAck = m.seq
+		default:
+			return curMask, curAck, curDt
+		}
+	}
+}
+
+func forwardShots(from, to *Client) {
+	for {
+		select {
+		case sh := <-from.shot:
+			sendRemoteShot(to, sh.a, sh.b, sh.charge)
+		default:
+			return
+		}
+	}
+}
+
+// ============== MAIN ==============
+
+func main() {
+	ln, err := net.Listen("tcp", ListenAddr)
+	if err != nil {
+		panic(err)
+	}
+	defer ln.Close()
+
+	fmt.Println("Server listening on", ListenAddr)
+
+	join := make(chan *Client, 128)
+	go matchmaker(join)
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			continue
+		}
+		if tc, ok := conn.(*net.TCPConn); ok {
+			_ = tc.SetNoDelay(true)
+		}
+
+		c := &Client{
+			conn:  conn,
+			send:  make(chan []byte, 256),
+			input: make(chan StateMsg, 64),
+			shot:  make(chan ShotMsg, 8),
+
+			done: make(chan struct{}),
+		}
+
+		fmt.Println("[ACCEPT]", conn.RemoteAddr())
+		go writerLoop(c)
+		go readerLoop(c)
+		join <- c
+	}
+}
