@@ -23,6 +23,7 @@ public class Game1: Game
     private Texture2D _backgroundTexture;
     private NetworkManager networkManager;
     private Reconciler _reconciler;
+    private float NetDt = 0;
     
     //private readonly ConcurrentQueue<JoinSnapshot> _joinQueue = new();
     //private readonly ConcurrentQueue<AuthSnapshot> _authQueue = new();
@@ -72,7 +73,8 @@ public class Game1: Game
         
         string bluePathPlatform = "Content/images/green_logo.png";
         string redPathPlatform = "Content/images/red_logo.png";
-        private float NetDt = 1f / (float)ack.Heartz;
+        NetDt = 1f / (float)ack.Heartz;
+        Console.WriteLine($"Delta time: {NetDt}");
         _bluePlatform = new BasePlatform(this, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
         _redPlatform =  new BasePlatform(this, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
         _myPenguin = new Penguin(this,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt);
