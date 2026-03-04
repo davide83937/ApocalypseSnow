@@ -177,11 +177,11 @@ public class Game1: Game
         {
             if (_eggsEvent._myPenguinScore > _eggsEvent._redPenguinScore)
             {
-                Console.WriteLine("Pinguino BLU ha vinto!!!!!!!!!!!");
+                Console.WriteLine("Pinguino BLU ha vinto!!!!!!!!!!");
             }
             else
             {
-                Console.WriteLine("Pinguino ROSSO ha vinto!!!!!!!!!!");
+                Console.WriteLine("Pinguino ROSSO ha vinto!!!!!!!!!");
             }
         }
         base.Update(gameTime);
