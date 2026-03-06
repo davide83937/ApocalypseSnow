@@ -411,7 +411,8 @@ func (gameRoom *GameRoom) createShotFromEvent(ownerID uint32, shotEvent ShotEven
 	if authChargeScaled > 250000 {
 		authChargeScaled = 250000
 	}
-	deltaScaled := shot.LocalCharge - uint32(authChargeScaled)
+
+	deltaScaled := int64(shot.LocalCharge) - int64(authChargeScaled)
 
 	log.Printf(
 		"[SHOT CMP] owner=%d shotId=%d press=%d release=%d localCharge=%d authChargeTicks=%d authChargeScaled=%d deltaScaled=%d target=(%.1f, %.1f)",
