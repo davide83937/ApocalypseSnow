@@ -59,8 +59,13 @@ func (gameRoom *GameRoom) Run() {
 	gameRoom.SendJoinAcknowledgements()
 	gameRoom.CreateInitialEggs(5)
 
-	ticker := time.NewTicker(time.Second / time.Duration(gameRoom.tickRateHz))
+	tickDuration := time.Second / time.Duration(gameRoom.tickRateHz)
+	ticker := time.NewTicker(tickDuration)
 	defer ticker.Stop()
+
+	// 1. Inizializziamo l'accumulatore per prevenire i freeze del server
+	lastTime := time.Now()
+	var accumulator time.Duration
 
 	for {
 		select {
@@ -75,7 +80,16 @@ func (gameRoom *GameRoom) Run() {
 			return
 
 		case <-ticker.C:
-			gameRoom.Tick()
+			// 2. Calcoliamo quanto tempo reale è passato
+			now := time.Now()
+			accumulator += now.Sub(lastTime)
+			lastTime = now
+
+			// 3. Il "Catch-up loop": se c'è stato lag, recupera i tick persi all'istante!
+			for accumulator >= tickDuration {
+				gameRoom.Tick(now)
+				accumulator -= tickDuration
+			}
 		}
 	}
 }
@@ -86,10 +100,9 @@ func (gameRoom *GameRoom) Run() {
 // - applica dalla pending tutti gli input con SeqN <= matchTick
 // - gli input con SeqN > matchTick restano pending
 // - scarta solo vecchi/duplicati (SeqN <= LastSeqN)
-func (gameRoom *GameRoom) Tick() {
+func (gameRoom *GameRoom) Tick(now time.Time) { // <-- Aggiunto now come parametro
 	gameRoom.matchTick++
 	deltaTime := float32(1.0 / float32(gameRoom.tickRateHz))
-	now := time.Now()
 
 	drain1, drain2 := 0, 0
 	inserted1, inserted2 := 0, 0
@@ -232,8 +245,6 @@ func (gameRoom *GameRoom) applyMaturePendingInputs(
 	pending *[]InputState,
 	deltaTime float32,
 ) (applied int, futureCount int) {
-	// Con TCP gli input arrivano ordinati, quindi la pending è già FIFO/Seq-order.
-	// Applichiamo tutti quelli maturi dalla testa, e ci fermiamo al primo futuro.
 	consumeCount := 0
 
 	for consumeCount < len(*pending) {
