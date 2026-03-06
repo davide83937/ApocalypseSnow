@@ -27,11 +27,12 @@ type Player struct {
 }
 
 type InputState struct {
-	Mask int32
 	SeqN uint32
+	Mask int32
 }
 
 type ShotEvent struct {
+	SeqN uint32
 	Position
-	Charge float32
+	Charge uint32
 }
