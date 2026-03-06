@@ -14,11 +14,13 @@ public class NetworkManager : GameComponent
     private NetworkStream _stream;
     private readonly string _ip;
     private readonly int _port;
-    private uint _stateSequence = 0;
     public event Action<uint, float, float> OnAuthReceived;
     public event Action<float, float, int> OnRemoteReceived;
     public event Action<float, float, int> OnRemoteShotReceived; // mouseX, mouseY, charge
     public event Action<int, float, float> OnEggReceived;
+
+    public uint StartTick { get; private set; }
+    public uint ServerTickHz { get; private set; }
 
     private static NetworkManager _instance;
 
@@ -49,6 +51,7 @@ public class NetworkManager : GameComponent
         try
         {
             _tcpClient = new TcpClient();
+            _tcpClient.NoDelay = true; // Disabilita Nagle per ridurre la latenza
             _tcpClient.Connect(_ip, _port);
             _stream = _tcpClient.GetStream();
             Console.WriteLine("Connessione OK");
@@ -79,7 +82,7 @@ public class NetworkManager : GameComponent
     }
     
 
-    public void SendState(StateStruct state)
+    public void SendState(StateStruct state, uint seq)
     {
         // Se non siamo connessi, non inviamo nulla
         if (_stream == null || !_tcpClient.Connected) return;
@@ -91,13 +94,11 @@ public class NetworkManager : GameComponent
         // 1. Inseriamo il tipo di messaggio (1 byte)
         packet[0] = (byte)MessageType.State; 
     
-        // Incrementiamo il numero di sequenza per l'ordine dei pacchetti
-        _stateSequence++;
         //Console.WriteLine(_stateSequence);
         //Console.WriteLine($"X after Normalization: {position.X}, Y after Normalization: {position.Y}");
         // 2. Inseriamo i dati nel buffer (Little Endian, come si aspetta Go)
         Buffer.BlockCopy(BitConverter.GetBytes((int)state.Current), 0, packet, 1, 4);
-        Buffer.BlockCopy(BitConverter.GetBytes(_stateSequence), 0, packet, 5, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(seq), 0, packet, 5, 4);
 
         try 
         {
@@ -148,11 +149,13 @@ public class NetworkManager : GameComponent
 
             if (type == 8) // MsgSpawnEgg
             {
-                
+                System.Diagnostics.Debug.WriteLine($"EGG arrived, handler={(OnEggReceived == null ? "NULL" : "OK")}");
                 int id = BitConverter.ToInt32(payload, 0);
                 float x = BitConverter.ToSingle(payload, 4);
                 float y = BitConverter.ToSingle(payload, 8);
                 OnEggReceived?.Invoke(id, x, y);
+
+
             }
             else if (type == 4) // MsgAuthState
             {
@@ -175,6 +178,15 @@ public class NetworkManager : GameComponent
                 float my = BitConverter.ToSingle(payload, 4);
                 int charge = BitConverter.ToInt32(payload, 8);
                 OnRemoteShotReceived?.Invoke(mx, my, charge);
+            }
+            else if (type == 9) // MsgTickAlign
+            {
+                uint startTick = BitConverter.ToUInt32(payload, 0);
+                uint tickHz = BitConverter.ToUInt32(payload, 4);
+                // payload[8..12] = reserved/padding
+
+                StartTick = startTick;
+                ServerTickHz = tickHz;
             }
         }
     }
@@ -243,6 +255,7 @@ public class NetworkManager : GameComponent
             OpponentSpawnY = BitConverter.ToSingle(buffer, 17),  // Lettura nuovi dati
             Heartz =  BitConverter.ToUInt32(buffer, 21)
         };
+
     }
     
   

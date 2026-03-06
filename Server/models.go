@@ -22,7 +22,7 @@ type Player struct {
 	RecvMask int32
 	RecvSeqN uint32
 
-	// Timestamp ultimo MsgState ricevuto (timeout anti ghiaccio)
+	// Timestamp ultimo MsgState ricevuto
 	LastRx time.Time
 }
 

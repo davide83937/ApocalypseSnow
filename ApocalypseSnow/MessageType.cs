@@ -8,5 +8,5 @@ public enum MessageType
     AuthState = 4,
     JoinAck = 5,
     RemoteState = 6, // Aggiunto
-    RemoteShot = 7   // Aggiunto
+    RemoteShot = 7,   // Aggiunto
 }

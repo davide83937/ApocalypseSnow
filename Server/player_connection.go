@@ -13,6 +13,9 @@ import (
 type PlayerConnection struct {
 	networkConnection net.Conn
 
+	// IMPORTANTISSIMO:
+	// - InputChannel NON deve droppare, altrimenti salti SeqN e col server "consecutivo" ti blocchi.
+	// - ShotChannel NON deve droppare, altrimenti perdi eventi di sparo.
 	InputChannel chan InputState
 	ShotChannel  chan ShotEvent
 
@@ -25,12 +28,16 @@ type PlayerConnection struct {
 
 func NewPlayerConnection(networkConnection net.Conn) *PlayerConnection {
 	return &PlayerConnection{
-		networkConnection:     networkConnection,
-		InputChannel:          make(chan InputState, 128),
-		ShotChannel:           make(chan ShotEvent, 128),
-		OutgoingPacketChannel: make(chan []byte, 128),
+		networkConnection: networkConnection,
+
+		// puoi aumentare questi buffer se vuoi assorbire burst senza bloccare subito
+		InputChannel: make(chan InputState, 1024),
+		ShotChannel:  make(chan ShotEvent, 256),
+
+		OutgoingPacketChannel: make(chan []byte, 256),
 		DisconnectChannel:     make(chan struct{}),
-		bufferReader:          bufio.NewReader(networkConnection),
+
+		bufferReader: bufio.NewReader(networkConnection),
 	}
 }
 
@@ -39,6 +46,7 @@ func (playerConnection *PlayerConnection) TryEnqueueOutgoingPacket(packet []byte
 	case playerConnection.OutgoingPacketChannel <- packet:
 		return
 	default:
+		// se è "mustSend" e la coda è piena, chiudiamo: meglio killare che desyncare
 		if mustSend {
 			playerConnection.CloseConnection()
 		}
@@ -90,6 +98,7 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 			if _, err := io.ReadFull(playerConnection.bufferReader, joinPayloadBuffer); err != nil {
 				return
 			}
+			// niente da fare qui (il matchmaker usa l’evento join in altri punti)
 
 		case MsgState:
 			if _, err := io.ReadFull(playerConnection.bufferReader, statePayloadBuffer); err != nil {
@@ -102,18 +111,13 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 
 			inputState := InputState{Mask: inputMask, SeqN: sequenceNumber}
 
-			// latest-wins
+			// *** NIENTE latest-wins ***
+			// Se droppi qui, poi il server (che vuole seq consecutivo) resta incastrato.
 			select {
 			case playerConnection.InputChannel <- inputState:
-			default:
-				select {
-				case <-playerConnection.InputChannel:
-				default:
-				}
-				select {
-				case playerConnection.InputChannel <- inputState:
-				default:
-				}
+				// ok
+			case <-playerConnection.DisconnectChannel:
+				return
 			}
 
 		case MsgShot:
@@ -130,18 +134,11 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 				Charge:   float32(chargeValue),
 			}
 
-			// latest-wins
+			// Anche qui: NON droppare (sono eventi, se li perdi desync di gameplay).
 			select {
 			case playerConnection.ShotChannel <- shotEvent:
-			default:
-				select {
-				case <-playerConnection.ShotChannel:
-				default:
-				}
-				select {
-				case playerConnection.ShotChannel <- shotEvent:
-				default:
-				}
+			case <-playerConnection.DisconnectChannel:
+				return
 			}
 
 		default:

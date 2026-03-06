@@ -67,11 +67,10 @@ public class MovementsManager:IMovements
         //_networkManager.SendState(stateStruct, _deltaTime);
         //_networkManager.Receive();
         //Console.WriteLine($"X after Normalization: {_position.X}, Y after Normalization: {_position.Y}");
-        i = Reconciler.Instance.NextSeq();
-        Reconciler.Instance.Record(i, stateStruct.Current);
-        NetworkManager.Instance.SendState(stateStruct);
+        //Reconciler.Instance.Record(GameSession.LocalTick, stateStruct.Current);
+        //NetworkManager.Instance.SendState(stateStruct, GameSession.LocalTick);
         // 2. Ricevi gli aggiornamenti dal server
-       // return vector2;
+        // return vector2;
     }
     
 }

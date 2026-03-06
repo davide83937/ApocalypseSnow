@@ -15,18 +15,20 @@ type GameRoom struct {
 	firstPlayer  Player
 	secondPlayer Player
 
-	tickRateHz int
-	// Contatore tick (solo per debug/log).
-	tickNo uint64
+	// Runtime netcode della room
+	firstPlayerPendingInputs  []InputState
+	secondPlayerPendingInputs []InputState
+
+	tickRateHz uint32
+	matchTick  uint32
 }
 
 func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection) *GameRoom {
 	return &GameRoom{
 		firstPlayerConnection:  firstPlayerConnection,
 		secondPlayerConnection: secondPlayerConnection,
-		tickRateHz:             int(MoveHz),
+		tickRateHz:             uint32(MoveHz),
 
-		// Spawn identici al vecchio old_main.go
 		firstPlayer: Player{
 			ID:       1,
 			Position: Position{X: 100, Y: 300},
@@ -45,14 +47,16 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 			RecvSeqN: 0,
 			LastRx:   time.Time{},
 		},
+
+		firstPlayerPendingInputs:  make([]InputState, 0, 64),
+		secondPlayerPendingInputs: make([]InputState, 0, 64),
 	}
 }
 
 func (gameRoom *GameRoom) Run() {
-	// JoinAck (blocca il client se manca)
-	gameRoom.SendJoinAcknowledgements()
+	gameRoom.matchTick = 0
 
-	// Parità col vecchio old_main.go: 5 uova subito
+	gameRoom.SendJoinAcknowledgements()
 	gameRoom.CreateInitialEggs(5)
 
 	ticker := time.NewTicker(time.Second / time.Duration(gameRoom.tickRateHz))
@@ -76,69 +80,54 @@ func (gameRoom *GameRoom) Run() {
 	}
 }
 
-// Tick (server authoritative, tick-based):
-// - drena gli input arrivati (anche in burst) e tiene SOLO l'ultimo (latest-wins)
-// - fa SEMPRE 1 step fisico per tick usando l'ultima mask ricevuta
-// - se non arriva input da troppo, stoppa il player (anti "ghiaccio")
+// Tick nuovo:
+// - matchTick++
+// - drena gli input nuovi dentro la pending queue della room
+// - applica dalla pending tutti gli input con SeqN <= matchTick
+// - gli input con SeqN > matchTick restano pending
+// - scarta solo vecchi/duplicati (SeqN <= LastSeqN)
 func (gameRoom *GameRoom) Tick() {
-	gameRoom.tickNo++
+	gameRoom.matchTick++
 	deltaTime := float32(1.0 / float32(gameRoom.tickRateHz))
 	now := time.Now()
-	staleTimeout := time.Duration(inputStaleTimeoutMs) * time.Millisecond
 
-	// helper: drena fino a maxDrainInputsPerTick e ritorna l'ultimo letto + quanti drenati
-	drainLatest := func(ch <-chan InputState) (InputState, bool, int) {
-		var last InputState
-		has := false
-		count := 0
-		for n := 0; n < maxDrainInputsPerTick; n++ {
-			select {
-			case s := <-ch:
-				last = s
-				has = true
-				count++
-			default:
-				return last, has, count
-			}
-		}
-		return last, has, count
-	}
+	drain1, drain2 := 0, 0
+	inserted1, inserted2 := 0, 0
+	applied1, applied2 := 0, 0
+	future1, future2 := 0, 0
+	droppedOld1, droppedOld2 := 0, 0
 
 	// =======================
-	// PLAYER 1: latest-wins + 1 step per tick
+	// PLAYER 1
 	// =======================
-	in1, ok1, drain1 := drainLatest(gameRoom.firstPlayerConnection.InputChannel)
-	if ok1 {
-		gameRoom.firstPlayer.RecvMask = in1.Mask
-		gameRoom.firstPlayer.RecvSeqN = in1.SeqN
-		gameRoom.firstPlayer.LastRx = now
-	}
-	mask1 := gameRoom.firstPlayer.RecvMask
-	if gameRoom.firstPlayer.LastRx.IsZero() || now.Sub(gameRoom.firstPlayer.LastRx) > staleTimeout {
-		mask1 = 0
-	}
-	gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y = stepFromStateDLL(
-		gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y, mask1, deltaTime)
-	gameRoom.firstPlayer.LastMask = mask1
-	gameRoom.firstPlayer.LastSeqN = gameRoom.firstPlayer.RecvSeqN
+	drain1, inserted1, droppedOld1 = gameRoom.drainInputChannelToPending(
+		gameRoom.firstPlayerConnection,
+		&gameRoom.firstPlayer,
+		&gameRoom.firstPlayerPendingInputs,
+		now,
+	)
+
+	applied1, future1 = gameRoom.applyMaturePendingInputs(
+		&gameRoom.firstPlayer,
+		&gameRoom.firstPlayerPendingInputs,
+		deltaTime,
+	)
 
 	// =======================
-	// PLAYER 2: latest-wins + 1 step per tick
+	// PLAYER 2
 	// =======================
-	in2, ok2, drain2 := drainLatest(gameRoom.secondPlayerConnection.InputChannel)
-	if ok2 {
-		gameRoom.secondPlayer.RecvMask = in2.Mask
-		gameRoom.secondPlayer.RecvSeqN = in2.SeqN
-		gameRoom.secondPlayer.LastRx = now
-	}
-	mask2 := gameRoom.secondPlayer.RecvMask
-	if gameRoom.secondPlayer.LastRx.IsZero() || now.Sub(gameRoom.secondPlayer.LastRx) > staleTimeout {
-		mask2 = 0
-	}
-	gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y = stepFromStateDLL(
-		gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y, mask2, deltaTime)
-	gameRoom.secondPlayer.LastMask = mask2
-	gameRoom.secondPlayer.LastSeqN = gameRoom.secondPlayer.RecvSeqN
+	drain2, inserted2, droppedOld2 = gameRoom.drainInputChannelToPending(
+		gameRoom.secondPlayerConnection,
+		&gameRoom.secondPlayer,
+		&gameRoom.secondPlayerPendingInputs,
+		now,
+	)
+
+	applied2, future2 = gameRoom.applyMaturePendingInputs(
+		&gameRoom.secondPlayer,
+		&gameRoom.secondPlayerPendingInputs,
+		deltaTime,
+	)
 
 	// =======================
 	// BROADCAST STATO
@@ -150,9 +139,9 @@ func (gameRoom *GameRoom) Tick() {
 	gameRoom.sendRemoteStateToPlayer(gameRoom.secondPlayerConnection, gameRoom.firstPlayer)
 
 	// =======================
-	// DEBUG LOG (1 volta al secondo)
+	// LOG 1 VOLTA AL SECONDO
 	// =======================
-	if gameRoom.tickNo%uint64(gameRoom.tickRateHz) == 0 {
+	if gameRoom.matchTick%gameRoom.tickRateHz == 0 {
 		age1 := int64(-1)
 		if !gameRoom.firstPlayer.LastRx.IsZero() {
 			age1 = now.Sub(gameRoom.firstPlayer.LastRx).Milliseconds()
@@ -162,11 +151,16 @@ func (gameRoom *GameRoom) Tick() {
 			age2 = now.Sub(gameRoom.secondPlayer.LastRx).Milliseconds()
 		}
 
-		log.Printf("[TICK] P1 drain=%d ok=%v ageMs=%d recvSeq=%d usedMask=%d pos=(%.0f,%.0f) | P2 drain=%d ok=%v ageMs=%d recvSeq=%d usedMask=%d pos=(%.0f,%.0f)",
-			drain1, ok1, age1, gameRoom.firstPlayer.RecvSeqN, gameRoom.firstPlayer.LastMask, gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y,
-			drain2, ok2, age2, gameRoom.secondPlayer.RecvSeqN, gameRoom.secondPlayer.LastMask, gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y,
+		log.Printf(
+			"[TICK %d] "+
+				"P1 drain=%d inserted=%d applied=%d pending=%d future=%d droppedOld=%d ageMs=%d lastSeq=%d mask=%d pos=(%.0f,%.0f) | "+
+				"P2 drain=%d inserted=%d applied=%d pending=%d future=%d droppedOld=%d ageMs=%d lastSeq=%d mask=%d pos=(%.0f,%.0f)",
+			gameRoom.matchTick,
+			drain1, inserted1, applied1, len(gameRoom.firstPlayerPendingInputs), future1, droppedOld1, age1, gameRoom.firstPlayer.LastSeqN, gameRoom.firstPlayer.LastMask, gameRoom.firstPlayer.X, gameRoom.firstPlayer.Y,
+			drain2, inserted2, applied2, len(gameRoom.secondPlayerPendingInputs), future2, droppedOld2, age2, gameRoom.secondPlayer.LastSeqN, gameRoom.secondPlayer.LastMask, gameRoom.secondPlayer.X, gameRoom.secondPlayer.Y,
 		)
 	}
+
 	// =======================
 	// FORWARD SHOTS
 	// =======================
@@ -191,8 +185,94 @@ drainSecondPlayerShots:
 	}
 }
 
+func (gameRoom *GameRoom) drainInputChannelToPending(
+	playerConnection *PlayerConnection,
+	player *Player,
+	pending *[]InputState,
+	now time.Time,
+) (drain int, inserted int, droppedOld int) {
+	for n := 0; n < maxDrainInputsPerTick; n++ {
+		select {
+		case inputState := <-playerConnection.InputChannel:
+			drain++
+			player.LastRx = now
+			player.RecvMask = inputState.Mask
+			player.RecvSeqN = inputState.SeqN
+
+			// vecchio o duplicato rispetto a ciò che abbiamo già applicato
+			if inputState.SeqN <= player.LastSeqN {
+				droppedOld++
+				continue
+			}
+
+			// evita duplicati già in pending
+			alreadyQueued := false
+			for i := range *pending {
+				if (*pending)[i].SeqN == inputState.SeqN {
+					alreadyQueued = true
+					break
+				}
+			}
+			if alreadyQueued {
+				continue
+			}
+
+			*pending = append(*pending, inputState)
+			inserted++
+
+		default:
+			return
+		}
+	}
+	return
+}
+
+func (gameRoom *GameRoom) applyMaturePendingInputs(
+	player *Player,
+	pending *[]InputState,
+	deltaTime float32,
+) (applied int, futureCount int) {
+	// Con TCP gli input arrivano ordinati, quindi la pending è già FIFO/Seq-order.
+	// Applichiamo tutti quelli maturi dalla testa, e ci fermiamo al primo futuro.
+	consumeCount := 0
+
+	for consumeCount < len(*pending) {
+		inputState := (*pending)[consumeCount]
+
+		// se è vecchio rispetto all'ultimo applicato, buttalo
+		if inputState.SeqN <= player.LastSeqN {
+			consumeCount++
+			continue
+		}
+
+		// se è ancora nel futuro, ci fermiamo: i successivi saranno futuri pure loro
+		if inputState.SeqN > gameRoom.matchTick {
+			break
+		}
+
+		player.X, player.Y = stepFromStateDLL(
+			player.X, player.Y, inputState.Mask, deltaTime,
+		)
+
+		player.LastMask = inputState.Mask
+		player.LastSeqN = inputState.SeqN
+		player.RecvMask = inputState.Mask
+		player.RecvSeqN = inputState.SeqN
+		applied++
+		consumeCount++
+	}
+
+	if consumeCount > 0 {
+		remaining := (*pending)[consumeCount:]
+		copy((*pending), remaining)
+		*pending = (*pending)[:len(remaining)]
+	}
+
+	futureCount = len(*pending)
+	return
+}
+
 func (gameRoom *GameRoom) SendJoinAcknowledgements() {
-	// P1 JoinAck
 	packetP1 := make([]byte, 25)
 	packetP1[0] = MsgJoinAck
 	binary.LittleEndian.PutUint32(packetP1[1:5], gameRoom.firstPlayer.ID)
@@ -200,11 +280,9 @@ func (gameRoom *GameRoom) SendJoinAcknowledgements() {
 	binary.LittleEndian.PutUint32(packetP1[9:13], math.Float32bits(gameRoom.firstPlayer.Y))
 	binary.LittleEndian.PutUint32(packetP1[13:17], math.Float32bits(gameRoom.secondPlayer.X))
 	binary.LittleEndian.PutUint32(packetP1[17:21], math.Float32bits(gameRoom.secondPlayer.Y))
-	// Nuovo campo: TickRate (frequenza intera, es: 30)
-	binary.LittleEndian.PutUint32(packetP1[21:25], uint32(gameRoom.tickRateHz))
+	binary.LittleEndian.PutUint32(packetP1[21:25], gameRoom.tickRateHz)
 	gameRoom.firstPlayerConnection.TryEnqueueOutgoingPacket(packetP1, true)
 
-	// P2 JoinAck
 	packetP2 := make([]byte, 25)
 	packetP2[0] = MsgJoinAck
 	binary.LittleEndian.PutUint32(packetP2[1:5], gameRoom.secondPlayer.ID)
@@ -212,16 +290,14 @@ func (gameRoom *GameRoom) SendJoinAcknowledgements() {
 	binary.LittleEndian.PutUint32(packetP2[9:13], math.Float32bits(gameRoom.secondPlayer.Y))
 	binary.LittleEndian.PutUint32(packetP2[13:17], math.Float32bits(gameRoom.firstPlayer.X))
 	binary.LittleEndian.PutUint32(packetP2[17:21], math.Float32bits(gameRoom.firstPlayer.Y))
-	// Nuovo campo: TickRate (frequenza intera, es: 30)
-	binary.LittleEndian.PutUint32(packetP2[21:25], uint32(gameRoom.tickRateHz))
+	binary.LittleEndian.PutUint32(packetP2[21:25], gameRoom.tickRateHz)
 	gameRoom.secondPlayerConnection.TryEnqueueOutgoingPacket(packetP2, true)
 }
 
-// Parità old_main: genera N uova subito e le invia a entrambi
 func (gameRoom *GameRoom) CreateInitialEggs(eggCount int) {
 	for eggId := 0; eggId < eggCount; eggId++ {
-		eggX := float32(250 + rand.Intn(250)) // 250..499
-		eggY := float32(rand.Intn(400))       // 0..399
+		eggX := float32(250 + rand.Intn(250))
+		eggY := float32(rand.Intn(400))
 		gameRoom.sendSpawnEggToBothPlayers(int32(eggId), eggX, eggY)
 	}
 }
@@ -240,15 +316,9 @@ func (gameRoom *GameRoom) sendSpawnEggToBothPlayers(eggId int32, eggX, eggY floa
 func (gameRoom *GameRoom) sendAuthStateToPlayer(targetConn *PlayerConnection, player Player) {
 	packet := make([]byte, 13)
 	packet[0] = MsgAuthState
-
-	// Parità old_main: rounding su AuthState self
-	roundedX := float32(math.Round(float64(player.X)))
-	roundedY := float32(math.Round(float64(player.Y)))
-
 	binary.LittleEndian.PutUint32(packet[1:5], player.LastSeqN)
-	binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(roundedX))
-	binary.LittleEndian.PutUint32(packet[9:13], math.Float32bits(roundedY))
-
+	binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(player.X))
+	binary.LittleEndian.PutUint32(packet[9:13], math.Float32bits(player.Y))
 	targetConn.TryEnqueueOutgoingPacket(packet, false)
 }
 
@@ -262,7 +332,6 @@ func (gameRoom *GameRoom) sendRemoteStateToPlayer(targetConn *PlayerConnection, 
 }
 
 func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnection, shot ShotEvent) {
-	// clamp charge
 	charge := shot.Charge
 	if charge < 0 {
 		charge = 0
@@ -276,6 +345,5 @@ func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnectio
 	binary.LittleEndian.PutUint32(packet[1:5], math.Float32bits(shot.X))
 	binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(shot.Y))
 	binary.LittleEndian.PutUint32(packet[9:13], uint32(charge))
-
 	targetConn.TryEnqueueOutgoingPacket(packet, false)
 }

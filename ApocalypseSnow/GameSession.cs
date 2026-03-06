@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using Microsoft.Xna.Framework;
 
 namespace ApocalypseSnow;
@@ -21,7 +22,14 @@ public sealed class GameSession : GameComponent
     public Events _events;
     private Game _game;
     public string state = null;
-  
+
+    //copia del tick locale, che incrementiamo ad ogni update, e del tick accumulato, che invece incrementiamo con il delta time
+    //e usiamo per capire quando è ora di fare un nuovo tick di gioco (e quindi inviare un nuovo input al server)
+    public static uint LocalTick { get; private set; } = 0;
+    // Questo accumulatore ci serve per gestire il tick rate del gioco, che è indipendente dal frame rate. stessa logica del pinguino, per ora la metto qui
+    private float _tickAcc = 0f;
+    
+
     public GameSession(Game game) : base(game)
     {
         _game = game;
@@ -56,6 +64,8 @@ public sealed class GameSession : GameComponent
                 // Una volta ricevuto l'ACK, creiamo i pinguini e gli oggetti
                 // Usiamo un metodo di supporto
                 StartMatch(ack);
+
+
             
                 // Togliamo il messaggio di attesa
                 state = null;
@@ -76,7 +86,13 @@ public sealed class GameSession : GameComponent
         IMovements movementsRed = new MovementsManagerRed();
         string bluePathPlatform = "Content/images/green_logo.png";
         string redPathPlatform = "Content/images/red_logo.png";
-    
+
+        //aggiunti questi due per tenere traccia del tick del server e del client, utili per la reconciler
+        LocalTick = 0;
+        _tickAcc = 0f;
+        Reconciler.Instance.Reset();
+        //Reconciler.Instance.SetNextSeq(1);
+
         NetDt = 1f / (float)ack.Heartz;
 
         _bluePlatform = new BasePlatform(_game, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
@@ -131,19 +147,41 @@ public sealed class GameSession : GameComponent
     
     public override void Update(GameTime gameTime)
     {
+        // ✅ ricevi SEMPRE
+
+
+        // se non è iniziato il match, stop qui
         if (state != null || _myPenguin == null || _events == null)
-        {
-            return; 
-        }
-        
+            return;
         NetworkManager.Instance?.Receive();
-      
+        // ✅ tick fisso (stesso dt della sim di rete)
+        _tickAcc += (float)gameTime.ElapsedGameTime.TotalSeconds;
+        while (_tickAcc >= NetDt)
+        {
+            _tickAcc -= NetDt;
+            Debug.WriteLine($"LocalTick++: {LocalTick}");
+
+            var st = _myPenguin._penguinInputHandler._stateStruct;
+
+            // 2) pulisci SOLO UDLR per il replay
+            StateList moveMask = st.Current & (StateList.Up | StateList.Down | StateList.Left | StateList.Right);
+
+            // 3) record + send usando QUESTO tick
+            Reconciler.Instance.Record(LocalTick, moveMask);
+            NetworkManager.Instance.SendState(st, LocalTick);
+            LocalTick++;
+        }
+
+        //SUPER NOTA: dentro il while siamo a 30 HZ, fuori dal while ma dentro questo Update siamo a 60 FPS
+
         // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
         Reconciler.Instance.GetLatest(_events._authQueue, auth =>
         {
             Reconciler.Instance.OnServerAuth(auth.Ack, auth.Position);
             Reconciler.Instance.Apply(ref _myPenguin._position, 200f, NetDt);
         });
+
+
         
         if (_eggsEvent._eggs.Count == 0)
         {
@@ -157,5 +195,10 @@ public sealed class GameSession : GameComponent
             }
         }
         base.Update(gameTime);
+    }
+
+    public uint getLocaltick()
+    {
+        return LocalTick;
     }
 }
