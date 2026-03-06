@@ -19,15 +19,29 @@ type GameRoom struct {
 	firstPlayerPendingInputs  []InputState
 	secondPlayerPendingInputs []InputState
 
+	// Shot lato server:
+	// - activeShots contiene gli shot creati davvero
+	// - lastPressTickByOwner ricorda l'ultimo tick di PRESS del tasto Shoot per ogni player
+	// - nextShotID genera ID progressivi
+	activeShots          []Shot
+	lastPressTickByOwner map[uint32]uint32
+	nextShotID           uint32
+
 	tickRateHz uint32
 	matchTick  uint32
 }
 
 func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection) *GameRoom {
 	return &GameRoom{
-		firstPlayerConnection:  firstPlayerConnection,
-		secondPlayerConnection: secondPlayerConnection,
-		tickRateHz:             uint32(MoveHz),
+		firstPlayerConnection:     firstPlayerConnection,
+		secondPlayerConnection:    secondPlayerConnection,
+		tickRateHz:                uint32(MoveHz),
+		firstPlayerPendingInputs:  make([]InputState, 0, 64),
+		secondPlayerPendingInputs: make([]InputState, 0, 64),
+
+		activeShots:          make([]Shot, 0, 64),
+		lastPressTickByOwner: make(map[uint32]uint32),
+		nextShotID:           1,
 
 		firstPlayer: Player{
 			ID:       1,
@@ -47,9 +61,6 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 			RecvSeqN: 0,
 			LastRx:   time.Time{},
 		},
-
-		firstPlayerPendingInputs:  make([]InputState, 0, 64),
-		secondPlayerPendingInputs: make([]InputState, 0, 64),
 	}
 }
 
@@ -59,8 +70,14 @@ func (gameRoom *GameRoom) Run() {
 	gameRoom.SendJoinAcknowledgements()
 	gameRoom.CreateInitialEggs(5)
 
-	ticker := time.NewTicker(time.Second / time.Duration(gameRoom.tickRateHz))
+	// Calcoliamo la durata esatta di un singolo tick (es. 33.33ms per 30Hz)
+	tickDuration := time.Second / time.Duration(gameRoom.tickRateHz)
+	ticker := time.NewTicker(tickDuration)
 	defer ticker.Stop()
+
+	// Variabili per l'accumulatore del tempo reale
+	lastTime := time.Now()
+	var accumulator time.Duration
 
 	for {
 		select {
@@ -75,7 +92,21 @@ func (gameRoom *GameRoom) Run() {
 			return
 
 		case <-ticker.C:
-			gameRoom.Tick()
+			// 1. Calcoliamo quanto tempo reale è DAVVERO trascorso dall'ultimo giro
+			now := time.Now()
+			elapsed := now.Sub(lastTime)
+			lastTime = now
+
+			// 2. Aggiungiamo il tempo trascorso all'accumulatore
+			accumulator += elapsed
+
+			// 3. Catch-up loop: consumiamo l'accumulatore a fette di 'tickDuration'
+			// Se il server si era bloccato per 1 secondo, questo for girerà 30 volte
+			// in un istante, recuperando tutti i matchTick persi!
+			for accumulator >= tickDuration {
+				gameRoom.Tick()
+				accumulator -= tickDuration
+			}
 		}
 	}
 }
@@ -162,12 +193,13 @@ func (gameRoom *GameRoom) Tick() {
 	}
 
 	// =======================
-	// FORWARD SHOTS
+	// FORWARD SHOTS + CREAZIONE SHOT SERVER
 	// =======================
 drainFirstPlayerShots:
 	for {
 		select {
 		case shotEvent := <-gameRoom.firstPlayerConnection.ShotChannel:
+			gameRoom.createShotFromEvent(gameRoom.firstPlayer.ID, shotEvent)
 			gameRoom.forwardShotEventToOpponent(gameRoom.secondPlayerConnection, shotEvent)
 		default:
 			break drainFirstPlayerShots
@@ -178,6 +210,7 @@ drainSecondPlayerShots:
 	for {
 		select {
 		case shotEvent := <-gameRoom.secondPlayerConnection.ShotChannel:
+			gameRoom.createShotFromEvent(gameRoom.secondPlayer.ID, shotEvent)
 			gameRoom.forwardShotEventToOpponent(gameRoom.firstPlayerConnection, shotEvent)
 		default:
 			break drainSecondPlayerShots
@@ -202,18 +235,6 @@ func (gameRoom *GameRoom) drainInputChannelToPending(
 			// vecchio o duplicato rispetto a ciò che abbiamo già applicato
 			if inputState.SeqN <= player.LastSeqN {
 				droppedOld++
-				continue
-			}
-
-			// evita duplicati già in pending
-			alreadyQueued := false
-			for i := range *pending {
-				if (*pending)[i].SeqN == inputState.SeqN {
-					alreadyQueued = true
-					break
-				}
-			}
-			if alreadyQueued {
 				continue
 			}
 
@@ -248,6 +269,17 @@ func (gameRoom *GameRoom) applyMaturePendingInputs(
 		// se è ancora nel futuro, ci fermiamo: i successivi saranno futuri pure loro
 		if inputState.SeqN > gameRoom.matchTick {
 			break
+		}
+
+		// Rilevazione PRESS di Shoot:
+		// ci interessa solo ricordare il tick di inizio carica.
+		// Il RELEASE non lo leggiamo dalla mask: per quello usiamo direttamente SeqN del MsgShot.
+		prevShoot := (player.LastMask & Shoot) != 0
+		currShoot := (inputState.Mask & Shoot) != 0
+
+		if !prevShoot && currShoot {
+			gameRoom.lastPressTickByOwner[player.ID] = inputState.SeqN
+			log.Printf("[SHOT PRESS] owner=%d pressedTick=%d", player.ID, inputState.SeqN)
 		}
 
 		player.X, player.Y = stepFromStateDLL(
@@ -333,9 +365,6 @@ func (gameRoom *GameRoom) sendRemoteStateToPlayer(targetConn *PlayerConnection, 
 
 func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnection, shot ShotEvent) {
 	charge := shot.Charge
-	if charge < 0 {
-		charge = 0
-	}
 	if charge > chargeCap {
 		charge = chargeCap
 	}
@@ -344,6 +373,60 @@ func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnectio
 	packet[0] = MsgRemoteShot
 	binary.LittleEndian.PutUint32(packet[1:5], math.Float32bits(shot.X))
 	binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(shot.Y))
-	binary.LittleEndian.PutUint32(packet[9:13], uint32(charge))
+	binary.LittleEndian.PutUint32(packet[9:13], charge)
 	targetConn.TryEnqueueOutgoingPacket(packet, false)
+}
+
+// createShotFromEvent crea davvero uno Shot lato server quando arriva MsgShot.
+// Il PRESS è già stato salvato in lastPressTickByOwner quando il bit Shoot è passato 0 -> 1.
+// Il RELEASE lo prendiamo da shotEvent.SeqN, cioè il tick locale che il client mette nello shot.
+func (gameRoom *GameRoom) createShotFromEvent(ownerID uint32, shotEvent ShotEvent) {
+	pressedTick, ok := gameRoom.lastPressTickByOwner[ownerID]
+	if !ok {
+		log.Printf("[SHOT] owner=%d arrivato MsgShot ma nessun pressedTick trovato", ownerID)
+		return
+	}
+
+	releasedTick := shotEvent.SeqN
+	authCharge := uint32(0)
+	if releasedTick >= pressedTick {
+		authCharge = releasedTick - pressedTick
+	}
+
+	shot := Shot{
+		ShotID:        gameRoom.nextShotID,
+		OwnerPlayerID: ownerID,
+		TargetX:       shotEvent.X,
+		TargetY:       shotEvent.Y,
+		LocalCharge:   shotEvent.Charge,
+		PressedTick:   pressedTick,
+		ReleasedTick:  releasedTick,
+		AuthCharge:    authCharge,
+	}
+
+	gameRoom.nextShotID++
+	gameRoom.activeShots = append(gameRoom.activeShots, shot)
+
+	authChargeScaled := uint32(float64(shot.AuthCharge) * (100000.0 / float64(gameRoom.tickRateHz)))
+	if authChargeScaled > 250000 {
+		authChargeScaled = 250000
+	}
+	deltaScaled := shot.LocalCharge - uint32(authChargeScaled)
+
+	log.Printf(
+		"[SHOT CMP] owner=%d shotId=%d press=%d release=%d localCharge=%d authChargeTicks=%d authChargeScaled=%d deltaScaled=%d target=(%.1f, %.1f)",
+		shot.OwnerPlayerID,
+		shot.ShotID,
+		shot.PressedTick,
+		shot.ReleasedTick,
+		shot.LocalCharge,
+		shot.AuthCharge,
+		authChargeScaled,
+		deltaScaled,
+		shot.TargetX,
+		shot.TargetY,
+	)
+
+	// Consumato il press di questo shot: lo cancelliamo.
+	delete(gameRoom.lastPressTickByOwner, ownerID)
 }

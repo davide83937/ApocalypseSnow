@@ -3,7 +3,7 @@ package main
 // Tipi messaggi (wire format Little Endian)
 const (
 	MsgState       byte = 1 // 9B  [type][mask:int32][seq:uint32]
-	MsgShot        byte = 2 // 13B [type][x:int32][y:int32][charge:int32]
+	MsgShot        byte = 2 // 17B [type][shotTick:uint32][x:float32][y:float32][charge:int32]
 	MsgJoin        byte = 3 // 9B  [type][name:8B]
 	MsgAuthState   byte = 4 // 13B [type][ack:uint32][x:float32][y:float32]
 	MsgJoinAck     byte = 5 // 21B [type][playerId:uint32][spawnX:float32][spawnY:float32][oppX:float32][oppY:float32]
@@ -28,8 +28,8 @@ const (
 )
 
 const (
-	ListenAddr         = ":8080"
-	chargeCap  float32 = 200000
+	ListenAddr        = ":8080"
+	chargeCap  uint32 = 200000
 
 	// Quanti MsgState al massimo dreniamo (per player) in UN server-tick.
 	// Noi teniamo SOLO l'ultimo input ricevuto (latest-wins) e poi facciamo 1 step fisico per tick.
