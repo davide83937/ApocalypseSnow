@@ -76,10 +76,9 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 	defer playerConnection.CloseConnection()
 
 	messageTypeBuffer := make([]byte, 1)
-
 	joinPayloadBuffer := make([]byte, 8)
 	statePayloadBuffer := make([]byte, 8)
-	shotPayloadBuffer := make([]byte, 12)
+	shotPayloadBuffer := make([]byte, 16) // <-- era 12
 
 	for {
 		select {
@@ -93,12 +92,10 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 		}
 
 		switch messageTypeBuffer[0] {
-
 		case MsgJoin:
 			if _, err := io.ReadFull(playerConnection.bufferReader, joinPayloadBuffer); err != nil {
 				return
 			}
-			// niente da fare qui (il matchmaker usa l’evento join in altri punti)
 
 		case MsgState:
 			if _, err := io.ReadFull(playerConnection.bufferReader, statePayloadBuffer); err != nil {
@@ -109,13 +106,13 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 			inputMask = sanitizeMask(inputMask)
 			sequenceNumber := binary.LittleEndian.Uint32(statePayloadBuffer[4:8])
 
-			inputState := InputState{Mask: inputMask, SeqN: sequenceNumber}
+			inputState := InputState{
+				Mask: inputMask,
+				SeqN: sequenceNumber,
+			}
 
-			// *** NIENTE latest-wins ***
-			// Se droppi qui, poi il server (che vuole seq consecutivo) resta incastrato.
 			select {
 			case playerConnection.InputChannel <- inputState:
-				// ok
 			case <-playerConnection.DisconnectChannel:
 				return
 			}
@@ -125,16 +122,20 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 				return
 			}
 
-			targetX := math.Float32frombits(binary.LittleEndian.Uint32(shotPayloadBuffer[0:4]))
-			targetY := math.Float32frombits(binary.LittleEndian.Uint32(shotPayloadBuffer[4:8]))
-			chargeValue := int32(binary.LittleEndian.Uint32(shotPayloadBuffer[8:12]))
+			shotTick := binary.LittleEndian.Uint32(shotPayloadBuffer[0:4])
+			targetX := math.Float32frombits(binary.LittleEndian.Uint32(shotPayloadBuffer[4:8]))
+			targetY := math.Float32frombits(binary.LittleEndian.Uint32(shotPayloadBuffer[8:12]))
+			chargeValue := binary.LittleEndian.Uint32(shotPayloadBuffer[12:16])
 
 			shotEvent := ShotEvent{
-				Position: Position{X: float32(targetX), Y: float32(targetY)},
-				Charge:   float32(chargeValue),
+				Position: Position{
+					X: targetX,
+					Y: targetY,
+				},
+				Charge: chargeValue,
+				SeqN:   shotTick,
 			}
 
-			// Anche qui: NON droppare (sono eventi, se li perdi desync di gameplay).
 			select {
 			case playerConnection.ShotChannel <- shotEvent:
 			case <-playerConnection.DisconnectChannel:
@@ -142,7 +143,9 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 			}
 
 		default:
-			fmt.Printf("[WARN] unknown type=%d from %v\n", messageTypeBuffer[0], playerConnection.networkConnection.RemoteAddr())
+			fmt.Printf("[WARN] unknown type=%d from %v\n",
+				messageTypeBuffer[0],
+				playerConnection.networkConnection.RemoteAddr())
 			return
 		}
 	}

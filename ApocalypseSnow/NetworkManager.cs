@@ -197,20 +197,22 @@ public class NetworkManager : GameComponent
         if (_stream == null || !_tcpClient.Connected) return;
 
         // Pacchetto: 1 byte (Type) + 4 byte (mouseX) + 4 byte (mouseY) + 4 byte (charge) = 13 byte
-        byte[] packet = new byte[13];
-    
+        byte[] packet = new byte[17];
+
         // 1. Inseriamo il tipo all'inizio
         packet[0] = (byte)shot.Type;
-    
-        // 2. Inseriamo i dati sfalsando correttamente l'offset di destinazione (1, 5, 9)
-        Buffer.BlockCopy(BitConverter.GetBytes(shot.mouseX), 0, packet, 1, 4);
-        Buffer.BlockCopy(BitConverter.GetBytes(shot.mouseY), 0, packet, 5, 4);
-        Buffer.BlockCopy(BitConverter.GetBytes(shot.charge), 0, packet, 9, 4);
+
+        // 2. Inseriamo i dati sfalsando correttamente l'offset di destinazione
+        Buffer.BlockCopy(BitConverter.GetBytes(GameSession.LocalTick), 0, packet, 1, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(shot.mouseX), 0, packet, 5, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(shot.mouseY), 0, packet, 9, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(shot.charge), 0, packet, 13, 4);
+
 
         try
         {
             _stream.Write(packet, 0, packet.Length);
-            _stream.Flush();
+            //_stream.Flush();
         }
         catch (IOException)
         {
