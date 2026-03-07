@@ -53,7 +53,7 @@ public class Obstacle:DrawableGameComponent
         int posCollX = (int)_position.X + _halfTextureFractionWidth;
         int posCollY = (int)_position.Y + _halfTextureFractionHeight;
         _sourceRect = new Rectangle((int)position.X, (int)position.Y, _textureFractionWidth, _textureFractionHeight);
-        CollisionManager.Instance.addObject(_tag, posCollX, posCollY+25, _halfTextureFractionWidth-50, _halfTextureFractionHeight-120);
+        CollisionManager.Instance.addObject(_tag, posCollX, posCollY+25, _halfTextureFractionWidth+60, _halfTextureFractionHeight);
     }
 
     public void Draw(SpriteBatch spriteBatch)

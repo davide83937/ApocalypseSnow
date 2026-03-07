@@ -113,7 +113,7 @@ public class Ball:CollisionExtensions
         switch (otherTag)
         {
             case string t when isDeleteConditions(t):
-                //Console.WriteLine($"Collisione interna con {otherTag} ad altezza {_scale}");
+                Console.WriteLine($"Collisione interna con {otherTag} ad altezza {_scale}");
                 Game.Components.Remove(this);
                 CollisionManager.Instance.removeObject(_tag);
                 break;
