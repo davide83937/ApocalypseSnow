@@ -151,6 +151,12 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _physicsDeltaTime);
             _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _physicsDeltaTime);
 
+            // AGGIUNGI QUESTO:
+            if (_tag.EndsWith("Red"))
+            {
+                
+                _penguinColliderHandler.SyncStateWithNetwork(_penguinInputHandler._stateStruct, ref _myEgg);
+            }
             
             if (!_tag.EndsWith("Red"))
             {
@@ -160,6 +166,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 {
                     _penguinInputHandler.getMotion(ref _position.X, 200f, _physicsDeltaTime);
                 }
+                
                 
                 Vector2 mousePosition = _movementsManager.GetMousePosition();
                 _shotStruct.mouseX = (int)mousePosition.X;

@@ -31,13 +31,21 @@ public class PenguinColliderHandler
         timePuttingEgg = 0;
     }  
     
+    // In PenguinColliderHandler.cs
+
+
+    
     public void HandleEggPickup(string eggTag, StateStruct stateStruct, 
         float deltaTime, ref string myEgg)
     {
         
         // NOVITÀ: Se è il pinguino remoto e il server dice che ha l'uovo, 
         // completiamo la raccolta immediatamente senza aspettare il timer locale.
-        if (_tag.EndsWith("Red") && stateStruct.IsPressed(StateList.WithEgg)&& myEgg == null)
+        //if (_tag.EndsWith("Red") && stateStruct.IsPressed(StateList.WithEgg)&& myEgg == null)
+        if (_tag.EndsWith("Red") && 
+            stateStruct.IsPressed(StateList.WithEgg) && 
+            !stateStruct.IsPressed(StateList.TakingEgg) && // AGGIUNGI QUESTO: Non raccogliere se sta premendo per posare
+            myEgg == null)
         {
             isWithEgg = true;
             timeTakingEgg = 0;
@@ -92,7 +100,7 @@ public class PenguinColliderHandler
         // Verifica se il pinguino sta consegnando l'uovo alla piattaforma corretta
         bool isCorrectPlatform = (_tag == "penguin" && platformTag == "blueP") || 
                                  (_tag == "penguinRed" && platformTag == "redP");
-
+        
         if (isCorrectPlatform && stateStruct.IsPressed(StateList.WithEgg) && stateStruct.IsPressed(StateList.PuttingEgg))
         {
             timePuttingEgg += deltaTime;
@@ -104,6 +112,22 @@ public class PenguinColliderHandler
                 isWithEgg = false;
                 myEgg = null;
             }
+        }
+    }
+    
+    public void SyncStateWithNetwork(StateStruct stateStruct, ref string myEgg)
+    {
+        // Se siamo il pinguino remoto e il server dice che NON abbiamo più l'uovo,
+        // ma localmente risultiamo ancora "WithEgg", forziamo il reset immediato.
+        if (_tag.EndsWith("Red") && !stateStruct.IsPressed(StateList.WithEgg) && isWithEgg)
+        {
+            Console.WriteLine($"Uovo {myEgg} fa punto");
+            isWithEgg = false;
+            myEgg = null;
+            timePuttingEgg = 0;
+            timeTakingEgg = 0;
+            // Scatena l'uovo a terra o lo fa sparire se è stato consegnato
+            eggPutEvent?.Invoke(this, EventArgs.Empty);
         }
     }
     
