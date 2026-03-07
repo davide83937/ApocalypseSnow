@@ -90,8 +90,8 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
     public void HandleRemoteShot(Vector2 target)
     {
         // Chiamiamo lo shot handler usando la posizione passata dal server invece del mouse locale
-        Console.WriteLine(target.X + ", " + target.Y);
-        Console.WriteLine("Posizione X: " + _position.X + ", " + "Posizione Y: " + _position.Y);
+        //Console.WriteLine(target.X + ", " + target.Y);
+        //Console.WriteLine("Posizione X: " + _position.X + ", " + "Posizione Y: " + _position.Y);
         _penguinShotHandler.Shot(
             _penguinInputHandler._stateStruct,
             target,
@@ -173,7 +173,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
             int posCollX = (int)_position.X + _halfTextureFractionWidth;
             int posCollY = (int)_position.Y + _halfTextureFractionHeight;
-            CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY - 60, _textureFractionWidth,
+            CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _textureFractionWidth,
                 _halfTextureFractionHeight);
 
             _accumulator -= _physicsDeltaTime;

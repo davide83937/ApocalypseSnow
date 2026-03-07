@@ -109,10 +109,11 @@ public class Ball:CollisionExtensions
     {
         //if (!collisionRecordOut.Involves(_tag)) return;
         //string otherTag = collisionRecordOut.GetOtherTag(_tag);
-
+        //Console.WriteLine($"Collisione esterna con {otherTag} ad altezza {_scale}");
         switch (otherTag)
         {
             case string t when isDeleteConditions(t):
+                //Console.WriteLine($"Collisione interna con {otherTag} ad altezza {_scale}");
                 Game.Components.Remove(this);
                 CollisionManager.Instance.removeObject(_tag);
                 break;
@@ -130,7 +131,7 @@ public class Ball:CollisionExtensions
         PhysicsAPI.parabolic_motion(100,_startPosition.X+48, _startPosition.Y, ref _position.X, ref _position.Y,
             _startSpeed.X, -_startSpeed.Y, _ballTime);
         //Console.WriteLine($"Campo: {v._x}, Valore: {v._y}");
-        //Console.WriteLine($"Scale: {_scale}");
+        Console.WriteLine($"Scale: {_scale}");
         //Console.WriteLine($"Gravity: {gravity}");
         if (_scale < 1.0f) { _scale = 1.0f; }
         if (_scale > 1.4f) { _scale = 1.4f; }

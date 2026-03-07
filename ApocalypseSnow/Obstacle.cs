@@ -9,27 +9,27 @@ public class Obstacle:DrawableGameComponent
     private readonly string _tag;
     private Rectangle _sourceRect;
     private readonly Vector2 _position;
-    private readonly int _posX;
-    private readonly int _posY;
+    //private readonly int _posX;
+    //private readonly int _posY;
     private int _textureFractionWidth;
     private int _textureFractionHeight;
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
     
     
-    public Obstacle(Game game, Vector2 position, int posX, int posY) : base(game)
+    public Obstacle(Game game, Vector2 position) : base(game)
     {
         _position = position;
-        _posX = posX;
-        _posY = posY;
+        //_posX = posX;
+        //_posY = posY;
         _tag = "obstacle";
-        this.DrawOrder = 2;
+        DrawOrder = 2;
     }
 
-    private Vector2 GetPosition(int x, int y)
+    private Vector2 GetPosition(/*int x, int y*/)
     {
-        float posX = x * (_textureFractionWidth);
-        float posY = y * (_textureFractionHeight);
+        float posX = /*x **/ (_textureFractionWidth);
+        float posY = /*y **/ (_textureFractionHeight);
         Vector2 pos = new Vector2(posX, posY);
         return pos;
     }
@@ -45,7 +45,7 @@ public class Obstacle:DrawableGameComponent
     {
         //Vector2 position = GetPosition(_posX,  _posY);
         load_texture(GraphicsDevice, "Content/images/ostacoli1.png");
-        Vector2 position = GetPosition(_posX,  _posY);
+        Vector2 position = GetPosition(/*_posX,  _posY*/);
         _textureFractionWidth = _texture.Width / 2;
         _textureFractionHeight = _texture.Height / 2;
         _halfTextureFractionWidth = _textureFractionWidth / 2;
@@ -53,7 +53,7 @@ public class Obstacle:DrawableGameComponent
         int posCollX = (int)_position.X + _halfTextureFractionWidth;
         int posCollY = (int)_position.Y + _halfTextureFractionHeight;
         _sourceRect = new Rectangle((int)position.X, (int)position.Y, _textureFractionWidth, _textureFractionHeight);
-        CollisionManager.Instance.addObject(_tag, posCollX, posCollY, _halfTextureFractionWidth+60, _halfTextureFractionHeight);
+        CollisionManager.Instance.addObject(_tag, posCollX, posCollY+25, _halfTextureFractionWidth-50, _halfTextureFractionHeight-120);
     }
 
     public void Draw(SpriteBatch spriteBatch)

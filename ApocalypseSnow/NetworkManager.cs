@@ -18,6 +18,7 @@ public class NetworkManager : GameComponent
     public event Action<float, float, int> OnRemoteReceived;
     public event Action<float, float, int> OnRemoteShotReceived; // mouseX, mouseY, charge
     public event Action<int, float, float> OnEggReceived;
+    public event Action<float, float> OnObstacleReceived;
 
     public uint StartTick { get; private set; }
     public uint ServerTickHz { get; private set; }
@@ -114,21 +115,6 @@ public class NetworkManager : GameComponent
         }
     }
     
-    // Aggiungi questo metodo in NetworkManager.cs
-    private byte[] ReadExactly(int count)
-    {
-        byte[] buffer = new byte[count];
-        int offset = 0;
-        while (offset < count)
-        {
-            int read = _stream.Read(buffer, offset, count - offset);
-            if (read <= 0) throw new Exception("Connessione persa");
-            offset += read;
-        }
-        return buffer;
-    }
-    
-
    
     public void Receive()
     {
@@ -187,6 +173,13 @@ public class NetworkManager : GameComponent
 
                 StartTick = startTick;
                 ServerTickHz = tickHz;
+            }
+            else if(type == 10) //SpawnObstacle
+            {
+                Console.WriteLine($"Ricevuto messaggio 10. Payload length: {payload.Length}");
+                float x = BitConverter.ToSingle(payload, 0);
+                float y = BitConverter.ToSingle(payload, 4);
+                OnObstacleReceived?.Invoke(x, y);
             }
         }
     }

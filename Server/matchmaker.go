@@ -53,7 +53,6 @@ func (matchmaker *Matchmaker) waitForNextAliveConnection() *PlayerConnection {
 		if playerConnection == nil {
 			continue
 		}
-
 		select {
 		case <-playerConnection.DisconnectChannel:
 			// già chiusa => scarto e continuo

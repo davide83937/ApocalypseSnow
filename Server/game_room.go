@@ -1,7 +1,9 @@
 package main
 
+import "C"
 import (
 	"encoding/binary"
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
@@ -18,6 +20,8 @@ type GameRoom struct {
 	// Runtime netcode della room
 	firstPlayerPendingInputs  []InputState
 	secondPlayerPendingInputs []InputState
+
+	Obstacles []Position
 
 	// Shot lato server:
 	// - activeShots contiene gli shot creati davvero
@@ -42,6 +46,11 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 		activeShots:          make([]Shot, 0, 64),
 		lastPressTickByOwner: make(map[uint32]uint32),
 		nextShotID:           1,
+
+		Obstacles: []Position{
+			{X: 100, Y: 100},
+			{X: 500, Y: 200},
+		},
 
 		firstPlayer: Player{
 			ID:       1,
@@ -69,6 +78,7 @@ func (gameRoom *GameRoom) Run() {
 
 	gameRoom.SendJoinAcknowledgements()
 	gameRoom.CreateInitialEggs(5)
+	gameRoom.sendSpawnObstacleToBothPlayers()
 
 	// Calcoliamo la durata esatta di un singolo tick (es. 33.33ms per 30Hz)
 	tickDuration := time.Second / time.Duration(gameRoom.tickRateHz)
@@ -282,9 +292,28 @@ func (gameRoom *GameRoom) applyMaturePendingInputs(
 			log.Printf("[SHOT PRESS] owner=%d pressedTick=%d", player.ID, inputState.SeqN)
 		}
 
-		player.X, player.Y = stepFromStateDLL(
+		// --- LOGICA DI VALIDAZIONE MOVIMENTO ---
+
+		// 1. Salviamo la posizione attuale (sicura)
+		oldX, oldY := player.X, player.Y
+
+		// 2. Calcoliamo la posizione potenziale usando la DLL
+		newX, newY := stepFromStateDLL(player.X, player.Y, inputState.Mask, deltaTime)
+
+		// 3. Verifichiamo se la nuova posizione collide con gli ostacoli
+		if gameRoom.checkCollisionAt(newX, newY) {
+			// Se c'è una collisione, il server annulla il movimento.
+			// Restiamo alla posizione vecchia, ma aggiorniamo comunque SeqN e Mask
+			// per confermare al client che l'input è stato elaborato.
+			player.X, player.Y = oldX, oldY
+		} else {
+			// Se il percorso è libero, confermiamo il movimento
+			player.X, player.Y = newX, newY
+		}
+
+		/*player.X, player.Y = stepFromStateDLL(
 			player.X, player.Y, inputState.Mask, deltaTime,
-		)
+		)*/
 
 		player.LastMask = inputState.Mask
 		player.LastSeqN = inputState.SeqN
@@ -340,9 +369,22 @@ func (gameRoom *GameRoom) sendSpawnEggToBothPlayers(eggId int32, eggX, eggY floa
 	binary.LittleEndian.PutUint32(packet[1:5], uint32(eggId))
 	binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(eggX))
 	binary.LittleEndian.PutUint32(packet[9:13], math.Float32bits(eggY))
-
 	gameRoom.firstPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
 	gameRoom.secondPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
+}
+
+func (gameRoom *GameRoom) sendSpawnObstacleToBothPlayers() {
+
+	for i := 0; i < 2; i++ {
+		packet := make([]byte, 13)
+		packet[0] = MsgSpawnObstacle
+		fmt.Printf("Coordinate: %+v\n", gameRoom.Obstacles[i])
+		binary.LittleEndian.PutUint32(packet[1:5], math.Float32bits(gameRoom.Obstacles[i].X))
+		binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(gameRoom.Obstacles[i].Y))
+
+		gameRoom.firstPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
+		gameRoom.secondPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
+	}
 }
 
 func (gameRoom *GameRoom) sendAuthStateToPlayer(targetConn *PlayerConnection, player Player) {

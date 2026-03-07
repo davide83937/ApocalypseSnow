@@ -63,8 +63,8 @@ public class Egg:CollisionExtensions
         const int bounceDistance = 5;
         switch (collisionType)
         {
-            case 1: _position.Y -= bounceDistance; break; // TOP
-            case 2: _position.Y += bounceDistance; break; // BOTTOM
+            case 1: _position.Y += bounceDistance; break; // TOP
+            case 2: _position.Y -= bounceDistance; break; // BOTTOM
             case 3: _position.X += bounceDistance; break; // LEFT
             case 4: _position.X -= bounceDistance; break; // RIGHT
         }

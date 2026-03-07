@@ -69,17 +69,12 @@ public class EggsEvent:GameComponent
             if (sender == _myPenguin._penguinColliderHandler) penguin = _myPenguin;
             else if (sender == _redPenguin._penguinColliderHandler) penguin = _redPenguin;
 
-            if (penguin is { _tag: "penguin" })
-            {
-                _myPenguinScore++;
-            }
+            if (penguin is { _tag: "penguin" }) 
+            { _myPenguinScore++; }
             else
-            {
-                _redPenguinScore++;
-            }
+            {_redPenguinScore++;}
         }
     }
-
 
     
     private void addEgg(object sender, EventArgs e)

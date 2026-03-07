@@ -31,7 +31,7 @@ public class PenguinShotHandler
     {
         if (!stateStruct.IsPressed(StateList.Reload)) return;
         _reloadTime += deltaTime;
-        Console.WriteLine(_reloadTime);
+        //Console.WriteLine(_reloadTime);
         
         if (_reloadTime > FrameReload) 
         {

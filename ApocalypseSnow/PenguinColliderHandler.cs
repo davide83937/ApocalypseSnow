@@ -109,7 +109,7 @@ public class PenguinColliderHandler
     
     public void HandleObstacleCollision(int collisionType, ref Vector2 position)
     {
-        const float bounceDistance = 5f;
+        const float bounceDistance = 1f;
         switch (collisionType)
         {
             case 1: position.Y -= bounceDistance; break; // TOP

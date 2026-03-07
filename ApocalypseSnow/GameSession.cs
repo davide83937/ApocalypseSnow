@@ -56,17 +56,15 @@ public sealed class GameSession : GameComponent
                 string playerName = "Davide";
                 JoinStruct joinStruct = new JoinStruct(playerName);
                 NetworkManager.Instance.SendJoin(joinStruct);
-
+                
                 // Questa riga BLOCCHEREBBE il gioco, ma qui è dentro un Task, 
                 // quindi la finestra di gioco continua a girare!
                 JoinAckStruct ack = NetworkManager.Instance.WaitForJoinAck();
-
+                
                 // Una volta ricevuto l'ACK, creiamo i pinguini e gli oggetti
                 // Usiamo un metodo di supporto
                 StartMatch(ack);
-
-
-            
+                
                 // Togliamo il messaggio di attesa
                 state = null;
             }
@@ -99,7 +97,7 @@ public sealed class GameSession : GameComponent
         _redPlatform =  new BasePlatform(_game, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
         _myPenguin = new Penguin(_game,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt);
         _redPenguin = new Penguin(_game,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt);
-        _obstacle = new Obstacle(_game, new Vector2(100, 100), 1, 1);
+        //_obstacle = new Obstacle(_game, new Vector2(100, 100));
         _eggsEvent = new EggsEvent(_game, _myPenguin, _redPenguin);
         _events = new Events(_game, _redPenguin);
 
@@ -110,7 +108,7 @@ public sealed class GameSession : GameComponent
         _game.Components.Add(_redPenguin);
         _game.Components.Add(_bluePlatform);
         _game.Components.Add(_redPlatform);
-        _game.Components.Add(_obstacle);
+        //_game.Components.Add(_obstacle);
         _game.Components.Add(_eggsEvent);
         _game.Components.Add(_events);
     }
