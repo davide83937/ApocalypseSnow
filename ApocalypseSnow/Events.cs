@@ -47,8 +47,9 @@ public class Events:GameComponent
     
     private void HandleRemoteShot(float mx, float my, int charge)
     {
+        charge = 30000;
         Vector2 target = new Vector2(mx, my);
-        _redPenguin.HandleRemoteShot(target);
+        _redPenguin.HandleRemoteShot(target,charge);
         _redPenguin._myEgg = null;
     }
 }

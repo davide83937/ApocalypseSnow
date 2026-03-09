@@ -13,11 +13,9 @@ import (
 type PlayerConnection struct {
 	networkConnection net.Conn
 
-	// IMPORTANTISSIMO:
-	// - InputChannel NON deve droppare, altrimenti salti SeqN e col server "consecutivo" ti blocchi.
-	// - ShotChannel NON deve droppare, altrimenti perdi eventi di sparo.
-	InputChannel chan InputState
-	ShotChannel  chan ShotEvent
+	// EventChannel preserva l'ordine globale degli eventi letti dal TCP.
+	// MsgState e MsgShot restano nello stesso ordine in cui arrivano sulla connessione.
+	EventChannel chan PlayerEvent
 
 	OutgoingPacketChannel chan []byte
 	DisconnectChannel     chan struct{}
@@ -30,9 +28,8 @@ func NewPlayerConnection(networkConnection net.Conn) *PlayerConnection {
 	return &PlayerConnection{
 		networkConnection: networkConnection,
 
-		// puoi aumentare questi buffer se vuoi assorbire burst senza bloccare subito
-		InputChannel: make(chan InputState, 1024),
-		ShotChannel:  make(chan ShotEvent, 256),
+		// buffer unico per tutti gli eventi del player
+		EventChannel: make(chan PlayerEvent, 1024),
 
 		OutgoingPacketChannel: make(chan []byte, 256),
 		DisconnectChannel:     make(chan struct{}),
@@ -78,7 +75,7 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 	messageTypeBuffer := make([]byte, 1)
 	joinPayloadBuffer := make([]byte, 8)
 	statePayloadBuffer := make([]byte, 8)
-	shotPayloadBuffer := make([]byte, 16) // <-- era 12
+	shotPayloadBuffer := make([]byte, 16)
 
 	for {
 		select {
@@ -111,8 +108,13 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 				SeqN: sequenceNumber,
 			}
 
+			event := PlayerEvent{
+				Type:  EventInput,
+				Input: inputState,
+			}
+
 			select {
-			case playerConnection.InputChannel <- inputState:
+			case playerConnection.EventChannel <- event:
 			case <-playerConnection.DisconnectChannel:
 				return
 			}
@@ -136,8 +138,13 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 				SeqN:   shotTick,
 			}
 
+			event := PlayerEvent{
+				Type: EventShot,
+				Shot: shotEvent,
+			}
+
 			select {
-			case playerConnection.ShotChannel <- shotEvent:
+			case playerConnection.EventChannel <- event:
 			case <-playerConnection.DisconnectChannel:
 				return
 			}

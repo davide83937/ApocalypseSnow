@@ -68,7 +68,7 @@ public class Game1: Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _uiFont = Content.Load<SpriteFont>("UIAmmo");
-        load_texture("Content/images/environment.png", "Content/images/start.png");
+        load_texture("Content/images/background.png", "Content/images/start.png");
    
         
         base.LoadContent();

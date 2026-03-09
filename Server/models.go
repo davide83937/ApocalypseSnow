@@ -36,3 +36,27 @@ type ShotEvent struct {
 	Position
 	Charge uint32
 }
+
+type PlayerEventType int
+
+const (
+	EventInput PlayerEventType = iota
+	EventShot
+)
+
+type PlayerEvent struct {
+	Type  PlayerEventType
+	Input InputState
+	Shot  ShotEvent
+}
+
+func (event PlayerEvent) SeqN() uint32 {
+	switch event.Type {
+	case EventInput:
+		return event.Input.SeqN
+	case EventShot:
+		return event.Shot.SeqN
+	default:
+		return 0
+	}
+}

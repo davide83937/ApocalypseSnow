@@ -87,11 +87,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         );
     }
 
-    public void HandleRemoteShot(Vector2 target)
+    public void HandleRemoteShot(Vector2 target, int charge)
     {
-        // Chiamiamo lo shot handler usando la posizione passata dal server invece del mouse locale
-        //Console.WriteLine(target.X + ", " + target.Y);
-        //Console.WriteLine("Posizione X: " + _position.X + ", " + "Posizione Y: " + _position.Y);
+        _penguinShotHandler.pressedTime = charge;
+
         _penguinShotHandler.Shot(
             _penguinInputHandler._stateStruct,
             target,
@@ -138,6 +137,8 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         //   Con un semplice if invece droppiamo tick (fisica rallenta sotto carico).
         if (_accumulator >= _physicsDeltaTime)
         {
+
+
             _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
             _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct,
                 _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _physicsDeltaTime, _position);
@@ -149,8 +150,11 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             _penguinInputHandler.increaseTimeFreezing(_physicsDeltaTime, ref _penguinColliderHandler.isFrozen);
 
             _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _physicsDeltaTime);
-            _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _physicsDeltaTime);
 
+            if (!_tag.EndsWith("Red"))
+            {
+                _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _physicsDeltaTime);
+            }
             // AGGIUNGI QUESTO:
             if (_tag.EndsWith("Red"))
             {
