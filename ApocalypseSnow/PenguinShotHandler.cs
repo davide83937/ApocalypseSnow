@@ -235,7 +235,7 @@ public class PenguinShotHandler
         Vector2 spawnPosition = muzzleBase + aimScreenDirection * MuzzleDistance;
 
         // Debug/tuning
-        Vector2 finalPosition = FinalPoint(startSpeed, spawnPosition, gravity);
+        //Vector2 finalPosition = FinalPoint(startSpeed, spawnPosition, gravity);
 
         Ball b = new Ball(_gameContext, _tag, spawnPosition, startSpeed, _currentVerticalSpeed, tagBall, gravity);
         _gameContext.Components.Add(b);

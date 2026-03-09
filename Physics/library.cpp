@@ -106,3 +106,32 @@ Vector2 Lerp(Vector2 a, Vector2 b, float t) {
     result.y = a.y + (b.y - a.y) * t;
     return result;
 }
+
+
+float LerpFloat(float v0, float v1, float t) {
+    // Assicura che t sia tra 0 e 1 come avviene nel codice C#
+    t = std::clamp(t, 0.0f, 1.0f);
+    return v0 + t * (v1 - v0);
+}
+
+Vector2 calculateScreenPosition(Vector2 startPos, float worldDeltaX, float worldDeltaY, float z) {
+    Vector2 screenPos;
+
+    // X rimane lineare
+    screenPos.x = startPos.x + worldDeltaX;
+
+    // Y combina la prospettiva del piano e l'innalzamento dato dalla quota Z
+    screenPos.y = startPos.y + (PlanePerspectiveY * worldDeltaY) - (HeightProjection * z);
+
+    return screenPos;
+}
+
+/**
+ * Esempio di calcolo della scala visiva basata sull'altezza
+ */
+float calculateVisualScale(float z, float maxHeight, float scaleMin, float scaleMax, float* outAlpha) {
+    float alpha = (maxHeight > 0.0001f) ? (z / maxHeight) : 0.0f;
+    if (alpha > 1.0f) alpha = 1.0f;
+    *outAlpha = alpha; // "Esporta" il valore
+    return std::lerp(scaleMin, scaleMax, alpha);
+}

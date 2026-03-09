@@ -23,8 +23,8 @@ public class Ball : CollisionExtensions
     private readonly float _gravity;
 
     private float _ballTime;
-    private float _scale;
-    private float _currentHeight;
+    public float _scale;
+    public float _currentHeight;
 
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
@@ -131,14 +131,17 @@ public class Ball : CollisionExtensions
 
     protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
     {
+        if (_currentHeight >= 30f) return;
         switch (otherTag)
         {
-            case "obstacle" when _scale < 1.15f:
+            case "obstacle":
                 _hitObstacle = true;
+                Game.Components.Remove(this);
                 CollisionManager.Instance.removeObject(_tag);
                 break;
 
             case string t when isDeleteConditions(t):
+                Console.WriteLine("Palla eliminata");
                 Game.Components.Remove(this);
                 CollisionManager.Instance.removeObject(_tag);
                 break;
@@ -151,8 +154,8 @@ public class Ball : CollisionExtensions
             otherTag != "obstacle" &&
             otherTag != tagPenguin &&
             !otherTag.EndsWith("P") &&
-            !otherTag.StartsWith("egg") &&
-            _scale < 1.15f
+            !otherTag.StartsWith("egg") 
+            
         );
     }
 
@@ -180,29 +183,44 @@ public class Ball : CollisionExtensions
         if (z < 0f) z = 0f;
         _currentHeight = z;
 
-        float screenX = _startPosition.X + worldDeltaX;
-        float screenY = _startPosition.Y + (PlanePerspectiveY * worldDeltaY) - (HeightProjection * z);
+        Console.WriteLine("Current height: " + _currentHeight);
+        Vector2 screen = new Vector2(0, 0);
+        screen = PhysicsAPI.calculateScreenPosition(_startPosition, worldDeltaX, worldDeltaY, z);
+        //float screenX = _startPosition.X + worldDeltaX;
+        //float screenY = _startPosition.Y + (PlanePerspectiveY * worldDeltaY) - (HeightProjection * z);
 
-        _position.X = screenX;
-        _position.Y = screenY;
+        _position.X = screen.X;
+        _position.Y = screen.Y;
 
-        float alpha = 0f;
-        if (_maxHeight > 0.0001f)
-            alpha = MathHelper.Clamp(z / _maxHeight, 0f, 1f);
+       // float alpha = 0f;
+        //if (_maxHeight > 0.0001f)
+       //     alpha = MathHelper.Clamp(z / _maxHeight, 0f, 1f);
 
-        _scale = MathHelper.Lerp(ScaleMin, ScaleMax, alpha);
+        //_scale = PhysicsAPI.LerpFloat(ScaleMin, ScaleMax, alpha);
+        _scale = PhysicsAPI.calculateVisualScale( z,  _maxHeight,  0f,  1f, out float alpha);
 
-        float shadowScreenX = _startPosition.X + worldDeltaX;
-        float shadowScreenY = _startPosition.Y + (PlanePerspectiveY * worldDeltaY);
+        Vector2 shadowScreen = PhysicsAPI.calculateScreenPosition(_startPosition, worldDeltaX, worldDeltaY, z);
+        float shadowScreenX = shadowScreen.X;
+        float shadowScreenY = shadowScreen.Y;//_startPosition.Y + (PlanePerspectiveY * worldDeltaY);
 
         _shadowPosition = new Vector2(shadowScreenX, shadowScreenY);
 
-        _shadowScale = MathHelper.Lerp(1.0f, 0.5f, alpha);
-        _shadowOpacity = MathHelper.Lerp(0.4f, 0.15f, alpha);
+        _shadowScale = PhysicsAPI.LerpFloat(1.0f, 0.5f, alpha);
+        _shadowOpacity = PhysicsAPI.LerpFloat(0.4f, 0.15f, alpha);
 
-        int posCollX = (int)shadowScreenX + _halfTextureFractionWidth;
-        int posCollY = (int)shadowScreenY + _halfTextureFractionHeight;
+        if (_currentHeight >= 30f) 
+        {
+            // Spostiamo il collider fuori campo temporaneamente
+            CollisionManager.Instance.modifyObject(_tag, -1000, -1000, _texture.Width, _texture.Height);
+        }
+        else 
+        {
+            // La palla è bassa, aggiorniamo il collider sulla posizione reale (ombra)
+            int posCollX = (int)shadowScreenX + _halfTextureFractionWidth;
+            int posCollY = (int)shadowScreenY + _halfTextureFractionHeight;
+            CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _texture.Width, _texture.Height);
+        }
 
-        CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _texture.Width, _texture.Height);
+        //CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _texture.Width, _texture.Height);
     }
 }

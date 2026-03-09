@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Microsoft.Xna.Framework.Input;
 
 namespace ApocalypseSnow;
@@ -38,6 +39,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
         _penguinInputHandler = new PenguinInputHandler(_tag);
         _physicsDeltaTime = physicsDeltaTime;
+        
     }
     
 
@@ -113,7 +115,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                     _deltaTime, ref _myEgg);
                 break;
             case string t when _penguinColliderHandler.IsEnemyBall(t):
-                _penguinColliderHandler.HandleHitByBall(ref _myEgg);
+                // Controlla se la palla esiste e se è "abbastanza bassa" per colpire
+                    _penguinColliderHandler.HandleHitByBall(ref _myEgg);
+                
+                
                 break;
             case "blueP" or "redP":
                 _penguinColliderHandler.HandleEggDelivery(otherTag,
@@ -151,7 +156,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
             _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _physicsDeltaTime);
 
-            if (!_tag.EndsWith("Red"))
+            if (!_tag.EndsWith("Red") && _gameContext.IsActive)
             {
                 _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _physicsDeltaTime);
             }
@@ -162,7 +167,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 _penguinColliderHandler.SyncStateWithNetwork(_penguinInputHandler._stateStruct, ref _myEgg);
             }
             
-            if (!_tag.EndsWith("Red"))
+            if (!_tag.EndsWith("Red") && _gameContext.IsActive)
             {
                 KeyboardState _newState = Keyboard.GetState();
 

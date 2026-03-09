@@ -47,10 +47,13 @@ extern "C" {
         COLLISION_RIGHT = 4   // Impatto dal lato destro
     };
 
-    struct Vector2 {
+typedef struct {
         float x;
         float y;
-    };
+    } Vector2;
+
+    const float PlanePerspectiveY = 0.70f;
+    const float HeightProjection = 0.35f;
 
     PHYSICS_API const char* PhysicsBuildInfo();
     PHYSICS_API void uniform_rectilinear_motion(float *position, float velocity, float deltaTime);
@@ -76,7 +79,9 @@ extern "C" {
 
     PHYSICS_API float Distance(Vector2 a, Vector2 b);
     PHYSICS_API Vector2 Lerp(Vector2 a, Vector2 b, float t);
-
+    PHYSICS_API float LerpFloat(float v0, float v1, float t);
+    PHYSICS_API Vector2 calculateScreenPosition(Vector2 startPos, float worldDeltaX, float worldDeltaY, float z);
+    PHYSICS_API float calculateVisualScale(float z, float maxHeight, float scaleMin, float scaleMax, float* outAlpha);
 
     //PHYSICS_API void check_collisions2(CollisionDataIn* data, CollisionDataOut2* dataOut, int count);
 

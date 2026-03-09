@@ -41,4 +41,13 @@ internal static class PhysicsAPI
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern Vector2 Lerp(Vector2 a, Vector2 b, float t);
+    
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern float LerpFloat(float a, float b, float t);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern Vector2 calculateScreenPosition(Vector2 startPos, float worldDeltaX, float worldDeltaY, float z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern float calculateVisualScale(float z, float maxHeight, float scaleMin, float scaleMax, out float outAlpha);
 }
