@@ -1,76 +1,153 @@
-﻿using System;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 
 namespace ApocalypseSnow;
 
-public class MovementsManager:IMovements
+public class MovementsManager : IMovements
 {
+    private enum ChargeMode
+    {
+        None,
+        Left,
+        Right
+    }
+
     private KeyboardState _newState = Keyboard.GetState();
     private MouseState _mouseState = Mouse.GetState();
-    private bool movementKeyPressed = false;
-    private Game _game;
-    ShotStruct _shotStruct;
-    private uint i = 0;
+    private MouseState _previousMouseState = Mouse.GetState();
 
-    
+    private readonly Game _game;
+    private ChargeMode _chargeMode = ChargeMode.None;
+
     public MovementsManager(Game game)
     {
-        //this.networkManager = networkManager;
         _game = game;
     }
 
     public Vector2 GetMousePosition()
     {
-        Vector2 mousePosition = new Vector2(_mouseState.X, _mouseState.Y);
-        return mousePosition;
+        return new Vector2(_mouseState.X, _mouseState.Y);
     }
-    
 
-    public void UpdateInput(ref StateStruct stateStruct, bool isFreezing, bool isWithEgg, 
-        float _deltaTime, Vector2 _position)
-        {
-        
+    public void UpdateInput(
+        ref StateStruct stateStruct,
+        bool isFreezing,
+        bool isWithEgg,
+        float deltaTime,
+        Vector2 position)
+    {
         stateStruct.Update();
-        
+
         _newState = Keyboard.GetState();
         _mouseState = Mouse.GetState();
-  
-        if (_newState.IsKeyDown(Keys.W)) stateStruct.Current |= StateList.Up;
-        if (_newState.IsKeyDown(Keys.S)) stateStruct.Current |= StateList.Down;
-        if (_newState.IsKeyDown(Keys.A)) stateStruct.Current |= StateList.Left;
-        if (_newState.IsKeyDown(Keys.D)) stateStruct.Current |= StateList.Right;
-        if (_newState.IsKeyDown(Keys.R) && !isFreezing && !isWithEgg) stateStruct.Current |= StateList.Reload;
-        if (_newState.IsKeyDown(Keys.E) && !isFreezing) stateStruct.Current |= StateList.TakingEgg;
-        if(isWithEgg) stateStruct.Current |= StateList.WithEgg;
-        if (_newState.IsKeyDown(Keys.Space) && !isFreezing && isWithEgg) stateStruct.Current |= StateList.PuttingEgg;
 
-        if (_game.IsActive)
+        bool isActive = _game.IsActive;
+
+        // Stati derivati dal gameplay: questi possono restare anche fuori da IsActive
+        if (isWithEgg)
+            stateStruct.Current |= StateList.WithEgg;
+
+        if (isFreezing)
+            stateStruct.Current |= StateList.Freezing;
+
+        if (isActive)
         {
-            if (_mouseState.LeftButton == ButtonState.Pressed && !isFreezing && !isWithEgg)
-                stateStruct.Current |= StateList.Shoot;
-            if (stateStruct.JustReleased(StateList.Shoot))
+            // Movimento
+            if (_newState.IsKeyDown(Keys.W))
+                stateStruct.Current |= StateList.Up;
+
+            if (_newState.IsKeyDown(Keys.S))
+                stateStruct.Current |= StateList.Down;
+
+            if (_newState.IsKeyDown(Keys.A))
+                stateStruct.Current |= StateList.Left;
+
+            if (_newState.IsKeyDown(Keys.D))
+                stateStruct.Current |= StateList.Right;
+
+            // Azioni tastiera
+            if (_newState.IsKeyDown(Keys.R) && !isFreezing && !isWithEgg)
+                stateStruct.Current |= StateList.Reload;
+
+            if (_newState.IsKeyDown(Keys.E) && !isFreezing)
+                stateStruct.Current |= StateList.TakingEgg;
+
+            if (_newState.IsKeyDown(Keys.Space) && !isFreezing && isWithEgg)
+                stateStruct.Current |= StateList.PuttingEgg;
+
+            // Moving
+            bool movementKeyPressed =
+                _newState.IsKeyDown(Keys.W) ||
+                _newState.IsKeyDown(Keys.S) ||
+                _newState.IsKeyDown(Keys.A) ||
+                _newState.IsKeyDown(Keys.D);
+
+            if (movementKeyPressed && !isFreezing)
+                stateStruct.Current |= StateList.Moving;
+
+            // ===== SHOOT LOCK: first press wins =====
+            bool canShoot = !isFreezing && !isWithEgg;
+
+            bool leftPressed = _mouseState.LeftButton == ButtonState.Pressed;
+            bool righPressed = _mouseState.RightButton == ButtonState.Pressed;
+
+            bool leftJustPressed =
+                _mouseState.LeftButton == ButtonState.Pressed &&
+                _previousMouseState.LeftButton == ButtonState.Released;
+
+            bool rightJustPressed =
+                _mouseState.RightButton == ButtonState.Pressed &&
+                _previousMouseState.RightButton == ButtonState.Released;
+
+            if (!canShoot)
             {
-                Vector2 mousePosition = GetMousePosition();
-                _shotStruct.mouseX = mousePosition.X;
-                _shotStruct.mouseY = mousePosition.Y;
-                //NetworkManager.Instance.SendShot(_shotStruct);
+                _chargeMode = ChargeMode.None;
+            }
+            else
+            {
+                // Acquisizione lock solo sul primo click
+                if (_chargeMode == ChargeMode.None)
+                {
+                    if (leftJustPressed)
+                        _chargeMode = ChargeMode.Left;
+                    else if (rightJustPressed)
+                        _chargeMode = ChargeMode.Right;
+                }
+
+                switch (_chargeMode)
+                {
+                    case ChargeMode.Left:
+                        if (leftPressed)
+                        {
+                            stateStruct.Current |= StateList.ShootLeft;
+                        }
+                        else
+                        {
+                            _chargeMode = ChargeMode.None;
+                        }
+                        break;
+
+                    case ChargeMode.Right:
+                        if (righPressed)
+                        {
+                            stateStruct.Current |= StateList.ShootRight;
+                            bool rightPressed = _mouseState.RightButton == ButtonState.Pressed;
+                        }
+                        else
+                        {
+                            _chargeMode = ChargeMode.None;
+                        }
+                        break;
+                }
             }
         }
+        else
+        {
+            // Se stiamo cliccando fuori dalla finestra, resettiamo lo stato di shoot
+            _chargeMode = ChargeMode.None;
+        }
 
-        movementKeyPressed =
-            _newState.IsKeyDown(Keys.W) || _newState.IsKeyDown(Keys.S) ||
-            _newState.IsKeyDown(Keys.A) || _newState.IsKeyDown(Keys.D);
-        if (movementKeyPressed && !isFreezing) stateStruct.Current |= StateList.Moving;
-        if (isFreezing) stateStruct.Current |= StateList.Freezing;
-        //Vector2 vector2 = Vector2.Zero;
-        //_networkManager.SendState(stateStruct, _deltaTime);
-        //_networkManager.Receive();
-        //Console.WriteLine($"X after Normalization: {_position.X}, Y after Normalization: {_position.Y}");
-        //Reconciler.Instance.Record(GameSession.LocalTick, stateStruct.Current);
-        //NetworkManager.Instance.SendState(stateStruct, GameSession.LocalTick);
-        // 2. Ricevi gli aggiornamenti dal server
-        // return vector2;
+        //aggiorniamo sempre lo stato precedente del mouse, così da poter rilevare i click al frame successivo
+        _previousMouseState = _mouseState;
     }
-    
 }

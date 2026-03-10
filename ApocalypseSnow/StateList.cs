@@ -8,11 +8,12 @@ public enum StateList
     Down = 1 << 1,     // Sostituisce IsS
     Left = 1 << 2,     // Sostituisce IsA
     Right = 1 << 3,    // Sostituisce IsD
-    Reload = 1 << 4,   //  Sostituisce IsR
-    Shoot = 1 << 5,    // Sostituisce IsLeft
-    Moving = 1 << 6,    // Sostituisce IsMoving
+    Reload = 1 << 4,   
+    ShootLeft = 1 << 5, //tiro con il tasto sinistro del mouse (30 gradi)    
+    Moving = 1 << 6,
     Freezing = 1 << 7,
     TakingEgg = 1 << 8,
     WithEgg = 1 << 9,
     PuttingEgg = 1 << 10,
+    ShootRight = 1 << 11 //tiro con il tasto destro del mouse (60 gradi)    
 }

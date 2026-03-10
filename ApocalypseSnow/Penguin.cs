@@ -83,21 +83,22 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             ref _position,
             _penguinShotHandler.Ammo,
             _penguinInputHandler._stateStruct.IsPressed(StateList.Reload),
-            _penguinInputHandler._stateStruct.IsPressed(StateList.Shoot),
+            _penguinInputHandler._stateStruct.IsPressed(StateList.ShootLeft)|| _penguinInputHandler._stateStruct.IsPressed(StateList.ShootRight),
             _penguinInputHandler._stateStruct.IsPressed(StateList.Freezing),
             _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg)
         );
     }
 
-    public void HandleRemoteShot(Vector2 target, int charge)
+    public void HandleRemoteShot(Vector2 target, int charge, ShotType shotType)
     {
-        _penguinShotHandler.pressedTime = charge;
+        _penguinShotHandler.pressedTime = charge/1000f; //riportiamo charge in secondi
 
         _penguinShotHandler.Shot(
             _penguinInputHandler._stateStruct,
             target,
             _position,
-            _penguinInputHandler._animationManager._ballTag
+            _penguinInputHandler._animationManager._ballTag,
+            shotType
         );
     }
 
@@ -142,8 +143,6 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         //   Con un semplice if invece droppiamo tick (fisica rallenta sotto carico).
         if (_accumulator >= _physicsDeltaTime)
         {
-
-
             _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
             _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct,
                 _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _physicsDeltaTime, _position);

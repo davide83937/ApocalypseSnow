@@ -1,17 +1,19 @@
 ﻿using System;
-
-namespace ApocalypseSnow;
-
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+
+namespace ApocalypseSnow;
 
 public class PenguinShotHandler
 {
     public readonly Game _gameContext;
-    private string _tag;
+    private readonly string _tag;
     private int _ammo;
     public int Ammo { get => _ammo; set => _ammo = value; }
+
     private static readonly int FrameReload;
+
+    // Charge locale canonico in secondi
     public float pressedTime;
     public float _reloadTime;
 
@@ -41,6 +43,12 @@ public class PenguinShotHandler
     // Componente verticale iniziale del colpo corrente
     private float _currentVerticalSpeed;
 
+    // Proprietario della carica corrente:
+    // null = nessuna carica attiva
+    // Left = sto caricando col sinistro
+    // Right = sto caricando col destro
+    private ShotType? _chargingShotType = null;
+
     public PenguinShotHandler(Game gameContext, string tag)
     {
         _gameContext = gameContext;
@@ -58,7 +66,8 @@ public class PenguinShotHandler
 
     public void Reload(StateStruct stateStruct, float deltaTime)
     {
-        if (!stateStruct.IsPressed(StateList.Reload)) return;
+        if (!stateStruct.IsPressed(StateList.Reload))
+            return;
 
         _reloadTime += deltaTime;
 
@@ -80,14 +89,51 @@ public class PenguinShotHandler
         bool leftDown = _currentMouseState.LeftButton == ButtonState.Pressed;
         bool rightDown = _currentMouseState.RightButton == ButtonState.Pressed;
 
-        if ((!leftDown && !rightDown) || _ammo <= 0)
+        if (_ammo <= 0)
             return;
 
-        // Il sinistro seleziona il tiro teso, il destro quello arcuato
-        _currentThetaDeg = rightDown ? ThetaRightDeg : ThetaLeftDeg;
+        // Nessuna carica attiva: scegli il bottone che apre la carica
+        if (_chargingShotType == null)
+        {
+            if (leftDown && !rightDown)
+            {
+                _chargingShotType = ShotType.Left;
+                _currentThetaDeg = ThetaLeftDeg;
+            }
+            else if (rightDown && !leftDown)
+            {
+                _chargingShotType = ShotType.Right;
+                _currentThetaDeg = ThetaRightDeg;
+            }
+            else
+            {
+                // Nessun bottone o entrambi premuti insieme: non iniziare nulla
+                return;
+            }
+        }
 
-        // Charge in secondi reali
-        pressedTime += deltaTime;
+        // Da qui in poi la carica ha un proprietario preciso:
+        // l'altro tasto viene ignorato completamente.
+        switch (_chargingShotType)
+        {
+            case ShotType.Left:
+                _currentThetaDeg = ThetaLeftDeg;
+
+                if (leftDown)
+                {
+                    pressedTime += deltaTime;
+                }
+                break;
+
+            case ShotType.Right:
+                _currentThetaDeg = ThetaRightDeg;
+
+                if (rightDown)
+                {
+                    pressedTime += deltaTime;
+                }
+                break;
+        }
 
         if (pressedTime > MaxChargeSeconds)
             pressedTime = MaxChargeSeconds;
@@ -145,7 +191,8 @@ public class PenguinShotHandler
     private Vector2 FinalPoint(Vector2 startSpeed, Vector2 startPosition, float gravity)
     {
         float flightTime = (2f * _currentVerticalSpeed) / gravity;
-        if (flightTime < 0f) flightTime = 0f;
+        if (flightTime < 0f)
+            flightTime = 0f;
 
         float worldDeltaX = startSpeed.X * flightTime;
         float worldDeltaY = startSpeed.Y * flightTime;
@@ -156,36 +203,55 @@ public class PenguinShotHandler
         return new Vector2(screenX, screenY);
     }
 
-    public void Shot(StateStruct stateStruct, Vector2 mousePosition, Vector2 position, string tagBall)
+    public void Shot(StateStruct stateStruct, Vector2 mousePosition, Vector2 position, string tagBall, ShotType? remoteShotType = null)
     {
         if (!_tag.EndsWith("Red"))
         {
-            bool leftReleased =
-                _previousMouseState.LeftButton == ButtonState.Pressed &&
-                _currentMouseState.LeftButton == ButtonState.Released;
-
-            bool rightReleased =
-                _previousMouseState.RightButton == ButtonState.Pressed &&
-                _currentMouseState.RightButton == ButtonState.Released;
-
-            if ((!leftReleased && !rightReleased) || _ammo <= 0)
+            if (_chargingShotType == null || _ammo <= 0)
             {
                 _previousMouseState = _currentMouseState;
                 return;
             }
 
-            _currentThetaDeg = rightReleased ? ThetaRightDeg : ThetaLeftDeg;
+            bool released = false;
+
+            switch (_chargingShotType)
+            {
+                case ShotType.Left:
+                    released =
+                        _previousMouseState.LeftButton == ButtonState.Pressed &&
+                        _currentMouseState.LeftButton == ButtonState.Released;
+
+                    _currentThetaDeg = ThetaLeftDeg;
+                    break;
+
+                case ShotType.Right:
+                    released =
+                        _previousMouseState.RightButton == ButtonState.Pressed &&
+                        _currentMouseState.RightButton == ButtonState.Released;
+
+                    _currentThetaDeg = ThetaRightDeg;
+                    break;
+            }
+
+            if (!released)
+            {
+                _previousMouseState = _currentMouseState;
+                return;
+            }
         }
         else
         {
-            // TEMPORANEO:
-            // il remoto non riceve ancora dal protocollo il tipo di arco
-            _currentThetaDeg = ThetaLeftDeg;
+            if (remoteShotType == ShotType.Left)
+                _currentThetaDeg = ThetaLeftDeg;
+            else
+                _currentThetaDeg = ThetaRightDeg;
         }
 
         if (pressedTime <= 0f)
         {
             _previousMouseState = _currentMouseState;
+            _chargingShotType = null;
             return;
         }
 
@@ -209,8 +275,7 @@ public class PenguinShotHandler
         // Charge normalizzato 0..1
         float charge01 = MathHelper.Clamp(pressedTime / MaxChargeSeconds, 0f, 1f);
 
-        // Qui sta la genialata:
-        // la gittata diventa molto più lineare rispetto al tempo di carica
+        // La gittata diventa molto più lineare rispetto al tempo di carica
         float power01 = MathF.Sqrt(charge01);
 
         float v0 = power01 * maxV0;
@@ -234,26 +299,26 @@ public class PenguinShotHandler
 
         Vector2 spawnPosition = muzzleBase + aimScreenDirection * MuzzleDistance;
 
-        // Debug/tuning
-        //Vector2 finalPosition = FinalPoint(startSpeed, spawnPosition, gravity);
-
         Ball b = new Ball(_gameContext, _tag, spawnPosition, startSpeed, _currentVerticalSpeed, tagBall, gravity);
         _gameContext.Components.Add(b);
 
         if (!_tag.EndsWith("Red"))
         {
-            ShotStruct shotStruct = new ShotStruct();
-            shotStruct.mouseX = mousePosition.X;
-            shotStruct.mouseY = mousePosition.Y;
+            ShotStruct shotStruct = new ShotStruct
+            {
+                mouseX = mousePosition.X,
+                mouseY = mousePosition.Y,
 
-            // Inviamo il charge in millisecondi
-            shotStruct.charge = (int)(pressedTime * 1000f);
+                // Inviamo il charge in millisecondi
+                charge = (int)MathF.Round(pressedTime * 1000f)
+            };
 
             NetworkManager.Instance.SendShot(shotStruct);
         }
 
         pressedTime = 0f;
         _ammo--;
+        _chargingShotType = null;
         _previousMouseState = _currentMouseState;
     }
 }

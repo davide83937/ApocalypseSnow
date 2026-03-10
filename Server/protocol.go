@@ -20,17 +20,18 @@ const (
 	Left       int32 = 1 << 2
 	Right      int32 = 1 << 3
 	Reload     int32 = 1 << 4
-	Shoot      int32 = 1 << 5
+	ShootLeft  int32 = 1 << 5
 	Moving     int32 = 1 << 6
 	Freezing   int32 = 1 << 7
 	TakingEgg  int32 = 1 << 8
 	WithEgg    int32 = 1 << 9
 	PuttingEgg int32 = 1 << 10
+	ShootRight int32 = 1 << 11
 )
 
 const (
 	ListenAddr        = ":8080"
-	chargeCap  uint32 = 200000
+	chargeCap  uint32 = 1500
 
 	// Quanti MsgState al massimo dreniamo (per player) in UN server-tick.
 	// Noi teniamo SOLO l'ultimo input ricevuto (latest-wins) e poi facciamo 1 step fisico per tick.

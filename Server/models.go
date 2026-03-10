@@ -1,4 +1,3 @@
-// models.go
 package main
 
 import "time"
@@ -6,6 +5,24 @@ import "time"
 type Position struct {
 	X float32
 	Y float32
+}
+
+type ChargeMode int
+
+const (
+	ChargeNone ChargeMode = iota
+	ChargeLeft
+	ChargeRight
+)
+
+type PendingShot struct {
+	Active            bool
+	Mode              ChargeMode
+	PressTick         uint32
+	ReleaseTick       uint32
+	WaitingShotPacket bool
+	WaitingNeutral    bool
+	ShotPacket        *ShotEvent
 }
 
 type Player struct {
@@ -24,6 +41,9 @@ type Player struct {
 
 	// Timestamp ultimo MsgState ricevuto
 	LastRx time.Time
+
+	// Stato autoritativo della carica tiro
+	PendingShot PendingShot
 }
 
 type InputState struct {

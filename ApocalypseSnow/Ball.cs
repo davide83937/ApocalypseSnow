@@ -197,9 +197,10 @@ public class Ball : CollisionExtensions
        //     alpha = MathHelper.Clamp(z / _maxHeight, 0f, 1f);
 
         //_scale = PhysicsAPI.LerpFloat(ScaleMin, ScaleMax, alpha);
-        _scale = PhysicsAPI.calculateVisualScale( z,  _maxHeight,  0f,  1f, out float alpha);
+        _scale = PhysicsAPI.calculateVisualScale( z,  _maxHeight,  ScaleMin,  ScaleMax, out float alpha);
 
-        Vector2 shadowScreen = PhysicsAPI.calculateScreenPosition(_startPosition, worldDeltaX, worldDeltaY, z);
+        // L'ombra deve stare sul piano di gioco, quindi quota z = 0
+        Vector2 shadowScreen = PhysicsAPI.calculateScreenPosition(_startPosition, worldDeltaX, worldDeltaY, 0f);
         float shadowScreenX = shadowScreen.X;
         float shadowScreenY = shadowScreen.Y;//_startPosition.Y + (PlanePerspectiveY * worldDeltaY);
 
