@@ -358,7 +358,22 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 			newX, newY := StepFromState(player.X, player.Y, inputState.Mask, deltaTime)
 
 			// Collisione autoritativa contro gli ostacoli.
-			if gameRoom.collisionManager.CheckPlayerCollisionAt(newX, newY, gameRoom.Obstacles) {
+			if gameRoom.collisionManager.CheckPlayerCollisionAt(
+				playerCollisionTag(player.ID),
+				newX,
+				newY,
+				gameRoom.Obstacles,
+			) {
+				log.Printf(
+					"[COLLISION] player=%d tag=%s old=(%.1f, %.1f) attempted=(%.1f, %.1f)",
+					player.ID,
+					playerCollisionTag(player.ID),
+					oldX,
+					oldY,
+					newX,
+					newY,
+				)
+
 				player.X, player.Y = oldX, oldY
 			} else {
 				player.X, player.Y = newX, newY

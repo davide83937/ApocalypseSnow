@@ -11,6 +11,34 @@ import "C"
 
 import "unsafe"
 
+const (
+	collisionTagPenguin    = "penguin"
+	collisionTagPenguinRed = "penguinRed"
+	collisionTagObstacle   = "obstacle"
+
+	// Replica server-side della geometria usata dal client.
+	// Riferimenti:
+	// - ApocalypseSnow/Penguin.cs
+	// - ApocalypseSnow/Obstacle.cs
+	penguinTextureWidth          = 288
+	penguinTextureHeight         = 384
+	penguinTextureFractionWidth  = penguinTextureWidth / 3  // 96
+	penguinTextureFractionHeight = penguinTextureHeight / 3 // 128
+
+	penguinHalfTextureFractionWidth  = penguinTextureFractionWidth / 2  // 48
+	penguinHalfTextureFractionHeight = penguinTextureFractionHeight / 2 // 64
+
+	obstacleTextureWidth          = 500
+	obstacleTextureHeight         = 400
+	obstacleTextureFractionWidth  = obstacleTextureWidth / 2  // 250
+	obstacleTextureFractionHeight = obstacleTextureHeight / 2 // 200
+
+	obstacleHalfTextureFractionWidth  = obstacleTextureFractionWidth / 2  // 125
+	obstacleHalfTextureFractionHeight = obstacleTextureFractionHeight / 2 // 100
+	obstacleColliderYOffset           = 25
+	obstacleColliderExtraWidth        = 60
+)
+
 type CollisionManager struct {
 	collisionRecordIns  []CollisionRecordIn
 	collisionRecordOuts []CollisionRecordOut
@@ -88,19 +116,38 @@ func (cm *CollisionManager) Results() []CollisionRecordOut {
 	return cm.collisionRecordOuts
 }
 
-func (cm *CollisionManager) CheckPlayerCollisionAt(x, y float32, obstacles []Position) bool {
+func playerCollisionTag(playerID uint32) string {
+	if playerID == 2 {
+		return collisionTagPenguinRed
+	}
+	return collisionTagPenguin
+}
+
+func (cm *CollisionManager) CheckPlayerCollisionAt(playerTag string, x, y float32, obstacles []Position) bool {
 	cm.collisionRecordIns = cm.collisionRecordIns[:0]
 
-	cm.AddObject("P", x+48, y+64, 96, 128)
+	// Replica 1:1 della costruzione del collider del client in Penguin.Update().
+	posCollX := x + penguinHalfTextureFractionWidth
+	posCollY := y + penguinHalfTextureFractionHeight
+	cm.AddObject(playerTag, posCollX, posCollY, penguinTextureFractionWidth, penguinHalfTextureFractionHeight)
 
+	// Replica 1:1 della costruzione del collider del client in Obstacle.LoadContent().
 	for _, obs := range obstacles {
-		cm.AddObject("O", obs.X+125, obs.Y+125, 200, 80)
+		posCollX := obs.X + obstacleHalfTextureFractionWidth
+		posCollY := obs.Y + obstacleHalfTextureFractionHeight
+		cm.AddObject(
+			collisionTagObstacle,
+			posCollX,
+			posCollY+obstacleColliderYOffset,
+			obstacleHalfTextureFractionWidth+obstacleColliderExtraWidth,
+			obstacleHalfTextureFractionHeight,
+		)
 	}
 
 	cm.SendToCpp()
 
 	for _, result := range cm.collisionRecordOuts {
-		if result.Type != 0 && (result.MyTag == "P" || result.OtherTag == "P") {
+		if result.Type != 0 && (result.MyTag == playerTag || result.OtherTag == playerTag) {
 			return true
 		}
 	}

@@ -112,5 +112,61 @@ namespace ApocalypseSnow
 
             Console.WriteLine("CollisionManager: Liste pulite per la nuova partita.");
         }
+
+        //serve al reconciliator per verificare se il movimento applicato causerebbe una collisione
+        public bool wouldCollide(string tag, float x, float y, int w, int h, string otherTagFilter = "obstacle")
+        {
+            int index = _collisionRecordIns.FindIndex(r => r._tag == tag);
+
+            bool hadOriginal = index != -1;
+            CollisionRecordIn original = default;
+
+            if (hadOriginal)
+            {
+                original = _collisionRecordIns[index];
+                modifyObject(tag, x, y, w, h);
+            }
+            else
+            {
+                addObject(tag, x, y, w, h);
+            }
+
+            SendToCpp();
+
+            bool collided = false;
+
+            if (resultsBuffer != null)
+            {
+                foreach (var elemento in resultsBuffer)
+                {
+                    if (elemento._type <= 0)
+                        continue;
+
+                    bool involvesTag = elemento._myTag == tag || elemento._otherTag == tag;
+                    if (!involvesTag)
+                        continue;
+
+                    string otherTag = elemento._myTag == tag ? elemento._otherTag : elemento._myTag;
+
+                    if (otherTag == otherTagFilter)
+                    {
+                        collided = true;
+                        break;
+                    }
+                }
+            }
+
+            // Ripristina il collider originale
+            if (hadOriginal)
+            {
+                modifyObject(tag, original._x, original._y, original._width, original._height);
+            }
+            else
+            {
+                removeObject(tag);
+            }
+
+            return collided;
+        }
     }
 }

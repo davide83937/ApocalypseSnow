@@ -88,53 +88,78 @@ public sealed class Reconciler
         }
         if (hasData && latest != null) action(latest);
     }
-    
+
     /// <summary>
     /// Applica reconcile alla posizione locale.
     /// Va chiamato sul main thread (Update), dopo aver eventualmente ricevuto auth.
     /// </summary>
-    public void Apply(ref Vector2 pos, float moveSpeed, float moveDt)
+    public void Apply(
+    ref Vector2 pos,
+    float moveSpeed,
+    float moveDt,
+    Func<Vector2, bool>? isBlockedAt = null)
     {
-        if (!_hasAuth) return;
+        if (!_hasAuth)
+            return;
+
         _hasAuth = false;
 
         // Scarta gli input vecchi che il server ha già processato e confermato
         _pending.RemoveAll(p => p.Seq <= _ack);
         Debug.WriteLine($"ack={_ack} pending={_pending.Count}");
-        // 1. Calcola il "Vero Presente": parti dal passato sicuro (_authPos) 
+
+        // 1) Calcola il "vero presente": parti dal passato sicuro (_authPos)
         // e ri-simula tutti i movimenti che il server non ha ancora visto.
         Vector2 replayPos = _authPos;
+
         foreach (var p in _pending)
         {
-            PhysicsWrapper.StepFromState(ref replayPos, p.MoveMask, moveSpeed, moveDt);
+            // Calcola prima una posizione candidata
+            Vector2 candidatePos = replayPos;
+            PhysicsWrapper.StepFromState(ref candidatePos, p.MoveMask, moveSpeed, moveDt);
+
+            // Se la posizione candidata collide, non committare lo step
+            if (isBlockedAt != null && isBlockedAt(candidatePos))
+            {
+                Debug.WriteLine(
+                    $"[RECONCILE BLOCKED] seq={p.Seq} " +
+                    $"replay=({replayPos.X}, {replayPos.Y}) " +
+                    $"candidate=({candidatePos.X}, {candidatePos.Y})");
+                continue;
+            }
+
+            // Solo se non collide aggiorni davvero replayPos
+            replayPos = candidatePos;
         }
 
-        // 2. IL FIX: Confronta la tua posizione attuale (pos) con il "Vero Presente" (replayPos)
+        // 2) Confronta la posizione attuale con il "vero presente"
         float err = PhysicsAPI.Distance(pos, replayPos);
 
         const float Eps = 2f;
         const float SnapThreshold = 12f;
         const float SoftLerp = 0.25f;
 
-        // Se hai predetto bene, l'errore è 0. Il Reconciler non tocca il pinguino!
-        if (err <= Eps) return;
+        // Se hai predetto bene, il reconciler non tocca il pinguino
+        if (err <= Eps)
+            return;
 
         if (err <= SnapThreshold)
         {
-            // Piccolo errore (es. float drift), correzione invisibile
             Debug.WriteLine("SoftLerp");
             Debug.WriteLine($"PosX : {pos.X}, PosY: {pos.Y}");
             Debug.WriteLine($"ReplayPosX : {replayPos.X}, ReplayPosY : {replayPos.Y}");
+
             pos = PhysicsAPI.Lerp(pos, replayPos, SoftLerp);
             return;
         }
+
         Debug.WriteLine("HARD RECONCILE");
         Debug.WriteLine($"After if, PosX : {pos.X}, PosY: {pos.Y}");
-        Debug.WriteLine($"After if,,ReplayPosX : {replayPos.X}, ReplayPosY : {replayPos.Y}");
+        Debug.WriteLine($"After if, ReplayPosX : {replayPos.X}, ReplayPosY : {replayPos.Y}");
 
         // Errore grave (es. il server ti ha visto sbattere contro un muro)
         pos = replayPos;
     }
-    
-    
+
+
 }
