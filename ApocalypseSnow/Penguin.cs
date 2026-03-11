@@ -143,12 +143,15 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         //   Con un semplice if invece droppiamo tick (fisica rallenta sotto carico).
         if (_accumulator >= _physicsDeltaTime)
         {
+            _movementsManager.UpdateInput(
+                ref _penguinInputHandler._stateStruct,
+                _penguinColliderHandler.isFrozen,
+                _penguinColliderHandler.isWithEgg,
+                _physicsDeltaTime,
+                _position);
+
             _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
-            _movementsManager.UpdateInput(ref _penguinInputHandler._stateStruct,
-                _penguinColliderHandler.isFrozen, _penguinColliderHandler.isWithEgg, _physicsDeltaTime, _position);
-            _penguinInputHandler.MoveReload(ref _penguinShotHandler._reloadTime);
-            _penguinColliderHandler.putEgg(_penguinInputHandler._stateStruct, ref _myEgg);
-           
+
             resetTakingTimer();
             resetPuttingTimer();
             _penguinInputHandler.increaseTimeFreezing(_physicsDeltaTime, ref _penguinColliderHandler.isFrozen);
@@ -159,6 +162,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             {
                 _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _physicsDeltaTime);
             }
+
             // AGGIUNGI QUESTO:
             if (_tag.EndsWith("Red"))
             {
@@ -166,10 +170,12 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 _penguinColliderHandler.SyncStateWithNetwork(_penguinInputHandler._stateStruct, ref _myEgg);
             }
             
+            // pinguino locale, finestra attiva
             if (!_tag.EndsWith("Red") && _gameContext.IsActive)
             {
                 KeyboardState _newState = Keyboard.GetState();
 
+                //trucco
                 if (_newState.IsKeyDown(Keys.P))
                 {
                     _penguinInputHandler.getMotion(ref _position.X, 200f, _physicsDeltaTime);
@@ -180,6 +186,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 _shotStruct.mouseX = (int)mousePosition.X;
                 _shotStruct.mouseY = (int)mousePosition.Y;
 
+                //questo deve stare ancora qui?
                 _penguinShotHandler.Shot(_penguinInputHandler._stateStruct, mousePosition,
                     _position, _penguinInputHandler._animationManager._ballTag);
             }

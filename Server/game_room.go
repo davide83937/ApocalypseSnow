@@ -1,6 +1,5 @@
 package main
 
-import "C"
 import (
 	"encoding/binary"
 	"fmt"
@@ -10,6 +9,12 @@ import (
 	"time"
 )
 
+// GameRoom rappresenta una partita 1v1 lato server.
+// Il server è autoritativo su:
+// - movimento
+// - collisioni
+// - gestione degli shot
+// - broadcast degli stati ai due client
 type GameRoom struct {
 	firstPlayerConnection  *PlayerConnection
 	secondPlayerConnection *PlayerConnection
@@ -17,22 +22,32 @@ type GameRoom struct {
 	firstPlayer  Player
 	secondPlayer Player
 
-	// Runtime netcode della room
+	// Code di eventi pendenti per ciascun player.
+	// Qui accumuliamo input e shot packet finché non diventano "maturi"
+	// rispetto al matchTick del server.
 	firstPlayerPendingEvents  []PlayerEvent
 	secondPlayerPendingEvents []PlayerEvent
 
+	// Ostacoli statici presenti nella mappa.
 	Obstacles []Position
 
-	// Shot lato server:
-	// - activeShots contiene gli shot creati davvero
-	// - nextShotID genera ID progressivi
+	// Gestore collisioni server-side.
+	collisionManager *CollisionManager
+
+	// Shot realmente creati lato server.
 	activeShots []Shot
 	nextShotID  uint32
 
+	// Clock logico della stanza.
 	tickRateHz uint32
 	matchTick  uint32
 }
 
+// NewGameRoom crea una nuova stanza di gioco con:
+// - due player
+// - due connection
+// - ostacoli iniziali
+// - collision manager
 func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection) *GameRoom {
 	return &GameRoom{
 		firstPlayerConnection:     firstPlayerConnection,
@@ -41,8 +56,9 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 		firstPlayerPendingEvents:  make([]PlayerEvent, 0, 64),
 		secondPlayerPendingEvents: make([]PlayerEvent, 0, 64),
 
-		activeShots: make([]Shot, 0, 64),
-		nextShotID:  1,
+		activeShots:      make([]Shot, 0, 64),
+		nextShotID:       1,
+		collisionManager: NewCollisionManager(),
 
 		Obstacles: []Position{
 			{X: 100, Y: 100},
@@ -70,6 +86,9 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 	}
 }
 
+// Run è il loop principale della room.
+// Mantiene un ticker fisso e accumula il tempo reale per garantire
+// che i Tick() vengano eseguiti con il passo logico corretto.
 func (gameRoom *GameRoom) Run() {
 	gameRoom.matchTick = 0
 
@@ -111,6 +130,12 @@ func (gameRoom *GameRoom) Run() {
 	}
 }
 
+// Tick esegue un singolo passo logico del gioco:
+// 1. drena i messaggi dai due player
+// 2. applica gli eventi maturi
+// 3. manda a ciascun player:
+//    - il proprio stato autoritativo
+//    - lo stato remoto dell’avversario
 func (gameRoom *GameRoom) Tick() {
 	gameRoom.matchTick++
 	deltaTime := float32(1.0 / float32(gameRoom.tickRateHz))
@@ -146,7 +171,7 @@ func (gameRoom *GameRoom) Tick() {
 		deltaTime,
 	)
 
-	// BROADCAST STATO
+	// Broadcast stato
 	gameRoom.sendAuthStateToPlayer(gameRoom.firstPlayerConnection, gameRoom.firstPlayer)
 	gameRoom.sendRemoteStateToPlayer(gameRoom.firstPlayerConnection, gameRoom.secondPlayer)
 
@@ -154,6 +179,8 @@ func (gameRoom *GameRoom) Tick() {
 	gameRoom.sendRemoteStateToPlayer(gameRoom.secondPlayerConnection, gameRoom.firstPlayer)
 }
 
+// drainEventChannelToPending sposta eventi dalla channel di rete alla coda pending del player.
+// Gli input troppo vecchi vengono scartati subito.
 func (gameRoom *GameRoom) drainEventChannelToPending(
 	playerConnection *PlayerConnection,
 	player *Player,
@@ -170,6 +197,8 @@ func (gameRoom *GameRoom) drainEventChannelToPending(
 				player.RecvMask = event.Input.Mask
 				player.RecvSeqN = event.Input.SeqN
 
+				// Se l'input è più vecchio o uguale all'ultimo già processato,
+				// lo scartiamo direttamente.
 				if event.Input.SeqN <= player.LastSeqN {
 					droppedOld++
 					continue
@@ -186,6 +215,20 @@ func (gameRoom *GameRoom) drainEventChannelToPending(
 	return
 }
 
+// updatePendingShot implementa la FSM del tiro lato server.
+// È pensata per essere speculare alla FSM lato client.
+//
+// Stati logici:
+// - Idle            => !ps.Active && !ps.WaitingNeutral
+// - ChargingLeft    => ps.Active && ps.Mode == ChargeLeft
+// - ChargingRight   => ps.Active && ps.Mode == ChargeRight
+// - WaitingNeutral  => ps.WaitingNeutral == true
+//
+// Regole:
+// - first press wins
+// - mentre è attiva una carica, l'altro tasto viene ignorato
+// - quando il tasto lockato viene rilasciato, entriamo in WaitingShotPacket
+// - dopo la creazione dello shot, andremo in WaitingNeutral
 func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uint32) {
 	leftNow := (mask & ShootLeft) != 0
 	rightNow := (mask & ShootRight) != 0
@@ -193,14 +236,16 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 	leftPrev := (player.LastMask & ShootLeft) != 0
 	rightPrev := (player.LastMask & ShootRight) != 0
 
-	leftRise := leftNow && !leftPrev
-	rightRise := rightNow && !rightPrev
-
-	leftFall := !leftNow && leftPrev
-	rightFall := !rightNow && rightPrev
+	leftJustPressed := leftNow && !leftPrev
+	rightJustPressed := rightNow && !rightPrev
 
 	ps := &player.PendingShot
 
+	// =======================================================
+	// STATO: WaitingNeutral
+	// =======================================================
+	// Dopo aver chiuso uno shot, il server non accetta una nuova carica
+	// finché entrambi i tasti non tornano rilasciati.
 	if ps.WaitingNeutral {
 		if !leftNow && !rightNow {
 			ps.WaitingNeutral = false
@@ -208,41 +253,64 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 		return
 	}
 
+	// =======================================================
+	// STATO: Idle
+	// =======================================================
+	// Nessuna carica attiva: first press wins.
 	if !ps.Active {
-		if leftRise && !rightRise {
+		if leftJustPressed {
 			ps.Active = true
 			ps.Mode = ChargeLeft
 			ps.PressTick = seqN
 			ps.ReleaseTick = 0
 			ps.WaitingShotPacket = false
 			ps.ShotPacket = nil
+
 			log.Printf("[SHOT PRESS] owner=%d mode=LEFT pressedTick=%d", player.ID, seqN)
-		} else if rightRise && !leftRise {
+			return
+		}
+
+		if rightJustPressed {
 			ps.Active = true
 			ps.Mode = ChargeRight
 			ps.PressTick = seqN
 			ps.ReleaseTick = 0
 			ps.WaitingShotPacket = false
 			ps.ShotPacket = nil
+
 			log.Printf("[SHOT PRESS] owner=%d mode=RIGHT pressedTick=%d", player.ID, seqN)
+			return
 		}
+
 		return
 	}
 
+	// =======================================================
+	// STATO: WaitingShotPacket
+	// =======================================================
+	// Abbiamo già visto il rilascio del tasto lockato e stiamo aspettando
+	// che arrivi il MsgShot vero e proprio.
 	if ps.WaitingShotPacket {
 		return
 	}
 
+	// =======================================================
+	// STATO: ChargingLeft / ChargingRight
+	// =======================================================
 	switch ps.Mode {
 	case ChargeLeft:
-		if leftFall {
+		// Finché il sinistro resta premuto, continuiamo la carica.
+		// Il destro è ignorato.
+		if !leftNow {
 			ps.ReleaseTick = seqN
 			ps.WaitingShotPacket = true
 			log.Printf("[SHOT RELEASE] owner=%d mode=LEFT releasedTick=%d", player.ID, seqN)
 		}
 
 	case ChargeRight:
-		if rightFall {
+		// Finché il destro resta premuto, continuiamo la carica.
+		// Il sinistro è ignorato.
+		if !rightNow {
 			ps.ReleaseTick = seqN
 			ps.WaitingShotPacket = true
 			log.Printf("[SHOT RELEASE] owner=%d mode=RIGHT releasedTick=%d", player.ID, seqN)
@@ -250,6 +318,12 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 	}
 }
 
+// applyMaturePendingEvents applica tutti gli eventi con seq <= matchTick.
+// Qui avvengono:
+// - movimento autoritativo
+// - collisioni autoritative
+// - avanzamento FSM shot
+// - creazione shot quando release + packet shot sono entrambi presenti
 func (gameRoom *GameRoom) applyMaturePendingEvents(
 	player *Player,
 	pending *[]PlayerEvent,
@@ -261,6 +335,7 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 	for consumeCount < len(*pending) {
 		event := (*pending)[consumeCount]
 
+		// Gli eventi futuri restano in coda.
 		if event.SeqN() > gameRoom.matchTick {
 			break
 		}
@@ -269,29 +344,35 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 		case EventInput:
 			inputState := event.Input
 
+			// Protezione ulteriore contro input vecchi.
 			if inputState.SeqN <= player.LastSeqN {
 				consumeCount++
 				continue
 			}
 
+			// Aggiorniamo prima la FSM del tiro.
 			gameRoom.updatePendingShot(player, inputState.Mask, inputState.SeqN)
 
+			// Movimento autoritativo.
 			oldX, oldY := player.X, player.Y
-			newX, newY := stepFromStateDLL(player.X, player.Y, inputState.Mask, deltaTime)
+			newX, newY := StepFromState(player.X, player.Y, inputState.Mask, deltaTime)
 
-			if gameRoom.checkCollisionAt(newX, newY) {
+			// Collisione autoritativa contro gli ostacoli.
+			if gameRoom.collisionManager.CheckPlayerCollisionAt(newX, newY, gameRoom.Obstacles) {
 				player.X, player.Y = oldX, oldY
 			} else {
 				player.X, player.Y = newX, newY
 			}
 
+			// Aggiorniamo il last processed input del player.
 			player.LastMask = inputState.Mask
 			player.LastSeqN = inputState.SeqN
 			player.RecvMask = inputState.Mask
 			player.RecvSeqN = inputState.SeqN
 			applied++
 
-			// Se release già visto e lo shot packet era arrivato prima, crea ora lo shot
+			// Se avevamo già visto il release e lo shot packet era già arrivato,
+			// possiamo creare lo shot adesso.
 			ps := &player.PendingShot
 			if ps.Active && ps.WaitingShotPacket && ps.ShotPacket != nil {
 				shot := gameRoom.createShotFromEvent(player, *ps.ShotPacket)
@@ -305,13 +386,14 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 			shotEvent := event.Shot
 			ps := &player.PendingShot
 
-			// Memorizza il packet shot se c'è una carica attiva
+			// Se c'è una carica attiva, memorizziamo il packet shot.
+			// Lo shot reale verrà creato quando avremo anche il release.
 			if ps.Active {
 				copied := shotEvent
 				ps.ShotPacket = &copied
 			}
 
-			// Se il release era già arrivato, crea subito lo shot
+			// Se il release è già stato visto, possiamo creare subito lo shot.
 			if ps.Active && ps.WaitingShotPacket && ps.ShotPacket != nil {
 				shot := gameRoom.createShotFromEvent(player, *ps.ShotPacket)
 				if shot.ShotID != 0 {
@@ -326,6 +408,7 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 		consumeCount++
 	}
 
+	// Rimuoviamo dalla coda tutti gli eventi consumati.
 	if consumeCount > 0 {
 		remaining := (*pending)[consumeCount:]
 		copy((*pending), remaining)
@@ -336,6 +419,11 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 	return
 }
 
+// SendJoinAcknowledgements manda a ciascun client:
+// - il proprio ID
+// - la propria posizione iniziale
+// - la posizione dell'altro player
+// - il tick rate della stanza
 func (gameRoom *GameRoom) SendJoinAcknowledgements() {
 	packetP1 := make([]byte, 25)
 	packetP1[0] = MsgJoinAck
@@ -358,6 +446,8 @@ func (gameRoom *GameRoom) SendJoinAcknowledgements() {
 	gameRoom.secondPlayerConnection.TryEnqueueOutgoingPacket(packetP2, true)
 }
 
+// CreateInitialEggs genera un certo numero di uova iniziali
+// e le manda a entrambi i player.
 func (gameRoom *GameRoom) CreateInitialEggs(eggCount int) {
 	for eggId := 0; eggId < eggCount; eggId++ {
 		eggX := float32(250 + rand.Intn(250))
@@ -366,6 +456,7 @@ func (gameRoom *GameRoom) CreateInitialEggs(eggCount int) {
 	}
 }
 
+// sendSpawnEggToBothPlayers manda un pacchetto spawn egg a entrambi i client.
 func (gameRoom *GameRoom) sendSpawnEggToBothPlayers(eggId int32, eggX, eggY float32) {
 	packet := make([]byte, 13)
 	packet[0] = MsgSpawnEgg
@@ -376,11 +467,14 @@ func (gameRoom *GameRoom) sendSpawnEggToBothPlayers(eggId int32, eggX, eggY floa
 	gameRoom.secondPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
 }
 
+// sendSpawnObstacleToBothPlayers manda a entrambi i client gli ostacoli iniziali.
 func (gameRoom *GameRoom) sendSpawnObstacleToBothPlayers() {
-	for i := 0; i < 2; i++ {
+	for i := 0; i < len(gameRoom.Obstacles); i++ {
 		packet := make([]byte, 13)
 		packet[0] = MsgSpawnObstacle
+
 		fmt.Printf("Coordinate: %+v\n", gameRoom.Obstacles[i])
+
 		binary.LittleEndian.PutUint32(packet[1:5], math.Float32bits(gameRoom.Obstacles[i].X))
 		binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(gameRoom.Obstacles[i].Y))
 
@@ -389,6 +483,9 @@ func (gameRoom *GameRoom) sendSpawnObstacleToBothPlayers() {
 	}
 }
 
+// sendAuthStateToPlayer manda a un client il proprio stato autoritativo:
+// - ack seq
+// - posizione vera lato server
 func (gameRoom *GameRoom) sendAuthStateToPlayer(targetConn *PlayerConnection, player Player) {
 	packet := make([]byte, 13)
 	packet[0] = MsgAuthState
@@ -398,6 +495,7 @@ func (gameRoom *GameRoom) sendAuthStateToPlayer(targetConn *PlayerConnection, pl
 	targetConn.TryEnqueueOutgoingPacket(packet, false)
 }
 
+// sendRemoteStateToPlayer manda a un client lo stato remoto dell’avversario.
 func (gameRoom *GameRoom) sendRemoteStateToPlayer(targetConn *PlayerConnection, opponent Player) {
 	packet := make([]byte, 13)
 	packet[0] = MsgRemoteState
@@ -407,6 +505,8 @@ func (gameRoom *GameRoom) sendRemoteStateToPlayer(targetConn *PlayerConnection, 
 	targetConn.TryEnqueueOutgoingPacket(packet, false)
 }
 
+// forwardShotEventToOpponent manda al client remoto l'evento shot da renderizzare.
+// Per ora usa il charge ricavato da AuthCharge tick-based.
 func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnection, shot Shot) {
 	chargeMs := uint32(float64(shot.AuthCharge) * (1000.0 / float64(gameRoom.tickRateHz)))
 	if chargeMs > chargeCap {
@@ -423,6 +523,12 @@ func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnectio
 	targetConn.TryEnqueueOutgoingPacket(packet, false)
 }
 
+// createShotFromEvent crea lo shot vero e proprio quando il server ha:
+// - press tick
+// - release tick
+// - packet shot con target/charge client
+//
+// Dopo la creazione resetta lo stato PendingShot e porta il player in WaitingNeutral.
 func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEvent) Shot {
 	ps := &player.PendingShot
 
@@ -466,12 +572,13 @@ func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEven
 	authChargeMs := uint32(float64(shot.AuthCharge) * (1000.0 / float64(gameRoom.tickRateHz)))
 	deltaMs := int64(shot.LocalCharge) - int64(authChargeMs)
 
-	//integriamo l'errore di quantizzazione
+	// Integrazione dell'errore di quantizzazione.
+	// Qui sto mantenendo la tua logica attuale.
 	if deltaMs <= 34 {
 		authChargeMs = uint32(int64(authChargeMs) + deltaMs)
 	}
-	
-	//infine cappiamo al massimo
+
+	// Cap finale.
 	if authChargeMs > chargeCap {
 		authChargeMs = chargeCap
 	}
@@ -491,6 +598,7 @@ func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEven
 		shot.TargetY,
 	)
 
+	// Reset FSM shot dopo la creazione.
 	ps.Active = false
 	ps.Mode = ChargeNone
 	ps.PressTick = 0

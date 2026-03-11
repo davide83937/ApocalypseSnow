@@ -3,6 +3,16 @@ using Microsoft.Xna.Framework.Input;
 
 namespace ApocalypseSnow;
 
+/// Gestisce tutto l'input locale del player:
+/// - tastiera (movimento + azioni)
+/// - mouse (FSM del tiro con lock del primo click)
+///
+/// Logica del tiro:
+/// 1. Se nessun tiro è attivo, il primo bottone mouse premuto prende il lock.
+/// 2. Finché quel bottone resta premuto, continuiamo a emettere solo quel bit di shoot.
+/// 3. Quando il bottone che possiede il lock viene rilasciato, il lock viene chiuso.
+/// 4. Dopo il rilascio entriamo in "waiting neutral":
+///    nessun nuovo tiro può partire finché ENTRAMBI i bottoni mouse non tornano rilasciati.
 public class MovementsManager : IMovements
 {
     private enum ChargeMode
@@ -12,16 +22,22 @@ public class MovementsManager : IMovements
         Right
     }
 
-    private KeyboardState _newState = Keyboard.GetState();
-    private MouseState _mouseState = Mouse.GetState();
-    private MouseState _previousMouseState = Mouse.GetState();
+    private KeyboardState _newKeyboardState;
+    private MouseState _mouseState;
+    private MouseState _previousMouseState;
 
     private readonly Game _game;
+
     private ChargeMode _chargeMode = ChargeMode.None;
+    private bool _waitingNeutral = false;
 
     public MovementsManager(Game game)
     {
         _game = game;
+
+        _newKeyboardState = Keyboard.GetState();
+        _mouseState = Mouse.GetState();
+        _previousMouseState = _mouseState;
     }
 
     public Vector2 GetMousePosition()
@@ -38,116 +54,129 @@ public class MovementsManager : IMovements
     {
         stateStruct.Update();
 
-        _newState = Keyboard.GetState();
+        _newKeyboardState = Keyboard.GetState();
         _mouseState = Mouse.GetState();
 
-        bool isActive = _game.IsActive;
-
-        // Stati derivati dal gameplay: questi possono restare anche fuori da IsActive
         if (isWithEgg)
             stateStruct.Current |= StateList.WithEgg;
 
         if (isFreezing)
             stateStruct.Current |= StateList.Freezing;
 
-        if (isActive)
+        if (_game.IsActive)
         {
-            // Movimento
-            if (_newState.IsKeyDown(Keys.W))
-                stateStruct.Current |= StateList.Up;
-
-            if (_newState.IsKeyDown(Keys.S))
-                stateStruct.Current |= StateList.Down;
-
-            if (_newState.IsKeyDown(Keys.A))
-                stateStruct.Current |= StateList.Left;
-
-            if (_newState.IsKeyDown(Keys.D))
-                stateStruct.Current |= StateList.Right;
-
-            // Azioni tastiera
-            if (_newState.IsKeyDown(Keys.R) && !isFreezing && !isWithEgg)
-                stateStruct.Current |= StateList.Reload;
-
-            if (_newState.IsKeyDown(Keys.E) && !isFreezing)
-                stateStruct.Current |= StateList.TakingEgg;
-
-            if (_newState.IsKeyDown(Keys.Space) && !isFreezing && isWithEgg)
-                stateStruct.Current |= StateList.PuttingEgg;
-
-            // Moving
-            bool movementKeyPressed =
-                _newState.IsKeyDown(Keys.W) ||
-                _newState.IsKeyDown(Keys.S) ||
-                _newState.IsKeyDown(Keys.A) ||
-                _newState.IsKeyDown(Keys.D);
-
-            if (movementKeyPressed && !isFreezing)
-                stateStruct.Current |= StateList.Moving;
-
-            // ===== SHOOT LOCK: first press wins =====
-            bool canShoot = !isFreezing && !isWithEgg;
-
-            bool leftPressed = _mouseState.LeftButton == ButtonState.Pressed;
-            bool righPressed = _mouseState.RightButton == ButtonState.Pressed;
-
-            bool leftJustPressed =
-                _mouseState.LeftButton == ButtonState.Pressed &&
-                _previousMouseState.LeftButton == ButtonState.Released;
-
-            bool rightJustPressed =
-                _mouseState.RightButton == ButtonState.Pressed &&
-                _previousMouseState.RightButton == ButtonState.Released;
-
-            if (!canShoot)
-            {
-                _chargeMode = ChargeMode.None;
-            }
-            else
-            {
-                // Acquisizione lock solo sul primo click
-                if (_chargeMode == ChargeMode.None)
-                {
-                    if (leftJustPressed)
-                        _chargeMode = ChargeMode.Left;
-                    else if (rightJustPressed)
-                        _chargeMode = ChargeMode.Right;
-                }
-
-                switch (_chargeMode)
-                {
-                    case ChargeMode.Left:
-                        if (leftPressed)
-                        {
-                            stateStruct.Current |= StateList.ShootLeft;
-                        }
-                        else
-                        {
-                            _chargeMode = ChargeMode.None;
-                        }
-                        break;
-
-                    case ChargeMode.Right:
-                        if (righPressed)
-                        {
-                            stateStruct.Current |= StateList.ShootRight;
-                            bool rightPressed = _mouseState.RightButton == ButtonState.Pressed;
-                        }
-                        else
-                        {
-                            _chargeMode = ChargeMode.None;
-                        }
-                        break;
-                }
-            }
+            ProcessKeyboard(ref stateStruct, isFreezing, isWithEgg);
+            ProcessMouseFSM(ref stateStruct, isFreezing, isWithEgg);
         }
         else
         {
-            // Se stiamo cliccando fuori dalla finestra, resettiamo lo stato di shoot
-            _chargeMode = ChargeMode.None;
+            ResetMouseFSM();
         }
 
-        //aggiorniamo sempre lo stato precedente del mouse, così da poter rilevare i click al frame successivo
         _previousMouseState = _mouseState;
+    }
+
+    private void ProcessKeyboard(ref StateStruct stateStruct, bool isFreezing, bool isWithEgg)
+    {
+        if (_newKeyboardState.IsKeyDown(Keys.W))
+            stateStruct.Current |= StateList.Up;
+
+        if (_newKeyboardState.IsKeyDown(Keys.S))
+            stateStruct.Current |= StateList.Down;
+
+        if (_newKeyboardState.IsKeyDown(Keys.A))
+            stateStruct.Current |= StateList.Left;
+
+        if (_newKeyboardState.IsKeyDown(Keys.D))
+            stateStruct.Current |= StateList.Right;
+
+        if (_newKeyboardState.IsKeyDown(Keys.R) && !isFreezing && !isWithEgg)
+            stateStruct.Current |= StateList.Reload;
+
+        if (_newKeyboardState.IsKeyDown(Keys.E) && !isFreezing)
+            stateStruct.Current |= StateList.TakingEgg;
+
+        if (_newKeyboardState.IsKeyDown(Keys.Space) && !isFreezing && isWithEgg)
+            stateStruct.Current |= StateList.PuttingEgg;
+
+        bool movementKeyPressed =
+            _newKeyboardState.IsKeyDown(Keys.W) ||
+            _newKeyboardState.IsKeyDown(Keys.S) ||
+            _newKeyboardState.IsKeyDown(Keys.A) ||
+            _newKeyboardState.IsKeyDown(Keys.D);
+
+        if (movementKeyPressed && !isFreezing)
+            stateStruct.Current |= StateList.Moving;
+    }
+
+    private void ProcessMouseFSM(ref StateStruct stateStruct, bool isFreezing, bool isWithEgg)
+    {
+        bool canShoot = !isFreezing && !isWithEgg && !stateStruct.IsPressed(StateList.Reload);
+
+        if (!canShoot)
+        {
+            ResetMouseFSM();
+            return;
+        }
+
+        bool leftPressed = _mouseState.LeftButton == ButtonState.Pressed;
+        bool rightPressed = _mouseState.RightButton == ButtonState.Pressed;
+
+        bool leftJustPressed =
+            leftPressed &&
+            _previousMouseState.LeftButton == ButtonState.Released;
+
+        bool rightJustPressed =
+            rightPressed &&
+            _previousMouseState.RightButton == ButtonState.Released;
+
+        if (_waitingNeutral)
+        {
+            if (!leftPressed && !rightPressed)
+                _waitingNeutral = false;
+
+            return;
+        }
+
+        if (_chargeMode == ChargeMode.None)
+        {
+            if (leftJustPressed)
+            {
+                _chargeMode = ChargeMode.Left;
+            }
+            else if (rightJustPressed)
+            {
+                _chargeMode = ChargeMode.Right;
+            }
+        }
+
+        switch (_chargeMode)
+        {
+            case ChargeMode.Left:
+                if (leftPressed)
+                    stateStruct.Current |= StateList.ShootLeft;
+                else
+                    ReleaseLock();
+                break;
+
+            case ChargeMode.Right:
+                if (rightPressed)
+                    stateStruct.Current |= StateList.ShootRight;
+                else
+                    ReleaseLock();
+                break;
+        }
+    }
+
+    private void ReleaseLock()
+    {
+        _chargeMode = ChargeMode.None;
+        _waitingNeutral = true;
+    }
+
+    private void ResetMouseFSM()
+    {
+        _chargeMode = ChargeMode.None;
+        _waitingNeutral = false;
     }
 }

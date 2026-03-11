@@ -86,6 +86,4 @@ public class PenguinInputHandler
             reloadTime = 0f;
         }
     }
-
-    
 }

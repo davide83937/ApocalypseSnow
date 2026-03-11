@@ -52,8 +52,9 @@ typedef struct {
         float y;
     } Vector2;
 
-    const float PlanePerspectiveY = 0.70f;
-    const float HeightProjection = 0.35f;
+    //mettiamo una pezza, la via pulita sarebbe usare extern qui e valorizzare le variabili all'interno del file cpp
+    #define PlanePerspectiveY 0.70f
+    #define HeightProjection 0.35f
 
     PHYSICS_API const char* PhysicsBuildInfo();
     PHYSICS_API void uniform_rectilinear_motion(float *position, float velocity, float deltaTime);

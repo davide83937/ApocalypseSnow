@@ -14,7 +14,7 @@ internal static class PhysicsAPI
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void uniform_rectilinear_motion(ref float position, float velocity, float deltaTime);
 
-    //------------------ NORMALIZZAZIONE DELLA VELOCITA' (per evitare che in diagonale vada più veloce) ------------------
+    // ------------------ NORMALIZZAZIONE DELLA VELOCITA' ------------------
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
 
@@ -29,19 +29,18 @@ internal static class PhysicsAPI
         float start_velocityY,
         float gameTime
     );
-    
-    
+
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern float calculate_ball_scale_only(
-        float startX, float startY, float finalX, float finalY, float posX, 
+        float startX, float startY, float finalX, float finalY, float posX,
         float startSpeedX, float L, float K, float currentScale);
-    
+
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern float Distance(Vector2 a, Vector2 b);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern Vector2 Lerp(Vector2 a, Vector2 b, float t);
-    
+
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern float LerpFloat(float a, float b, float t);
 
