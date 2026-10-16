@@ -155,8 +155,17 @@ public class Ball : CollisionExtensions
             otherTag != tagPenguin &&
             !otherTag.EndsWith("P") &&
             !otherTag.StartsWith("egg") 
-            
         );
+    }
+
+    // ===== NUOVO METODO PER IL MOTO PARABOLICO =====
+    private void CalculateParabolicMotion(float t, out float worldDeltaX, out float worldDeltaY, out float z)
+    {
+        worldDeltaX = _groundVelocityWorld.X * t;
+        worldDeltaY = _groundVelocityWorld.Y * t;
+
+        z = (_startVerticalVelocity * t) - (0.5f * _gravity * t * t);
+        if (z < 0f) z = 0f;
     }
 
     public override void Update(GameTime gameTime)
@@ -174,35 +183,24 @@ public class Ball : CollisionExtensions
             return;
         }
 
-        float t = _ballTime;
+        // Richiamo la funzione per il calcolo della fisica
+        CalculateParabolicMotion(_ballTime, out float worldDeltaX, out float worldDeltaY, out float z);
 
-        float worldDeltaX = _groundVelocityWorld.X * t;
-        float worldDeltaY = _groundVelocityWorld.Y * t;
-
-        float z = (_startVerticalVelocity * t) - (0.5f * _gravity * t * t);
-        if (z < 0f) z = 0f;
         _currentHeight = z;
 
         Console.WriteLine("Current height: " + _currentHeight);
-        Vector2 screen = new Vector2(0, 0);
-        screen = PhysicsAPI.calculateScreenPosition(_startPosition, worldDeltaX, worldDeltaY, z);
-        //float screenX = _startPosition.X + worldDeltaX;
-        //float screenY = _startPosition.Y + (PlanePerspectiveY * worldDeltaY) - (HeightProjection * z);
+        
+        Vector2 screen = PhysicsAPI.calculateScreenPosition(_startPosition, worldDeltaX, worldDeltaY, z);
 
         _position.X = screen.X;
         _position.Y = screen.Y;
 
-       // float alpha = 0f;
-        //if (_maxHeight > 0.0001f)
-       //     alpha = MathHelper.Clamp(z / _maxHeight, 0f, 1f);
-
-        //_scale = PhysicsAPI.LerpFloat(ScaleMin, ScaleMax, alpha);
-        _scale = PhysicsAPI.calculateVisualScale( z,  _maxHeight,  ScaleMin,  ScaleMax, out float alpha);
+        _scale = PhysicsAPI.calculateVisualScale(z, _maxHeight, ScaleMin, ScaleMax, out float alpha);
 
         // L'ombra deve stare sul piano di gioco, quindi quota z = 0
         Vector2 shadowScreen = PhysicsAPI.calculateScreenPosition(_startPosition, worldDeltaX, worldDeltaY, 0f);
         float shadowScreenX = shadowScreen.X;
-        float shadowScreenY = shadowScreen.Y;//_startPosition.Y + (PlanePerspectiveY * worldDeltaY);
+        float shadowScreenY = shadowScreen.Y;
 
         _shadowPosition = new Vector2(shadowScreenX, shadowScreenY);
 
@@ -221,7 +219,5 @@ public class Ball : CollisionExtensions
             int posCollY = (int)shadowScreenY + _halfTextureFractionHeight;
             CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _texture.Width, _texture.Height);
         }
-
-        //CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _texture.Width, _texture.Height);
     }
 }

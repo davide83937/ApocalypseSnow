@@ -151,6 +151,7 @@ public sealed class GameSession : GameComponent
         // se non è iniziato il match, stop qui
         if (state != null || _myPenguin == null || _events == null)
             return;
+        
         NetworkManager.Instance?.Receive();
         // ✅ tick fisso (stesso dt della sim di rete)
         _tickAcc += (float)gameTime.ElapsedGameTime.TotalSeconds;
