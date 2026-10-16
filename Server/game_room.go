@@ -134,8 +134,8 @@ func (gameRoom *GameRoom) Run() {
 // 1. drena i messaggi dai due player
 // 2. applica gli eventi maturi
 // 3. manda a ciascun player:
-//    - il proprio stato autoritativo
-//    - lo stato remoto dell’avversario
+//   - il proprio stato autoritativo
+//   - lo stato remoto dell’avversario
 func (gameRoom *GameRoom) Tick() {
 	gameRoom.matchTick++
 	deltaTime := float32(1.0 / float32(gameRoom.tickRateHz))
@@ -229,6 +229,7 @@ func (gameRoom *GameRoom) drainEventChannelToPending(
 // - mentre è attiva una carica, l'altro tasto viene ignorato
 // - quando il tasto lockato viene rilasciato, entriamo in WaitingShotPacket
 // - dopo la creazione dello shot, andremo in WaitingNeutral
+
 func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uint32) {
 	leftNow := (mask & ShootLeft) != 0
 	rightNow := (mask & ShootRight) != 0

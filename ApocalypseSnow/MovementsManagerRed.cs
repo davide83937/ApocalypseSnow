@@ -41,8 +41,8 @@ public class MovementsManagerRed:IMovements
         inputList.Current = _remoteState;
 
         // 3. Forziamo gli stati di gioco locali
-        if (isWithEgg) inputList.Current |= StateList.WithEgg;
-        if (isFreezing) inputList.Current |= StateList.Freezing;
+        //if (isWithEgg) inputList.Current |= StateList.WithEgg;
+        //f (isFreezing) inputList.Current |= StateList.Freezing;
         //inputList.Old = inputList.Current;
     }
 }

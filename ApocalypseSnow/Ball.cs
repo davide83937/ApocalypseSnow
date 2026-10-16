@@ -159,15 +159,7 @@ public class Ball : CollisionExtensions
     }
 
     // ===== NUOVO METODO PER IL MOTO PARABOLICO =====
-    private void CalculateParabolicMotion(float t, out float worldDeltaX, out float worldDeltaY, out float z)
-    {
-        worldDeltaX = _groundVelocityWorld.X * t;
-        worldDeltaY = _groundVelocityWorld.Y * t;
-
-        z = (_startVerticalVelocity * t) - (0.5f * _gravity * t * t);
-        if (z < 0f) z = 0f;
-    }
-
+  
     public override void Update(GameTime gameTime)
     {
         if (_hitObstacle)
@@ -184,7 +176,13 @@ public class Ball : CollisionExtensions
         }
 
         // Richiamo la funzione per il calcolo della fisica
-        CalculateParabolicMotion(_ballTime, out float worldDeltaX, out float worldDeltaY, out float z);
+        // Chiamata diretta alla DLL C++
+        PhysicsAPI.calculate_parabolic_motion(
+            _ballTime, 
+            _groundVelocityWorld.X, _groundVelocityWorld.Y, 
+            _startVerticalVelocity, _gravity, 
+            out float worldDeltaX, out float worldDeltaY, out float z
+        );
 
         _currentHeight = z;
 

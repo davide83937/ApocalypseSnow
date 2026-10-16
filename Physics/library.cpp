@@ -135,3 +135,18 @@ float calculateVisualScale(float z, float maxHeight, float scaleMin, float scale
     *outAlpha = alpha; // "Esporta" il valore
     return std::lerp(scaleMin, scaleMax, alpha);
 }
+
+void calculate_parabolic_motion(
+    float t,
+    float groundVelocityWorldX, float groundVelocityWorldY,
+    float startVerticalVelocity, float gravity,
+    float* worldDeltaX, float* worldDeltaY, float* z
+) {
+    *worldDeltaX = groundVelocityWorldX * t;
+    *worldDeltaY = groundVelocityWorldY * t;
+
+    *z = (startVerticalVelocity * t) - (0.5f * gravity * t * t);
+    if (*z < 0.0f) {
+        *z = 0.0f;
+    }
+}
