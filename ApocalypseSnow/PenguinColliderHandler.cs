@@ -104,7 +104,7 @@ public class PenguinColliderHandler
         if (isCorrectPlatform && stateStruct.IsPressed(StateList.WithEgg) && stateStruct.IsPressed(StateList.PuttingEgg))
         {
             timePuttingEgg += deltaTime;
-            //Console.WriteLine(timePuttingEgg);
+            Console.WriteLine("Time Putting "+timePuttingEgg);
             if (timePuttingEgg > 1)
             {
                 deleteEgg(myEgg);

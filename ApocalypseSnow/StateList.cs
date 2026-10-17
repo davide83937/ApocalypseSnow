@@ -1,7 +1,7 @@
 ﻿namespace ApocalypseSnow;
 
 [System.Flags]
-public enum StateList
+public enum StateList: ushort
 {
     None = 0,
     Up = 1 << 0,       // Sostituisce IsW

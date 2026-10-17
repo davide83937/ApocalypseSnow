@@ -49,4 +49,12 @@ internal static class PhysicsAPI
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern float calculateVisualScale(float z, float maxHeight, float scaleMin, float scaleMax, out float outAlpha);
+    
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void calculate_parabolic_motion(
+        float t,
+        float groundVelocityWorldX, float groundVelocityWorldY,
+        float startVerticalVelocity, float gravity,
+        out float worldDeltaX, out float worldDeltaY, out float z
+    );
 }

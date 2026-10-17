@@ -140,7 +140,6 @@ public class PenguinShotHandler
             if (distSq > maxWorldRangeSq)
                 maxWorldRangeSq = distSq;
         }
-
         return MathF.Sqrt(maxWorldRangeSq);
     }
 

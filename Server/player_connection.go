@@ -98,7 +98,6 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 			if _, err := io.ReadFull(playerConnection.bufferReader, statePayloadBuffer); err != nil {
 				return
 			}
-
 			inputMask := int32(binary.LittleEndian.Uint32(statePayloadBuffer[0:4]))
 			inputMask = sanitizeMask(inputMask)
 			sequenceNumber := binary.LittleEndian.Uint32(statePayloadBuffer[4:8])
