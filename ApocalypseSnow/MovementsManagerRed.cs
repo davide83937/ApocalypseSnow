@@ -40,7 +40,8 @@ public class MovementsManagerRed:IMovements
         // 2. Applichiamo la maschera di bit che il server ci ha inviato dietro le quinte
         inputList.Current = _remoteState;
 
-        // La prediction locale blocca il remoto anche prima della conferma server.
+        // Preserva i bit autoritativi del server; la prediction locale puo' soltanto
+        // aggiungere un blocco temporaneo finche' non arriva la risoluzione.
         if (isFreezing)
             inputList.Current |= StateList.Freezing;
 
