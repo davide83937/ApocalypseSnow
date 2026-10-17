@@ -12,6 +12,9 @@ public class Events:GameComponent
     List<Obstacle> _obstacles;
     public record struct AuthPositionSnapshot(uint Ack, Vector2 Position);
     public readonly ConcurrentQueue<AuthPositionSnapshot> _authPositionQueue = new();
+    // Final server outcomes, indexed by the same key used by Ball.
+    private readonly Dictionary<ShotKey, ShotResolutionMessage> _shotResolutions = new();
+    public IReadOnlyDictionary<ShotKey, ShotResolutionMessage> ShotResolutions => _shotResolutions;
     
     public Events(Game game, Penguin redPenguin) : base(game)
     {
@@ -20,6 +23,7 @@ public class Events:GameComponent
         NetworkManager.Instance.OnAuthStateReceived += HandleServerReconciliation;
         NetworkManager.Instance.OnRemoteStateReceived += HandleRedState;
         NetworkManager.Instance.OnRemoteShotReceived += HandleRemoteShot;
+        NetworkManager.Instance.OnShotResolvedReceived += HandleShotResolved;
         NetworkManager.Instance.OnObstacleReceived += HandleSpawnObstacles;
     }
     
@@ -45,6 +49,12 @@ public class Events:GameComponent
         //_redPenguin._penguinInputHandler._stateStruct.Current = (StateList)mask;
     }
     
+    private void HandleShotResolved(ShotResolutionMessage resolution)
+    {
+        // Receipt is recorded but must NOT yet change freezing or predicted movement.
+        _shotResolutions.TryAdd(resolution.Key, resolution);
+    }
+
     private void HandleRemoteShot(RemoteShotMessage shot)
     {
         Vector2 target = new Vector2(shot.TargetX, shot.TargetY);

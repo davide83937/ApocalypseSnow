@@ -23,3 +23,18 @@ Server-side mature-event/burst tests live in Server/game_room_sync_test.go and r
 cd Server
 go test -count=1 ./...
 ~~~
+
+## Authoritative shot outcomes
+
+The same test executable also covers ShotKey, MsgRemoteShot, MsgShotResolved
+(18 bytes total), and TCP stream reassembly across partial/coalesced packets.
+The server test file Server/shot_resolution_test.go covers the three terminal
+outcomes (expired, obstacle, penguin), both recipients, duplicate protection and
+self-collision exclusion. Both players receive the outcome keyed by
+(OwnerPlayerId, ClientShotTick); ServerTick is server metadata, NOT a local
+client tick.
+
+Shot resolution currently records the result in Events.ShotResolutions but
+does not change freezing, movement, or ball rendering. Server-rejected shots
+that never become an authoritative Shot are outside these three terminal
+outcomes and will need explicit treatment before predictive freezing.

@@ -12,12 +12,15 @@ public class NetworkManager : GameComponent
     private NetworkStream _stream;
     private readonly string _ip;
     private readonly int _port;
+    private readonly NetworkPacketFramer _packetFramer = new();
+    private readonly byte[] _incomingBuffer = new byte[4096];
 
     public event Action<uint, float, float> OnAuthStateReceived; //posizione autoritativa del player locale
     public event Action<uint, float, int, ShotType> OnAuthShotReceived; //shot autoritativo del player locale (seqN, mouseY, charge, shotType) rivedere la firma
 
     public event Action<float, float, int> OnRemoteStateReceived;
     public event Action<RemoteShotMessage> OnRemoteShotReceived; // authoritative remote shot metadata
+    public event Action<ShotResolutionMessage> OnShotResolvedReceived;
 
     public event Action<int, float, float> OnEggReceived;
     public event Action<float, float> OnObstacleReceived;
@@ -95,41 +98,28 @@ public class NetworkManager : GameComponent
         }
     }
 
-    private byte[] ReadExactPayload(int payloadLength)
-    {
-        byte[] payload = new byte[payloadLength];
-        int read = 0;
-
-        while (read < payloadLength)
-        {
-            int chunk = _stream.Read(payload, read, payloadLength - read);
-            if (chunk <= 0)
-                throw new IOException("Connessione chiusa durante la lettura del payload.");
-
-            read += chunk;
-        }
-
-        return payload;
-    }
-
     public void Receive()
     {
         if (_stream == null || _tcpClient == null || !_tcpClient.Connected)
             return;
 
-        while (_tcpClient.Connected && _tcpClient.Available > 0)
+        // Read only bytes already available: do not stall the MonoGame update
+        // when a TCP packet contains only part of an application message.
+        while (_tcpClient.Available > 0)
         {
-            int type = _stream.ReadByte();
-            if (type == -1) break;
+            int count = Math.Min(_tcpClient.Available, _incomingBuffer.Length);
+            int read = _stream.Read(_incomingBuffer, 0, count);
+            if (read <= 0)
+                throw new IOException("Connessione chiusa durante la ricezione.");
+            _packetFramer.Append(_incomingBuffer.AsSpan(0, read));
+        }
 
+        while (_packetFramer.TryRead(out byte type, out byte[] payload))
+        {
             switch (type)
             {
-                case 8: // MsgSpawnEgg -> 12 byte payload
+                case 8: // MsgSpawnEgg
                     {
-                        if (_tcpClient.Available < 12) return;
-                        byte[] payload = ReadExactPayload(12);
-
-                        System.Diagnostics.Debug.WriteLine($"EGG arrived, handler={(OnEggReceived == null ? "NULL" : "OK")}");
                         int id = BitConverter.ToInt32(payload, 0);
                         float x = BitConverter.ToSingle(payload, 4);
                         float y = BitConverter.ToSingle(payload, 8);
@@ -137,11 +127,8 @@ public class NetworkManager : GameComponent
                         break;
                     }
 
-                case 4: // MsgAuthState -> 12 byte payload
+                case 4: // MsgAuthState
                     {
-                        if (_tcpClient.Available < 12) return;
-                        byte[] payload = ReadExactPayload(12);
-
                         uint ackSeq = BitConverter.ToUInt32(payload, 0);
                         float x = BitConverter.ToSingle(payload, 4);
                         float y = BitConverter.ToSingle(payload, 8);
@@ -149,11 +136,8 @@ public class NetworkManager : GameComponent
                         break;
                     }
 
-                case 6: // MsgRemoteState -> 12 byte payload
+                case 6: // MsgRemoteState
                     {
-                        if (_tcpClient.Available < 12) return;
-                        byte[] payload = ReadExactPayload(12);
-
                         float x = BitConverter.ToSingle(payload, 0);
                         float y = BitConverter.ToSingle(payload, 4);
                         int mask = BitConverter.ToInt32(payload, 8);
@@ -161,42 +145,26 @@ public class NetworkManager : GameComponent
                         break;
                     }
 
-                case 7: // MsgRemoteShot -> 21 byte payload
+                case 7: // MsgRemoteShot
+                    OnRemoteShotReceived?.Invoke(RemoteShotMessage.Parse(payload));
+                    break;
+
+                case 11: // MsgShotResolved
+                    OnShotResolvedReceived?.Invoke(ShotResolutionMessage.Parse(payload));
+                    break;
+
+                case 9: // MsgTickAlign (reserved; no server sender yet)
+                    StartTick = BitConverter.ToUInt32(payload, 0);
+                    ServerTickHz = BitConverter.ToUInt32(payload, 4);
+                    break;
+
+                case 10: // MsgSpawnObstacle
                     {
-                        if (_tcpClient.Available < RemoteShotMessage.PayloadLength) return;
-                        byte[] payload = ReadExactPayload(RemoteShotMessage.PayloadLength);
-                        OnRemoteShotReceived?.Invoke(RemoteShotMessage.Parse(payload));
-                        break;
-                    }
-
-                case 9: // MsgTickAlign -> 12 byte payload
-                    {
-                        if (_tcpClient.Available < 12) return;
-                        byte[] payload = ReadExactPayload(12);
-
-                        uint startTick = BitConverter.ToUInt32(payload, 0);
-                        uint tickHz = BitConverter.ToUInt32(payload, 4);
-
-                        StartTick = startTick;
-                        ServerTickHz = tickHz;
-                        break;
-                    }
-
-                case 10: // MsgSpawnObstacle -> 12 byte payload
-                    {
-                        if (_tcpClient.Available < 12) return;
-                        byte[] payload = ReadExactPayload(12);
-
-                        Console.WriteLine($"Ricevuto messaggio 10. Payload length: {payload.Length}");
                         float x = BitConverter.ToSingle(payload, 0);
                         float y = BitConverter.ToSingle(payload, 4);
                         OnObstacleReceived?.Invoke(x, y);
                         break;
                     }
-
-                default:
-                    Console.WriteLine($"Tipo messaggio sconosciuto ricevuto: {type}");
-                    return;
             }
         }
     }

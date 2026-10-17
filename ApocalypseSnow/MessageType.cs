@@ -9,5 +9,6 @@ public enum MessageType
     JoinAck = 5,    //Ack del server alla richiesta di join, usato per iniziare la partita
     RemoteState = 6, //Posizione del player remoto, usato per aggiornare la posizione dell'avversario
     RemoteShot = 7,  //Shot del player remoto, usato per spawnare la palla dell'avversario 
-    AuthShot = 8     //Shot autoritativo del player locale, usato per la reconciler
+    AuthShot = 8,    // Legacy reserved (server currently uses MsgSpawnEgg=8).
+    ShotResolved = 11 // Server terminal outcome of a spawned shot (both players)
 }

@@ -1,5 +1,14 @@
 package main
 
+// ShotOutcome describes the authoritative final fate of a spawned snowball.
+type ShotOutcome uint8
+
+const (
+	ShotOutcomeExpired  ShotOutcome = 1
+	ShotOutcomeObstacle ShotOutcome = 2
+	ShotOutcomePenguin  ShotOutcome = 3
+)
+
 type ShotType uint8
 
 const (

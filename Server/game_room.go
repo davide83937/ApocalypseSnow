@@ -637,9 +637,7 @@ func (gameRoom *GameRoom) updateShotColliders() {
 		shotTag := shotCollisionTag(shot.ShotID)
 
 		if expired {
-			shot.IsAlive = false
-			gameRoom.collisionManager.RemoveObject(shotTag)
-			log.Printf("[SHOT END FLIGHT] tick=%d shotId=%d owner=%d", gameRoom.matchTick, shot.ShotID, shot.OwnerPlayerID)
+			gameRoom.resolveShot(shot, ShotOutcomeExpired, 0)
 			continue
 		}
 
@@ -675,7 +673,10 @@ func (gameRoom *GameRoom) updateShotColliders() {
 	}
 }
 
-func (gameRoom *GameRoom) destroyShot(shot *Shot, reason string, otherTag string) {
+// resolveShot is the single terminal transition for a server-created ball.
+// It removes the collider and reports the immutable outcome to BOTH peers.
+// The IsAlive guard prevents duplicate outcomes from multiple C++ collision pairs.
+func (gameRoom *GameRoom) resolveShot(shot *Shot, outcome ShotOutcome, hitPlayerID uint32) {
 	if shot == nil || !shot.IsAlive {
 		return
 	}
@@ -684,13 +685,21 @@ func (gameRoom *GameRoom) destroyShot(shot *Shot, reason string, otherTag string
 	shotTag := shotCollisionTag(shot.ShotID)
 	gameRoom.collisionManager.RemoveObject(shotTag)
 
+	packet := make([]byte, 18)
+	packet[0] = MsgShotResolved
+	binary.LittleEndian.PutUint32(packet[1:5], shot.OwnerPlayerID)
+	binary.LittleEndian.PutUint32(packet[5:9], shot.ClientShotTick)
+	packet[9] = byte(outcome)
+	binary.LittleEndian.PutUint32(packet[10:14], hitPlayerID)
+	binary.LittleEndian.PutUint32(packet[14:18], gameRoom.matchTick)
+
+	// Terminal outcomes must not be silently dropped when outgoing queues are full.
+	gameRoom.firstPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
+	gameRoom.secondPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
+
 	log.Printf(
-		"[SHOT DESTROY] tick=%d shot=%s owner=%d reason=%s other=%s",
-		gameRoom.matchTick,
-		shotTag,
-		shot.OwnerPlayerID,
-		reason,
-		otherTag,
+		"[SHOT RESOLVED] tick=%d shot=%s owner=%d clientTick=%d outcome=%d victim=%d",
+		gameRoom.matchTick, shotTag, shot.OwnerPlayerID, shot.ClientShotTick, outcome, hitPlayerID,
 	)
 }
 
@@ -736,7 +745,7 @@ func (gameRoom *GameRoom) resolveCollisionResults() {
 				obstacleTag,
 			)
 
-			gameRoom.destroyShot(shot, "obstacle", obstacleTag)
+			gameRoom.resolveShot(shot, ShotOutcomeObstacle, 0)
 			continue
 		}
 
@@ -779,7 +788,11 @@ func (gameRoom *GameRoom) resolveCollisionResults() {
 				penguinTag,
 			)
 
-			gameRoom.destroyShot(shot, "penguin", penguinTag)
+			hitPlayerID := uint32(1)
+			if penguinTag == playerCollisionTag(2) {
+				hitPlayerID = 2
+			}
+			gameRoom.resolveShot(shot, ShotOutcomePenguin, hitPlayerID)
 		}
 	}
 }

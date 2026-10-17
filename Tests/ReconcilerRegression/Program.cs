@@ -35,7 +35,12 @@ internal static class Program
             ("Shot keys disambiguate shooters and ticks", ShotKeyEquality),
             ("Every ball collider tag is unique and fits native 16-byte buffer", BallCollisionTags),
             ("RemoteShot wire payload preserves identity and trajectory fields", RemoteShotPayload),
-            ("RemoteShot decoder rejects malformed length", RejectMalformedRemoteShot)
+            ("RemoteShot decoder rejects malformed length", RejectMalformedRemoteShot),
+            ("Three terminal shot results decode with complete identity", ShotResolutionPayload),
+            ("Terminal results reject corrupted payload", ShotResolutionRejectsInvalid),
+            ("TCP framing survives byte-by-byte fragmented resolution", FragmentedShotResolution),
+            ("TCP framing preserves concatenated and split messages", FramingBatchAndSplit),
+            ("TCP framing rejects unknown packet types", FramingRejectsUnknown)
         ];
 
         var errors = 0;
@@ -285,6 +290,106 @@ internal static class Program
             return;
         }
         throw new Exception("Truncated MsgRemoteShot payload was accepted");
+    }
+
+    private static byte[] ResolutionPacket(
+        uint owner = 1, uint shotTick = 33, ShotOutcome outcome = ShotOutcome.Penguin,
+        uint hitPlayerId = 2, uint serverTick = 500)
+    {
+        byte[] packet = new byte[1 + ShotResolutionMessage.PayloadLength];
+        packet[0] = (byte)MessageType.ShotResolved;
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(1, 4), owner);
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(5, 4), shotTick);
+        packet[9] = (byte)outcome;
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(10, 4), hitPlayerId);
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(14, 4), serverTick);
+        return packet;
+    }
+
+    private static void ShotResolutionPayload(Reconciler r)
+    {
+        foreach (var (outcome, victim) in new[]
+        {
+            (ShotOutcome.Penguin, 2u), (ShotOutcome.Obstacle, 0u), (ShotOutcome.Expired, 0u)
+        })
+        {
+            var packet = ResolutionPacket(outcome: outcome, hitPlayerId: victim);
+            var decoded = ShotResolutionMessage.Parse(packet.AsSpan(1));
+            Equal(decoded.Key, new ShotKey(1, 33));
+            Equal(decoded.Outcome, outcome);
+            Equal(decoded.HitPlayerId, victim);
+            Equal(decoded.ServerTick, 500u);
+        }
+    }
+
+    private static void ShotResolutionRejectsInvalid(Reconciler r)
+    {
+        static void Reject(byte[] payload)
+        {
+            try { ShotResolutionMessage.Parse(payload); }
+            catch (ArgumentException) { return; }
+            throw new Exception("Corrupt shot resolution was accepted");
+        }
+        Reject(new byte[15]);
+        var invalidType = ResolutionPacket();
+        invalidType[9] = 99;
+        Reject(invalidType[1..]);
+        Reject(ResolutionPacket(outcome: ShotOutcome.Obstacle, hitPlayerId: 2)[1..]);
+        Reject(ResolutionPacket(outcome: ShotOutcome.Penguin, hitPlayerId: 0)[1..]);
+    }
+
+    private static void FragmentedShotResolution(Reconciler r)
+    {
+        var framer = new NetworkPacketFramer();
+        byte[] packet = ResolutionPacket(owner: 2, shotTick: 33, outcome: ShotOutcome.Obstacle, hitPlayerId: 0);
+        for (int i = 0; i < packet.Length - 1; ++i)
+        {
+            framer.Append(packet.AsSpan(i, 1));
+            if (framer.TryRead(out _, out _))
+                throw new Exception("Fragmented packet dispatched before final byte");
+        }
+        framer.Append(packet.AsSpan(packet.Length - 1, 1));
+        if (!framer.TryRead(out byte type, out byte[] payload))
+            throw new Exception("Complete packet not reconstructed");
+        Equal(type, (byte)MessageType.ShotResolved);
+        var resolution = ShotResolutionMessage.Parse(payload);
+        Equal(resolution.Key, new ShotKey(2, 33));
+        Equal(resolution.Outcome, ShotOutcome.Obstacle);
+        if (framer.TryRead(out _, out _))
+            throw new Exception("Framer replayed already consumed message");
+    }
+
+    private static void FramingBatchAndSplit(Reconciler r)
+    {
+        var framer = new NetworkPacketFramer();
+        byte[] auth = new byte[13];
+        auth[0] = 4;
+        byte[] remote = new byte[22];
+        remote[0] = 7;
+        byte[] resolved = ResolutionPacket();
+        byte[] input = auth.Concat(remote).Concat(resolved).ToArray();
+        int split = input.Length - 5;
+        framer.Append(input.AsSpan(0, split));
+        if (!framer.TryRead(out byte t1, out byte[] p1) || t1 != 4 || p1.Length != 12)
+            throw new Exception("AuthState lost in batch");
+        if (!framer.TryRead(out byte t2, out byte[] p2) || t2 != 7 || p2.Length != 21)
+            throw new Exception("RemoteShot lost in batch");
+        if (framer.TryRead(out _, out _))
+            throw new Exception("Truncated trailing resolution incorrectly dispatched");
+        framer.Append(input.AsSpan(split));
+        if (!framer.TryRead(out byte t3, out byte[] p3) || t3 != 11)
+            throw new Exception("Resolution lost after fragmented batch");
+        Equal(ShotResolutionMessage.Parse(p3).Key, new ShotKey(1, 33));
+        if (framer.TryRead(out _, out _)) throw new Exception("Leftover bytes after batch");
+    }
+
+    private static void FramingRejectsUnknown(Reconciler r)
+    {
+        var framer = new NetworkPacketFramer();
+        framer.Append(new byte[] { 255 });
+        try { framer.TryRead(out _, out _); }
+        catch (System.IO.InvalidDataException) { return; }
+        throw new Exception("Unknown message was silently accepted");
     }
 
     private static void SingleUseAuth(Reconciler r)
