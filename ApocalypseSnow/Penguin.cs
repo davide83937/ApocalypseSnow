@@ -120,7 +120,9 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             case string t when _penguinColliderHandler.IsEnemyBall(t):
                 // Anticipa l'HIT su entrambi i pinguini, senza applicare effetti definitivi.
                 Ball ball = _gameContext.Components.OfType<Ball>().FirstOrDefault(b => b._tag == t);
-                if (ball != null)
+                // Applica la stessa soglia verticale usata dalla palla: una
+                // collisione 2D non e' un HIT se il proiettile passa in alto.
+                if (ball != null && ball._currentHeight < 30f)
                 {
                     uint hitTick = GameSession.LocalTick;
                     ShotTrace.Log($"[SHOT_TRACE] role={(_tag.EndsWith("Red") ? "REMOTE_TARGET" : "LOCAL_TARGET")} event=PRED_HIT key={ball.ShotKey} tick={hitTick} startTick={ball.ObservedStartTick} flightTicks={hitTick - ball.ObservedStartTick} utc={DateTime.UtcNow:O}");

@@ -112,12 +112,14 @@ public class Ball : CollisionExtensions
         {
             spriteBatch.Draw(
                 _texture,
-                _shadowPosition,
+                // Impronta sul terreno: ovalizzata e allineata alla base
+                // della palla, cosi' rimane leggibile anche nel tiro basso.
+                _shadowPosition + new Vector2(0f, _texture.Height * 0.75f),
                 null,
                 Color.Black * _shadowOpacity,
                 0f,
                 Vector2.Zero,
-                _shadowScale,
+                new Vector2(_shadowScale, _shadowScale * 0.50f),
                 SpriteEffects.None,
                 0f
             );
