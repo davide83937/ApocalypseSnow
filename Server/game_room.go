@@ -315,6 +315,17 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 
 	ps := &player.PendingShot
 
+	// Se arriva Reload, annulliamo anche il tiro in attesa del pacchetto.
+	if (mask & Reload) != 0 {
+		if ps.Active {
+			log.Printf("[SHOT CANCEL] owner=%d press=%d reloadTick=%d", player.ID, ps.PressTick, seqN)
+			*ps = PendingShot{WaitingNeutral: leftNow || rightNow}
+		} else if ps.WaitingNeutral && !leftNow && !rightNow {
+			ps.WaitingNeutral = false
+		}
+		return
+	}
+
 	if ps.WaitingNeutral {
 		if !leftNow && !rightNow {
 			ps.WaitingNeutral = false
@@ -909,6 +920,12 @@ func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEven
 
 	if ps.ReleaseTick < ps.PressTick {
 		log.Printf("[SHOT] owner=%d releaseTick < pressTick", player.ID)
+		return Shot{}
+	}
+
+	// Il pacchetto deve appartenere proprio a questo rilascio.
+	if shotEvent.SeqN != ps.ReleaseTick {
+		log.Printf("[SHOT REJECT] owner=%d shotTick=%d releaseTick=%d", player.ID, shotEvent.SeqN, ps.ReleaseTick)
 		return Shot{}
 	}
 
