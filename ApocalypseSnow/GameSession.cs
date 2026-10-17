@@ -23,11 +23,20 @@ public sealed class GameSession : GameComponent
     private Game _game;
     public string state = null;
 
-    //copia del tick locale, che incrementiamo ad ogni update, e del tick accumulato, che invece incrementiamo con il delta time
-    //e usiamo per capire quando è ora di fare un nuovo tick di gioco (e quindi inviare un nuovo input al server)
-    public static uint LocalTick { get; private set; } = 0;
-    // Questo accumulatore ci serve per gestire il tick rate del gioco, che è indipendente dal frame rate. stessa logica del pinguino, per ora la metto qui
-    private float _tickAcc = 0f;
+    // Sequenza degli input del pinguino locale (non è il tick del server).
+    // Viene avanzata una volta per ogni passo fisico del pinguino.
+    public static uint LocalTick { get; private set; } = 1;
+
+    public static void SendLocalInputTick(StateStruct state)
+    {
+        StateList replayMask = state.Current & (
+            StateList.Up | StateList.Down | StateList.Left | StateList.Right |
+            StateList.Reload | StateList.Freezing | StateList.TakingEgg | StateList.PuttingEgg);
+
+        Reconciler.Instance.Record(LocalTick, replayMask);
+        NetworkManager.Instance.SendState(state, LocalTick);
+        LocalTick++;
+    }
     
 
     public GameSession(Game game) : base(game)
@@ -87,7 +96,6 @@ public sealed class GameSession : GameComponent
 
         //aggiunti questi due per tenere traccia del tick del server e del client, utili per la reconciler
         LocalTick = 1; // Il server inizializza LastSeqN=0: la prima sequenza valida è 1.
-        _tickAcc = 0f;
         Reconciler.Instance.Reset();
         //Reconciler.Instance.SetNextSeq(1);
 
@@ -153,28 +161,9 @@ public sealed class GameSession : GameComponent
             return;
         
         NetworkManager.Instance?.Receive();
-        // ✅ tick fisso (stesso dt della sim di rete)
-        _tickAcc += (float)gameTime.ElapsedGameTime.TotalSeconds;
-        while (_tickAcc >= NetDt)
-        {
-            _tickAcc -= NetDt;
-            Debug.WriteLine($"LocalTick++: {LocalTick}");
 
-            var st = _myPenguin._penguinInputHandler._stateStruct;
-
-            // 2) Conserva anche gli stati che bloccano il movimento per il replay.
-            StateList moveMask = st.Current & (
-                StateList.Up | StateList.Down | StateList.Left | StateList.Right |
-                StateList.Reload | StateList.Freezing | StateList.TakingEgg | StateList.PuttingEgg);
-
-            // 3) record + send usando QUESTO tick
-            Reconciler.Instance.Record(LocalTick, moveMask);
-            NetworkManager.Instance.SendState(st, LocalTick);
-            LocalTick++;
-        }
-
-        //SUPER NOTA: dentro il while siamo a 30 HZ, fuori dal while ma dentro questo Update siamo a 60 FPS
-
+        // Gli input vengono inviati dal tick fisico di Penguin.Update(), non dal frame di GameSession.
+        // Applichiamo gli ACK prima del prossimo passo fisico locale.
         // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
         Reconciler.Instance.GetLatest(_events._authPositionQueue, auth =>
         {

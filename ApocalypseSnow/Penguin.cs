@@ -141,7 +141,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         //   se dt è grande, _accumulator può contenere più di un passo fisico e dobbiamo
         //   eseguire più tick nello stesso frame per “recuperare” e mantenere la fisica a 30 Hz.
         //   Con un semplice if invece droppiamo tick (fisica rallenta sotto carico).
-        if (_accumulator >= _physicsDeltaTime)
+        while (_accumulator >= _physicsDeltaTime)
         {
             _movementsManager.UpdateInput(
                 ref _penguinInputHandler._stateStruct,
@@ -197,6 +197,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             int posCollY = (int)_position.Y + _halfTextureFractionHeight;
             CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _textureFractionWidth,
                 _halfTextureFractionHeight);
+
+            // Un solo MsgState per ogni passo fisico locale, con la stessa sequenza di MsgShot.
+            if (!_tag.EndsWith("Red"))
+                GameSession.SendLocalInputTick(_penguinInputHandler._stateStruct);
 
             _accumulator -= _physicsDeltaTime;
         }

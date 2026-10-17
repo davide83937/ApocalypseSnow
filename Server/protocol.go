@@ -33,10 +33,7 @@ const (
 	ListenAddr        = ":8080"
 	chargeCap  uint32 = 1500
 
-	// Quanti MsgState al massimo dreniamo (per player) in UN server-tick.
-	// Noi teniamo SOLO l'ultimo input ricevuto (latest-wins) e poi facciamo 1 step fisico per tick.
+	// Limite di eventi letti dalla rete per player a ogni tick.
+	// La FSM usa l'ordine FIFO; il movimento e l'ACK consumano un input per tick.
 	maxDrainInputsPerTick = 64
-
-	// Se non arrivano input da troppo, stoppiamo il player (anti "ghiaccio" quando si perde il release).
-	inputStaleTimeoutMs = 150
 )
