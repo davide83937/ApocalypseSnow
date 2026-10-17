@@ -114,6 +114,11 @@ public sealed class Reconciler
 
         foreach (var p in _pending)
         {
+            // Come sul server, durante questi stati non si applica movimento.
+            if ((p.MoveMask & (StateList.Reload | StateList.Freezing |
+                               StateList.TakingEgg | StateList.PuttingEgg)) != StateList.None)
+                continue;
+
             // Calcola prima una posizione candidata
             Vector2 candidatePos = replayPos;
             PhysicsWrapper.StepFromState(ref candidatePos, p.MoveMask, moveSpeed, moveDt);

@@ -86,7 +86,7 @@ public sealed class GameSession : GameComponent
         string redPathPlatform = "Content/images/red_logo.png";
 
         //aggiunti questi due per tenere traccia del tick del server e del client, utili per la reconciler
-        LocalTick = 0;
+        LocalTick = 1; // Il server inizializza LastSeqN=0: la prima sequenza valida è 1.
         _tickAcc = 0f;
         Reconciler.Instance.Reset();
         //Reconciler.Instance.SetNextSeq(1);
@@ -162,8 +162,10 @@ public sealed class GameSession : GameComponent
 
             var st = _myPenguin._penguinInputHandler._stateStruct;
 
-            // 2) pulisci SOLO UDLR per il replay
-            StateList moveMask = st.Current & (StateList.Up | StateList.Down | StateList.Left | StateList.Right);
+            // 2) Conserva anche gli stati che bloccano il movimento per il replay.
+            StateList moveMask = st.Current & (
+                StateList.Up | StateList.Down | StateList.Left | StateList.Right |
+                StateList.Reload | StateList.Freezing | StateList.TakingEgg | StateList.PuttingEgg);
 
             // 3) record + send usando QUESTO tick
             Reconciler.Instance.Record(LocalTick, moveMask);
