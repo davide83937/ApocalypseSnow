@@ -42,7 +42,7 @@ public class MovementsManagerRed:IMovements
 
         // 3. Forziamo gli stati di gioco locali
         //if (isWithEgg) inputList.Current |= StateList.WithEgg;
-        //f (isFreezing) inputList.Current |= StateList.Freezing;
+        //if (isFreezing) inputList.Current |= StateList.Freezing;
         //inputList.Old = inputList.Current;
     }
 }

@@ -123,7 +123,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 break;
             case "blueP" or "redP":
                 _penguinColliderHandler.HandleEggDelivery(otherTag,
-                    _penguinInputHandler._stateStruct, _deltaTime, ref _myEgg);
+                    ref _penguinInputHandler._stateStruct, _deltaTime, ref _myEgg);
                 break;
             case "obstacle":
                 _penguinColliderHandler.HandleObstacleCollision(collisionRecordOut._type, ref _position);
