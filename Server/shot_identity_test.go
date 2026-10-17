@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// checkRemoteShotPayload controlla identita e formato del tiro remoto.
 func checkRemoteShotPayload(t *testing.T, payload []byte, ownerID, shotTick uint32, shotType ShotType) {
 	t.Helper()
 	if len(payload) != 22 {
@@ -25,6 +26,7 @@ func checkRemoteShotPayload(t *testing.T, payload []byte, ownerID, shotTick uint
 	}
 }
 
+// Verifica che il server inoltri la stessa identita del tiro.
 func TestRemoteShotBroadcastRetainsClientShotIdentity(t *testing.T) {
 	room := syncTestRoom()
 	shot := Shot{
@@ -50,6 +52,7 @@ func TestRemoteShotBroadcastRetainsClientShotIdentity(t *testing.T) {
 	}
 }
 
+// Verifica che due giocatori possano sparare nello stesso tick.
 func TestShotIdentitySeparatesPlayersWithSameClientTick(t *testing.T) {
 	room := syncTestRoom()
 	room.forwardShotEventToOpponent(room.firstPlayerConnection,

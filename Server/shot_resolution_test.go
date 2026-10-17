@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// checkShotResolution controlla tutti i campi dell'esito ricevuto.
 func checkShotResolution(t *testing.T, packet []byte, owner, clientTick uint32, outcome ShotOutcome, victim, serverTick uint32) {
 	t.Helper()
 	if len(packet) != 18 || packet[0] != MsgShotResolved {
@@ -27,6 +28,7 @@ func checkShotResolution(t *testing.T, packet []byte, owner, clientTick uint32, 
 	}
 }
 
+// assertNoResolution verifica che non siano partiti altri esiti.
 func assertNoResolution(t *testing.T, room *GameRoom) {
 	t.Helper()
 	if n := len(room.firstPlayerConnection.OutgoingPacketChannel); n != 0 {
@@ -37,6 +39,7 @@ func assertNoResolution(t *testing.T, room *GameRoom) {
 	}
 }
 
+// Prova tutti gli esiti e verifica che arrivino una sola volta.
 func TestShotResolutionEveryTerminalOutcomeBroadcastOnce(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -71,6 +74,7 @@ func TestShotResolutionEveryTerminalOutcomeBroadcastOnce(t *testing.T) {
 	}
 }
 
+// Verifica l'esito quando una palla termina il volo.
 func TestExpiredShotEmitsResolutionFromPhysicsTick(t *testing.T) {
 	room := syncTestRoom()
 	room.matchTick = 20
@@ -88,6 +92,7 @@ func TestExpiredShotEmitsResolutionFromPhysicsTick(t *testing.T) {
 	assertNoResolution(t, room)
 }
 
+// Verifica la vittima corretta e ignora collisioni duplicate.
 func TestCollisionOutcomeChoosesPlayerAndIgnoresLaterPairs(t *testing.T) {
 	room := syncTestRoom()
 	room.matchTick = 40
@@ -106,6 +111,7 @@ func TestCollisionOutcomeChoosesPlayerAndIgnoresLaterPairs(t *testing.T) {
 	assertNoResolution(t, room)
 }
 
+// Verifica l'esito di una palla che urta un ostacolo.
 func TestObstacleCollisionResolvesByShotKey(t *testing.T) {
 	room := syncTestRoom()
 	room.matchTick = 66
@@ -118,6 +124,7 @@ func TestObstacleCollisionResolvesByShotKey(t *testing.T) {
 	checkShotResolution(t, <-room.secondPlayerConnection.OutgoingPacketChannel, 2, 33, ShotOutcomeObstacle, 0, 66)
 }
 
+// Verifica che una palla non colpisca il suo tiratore.
 func TestSelfCollisionDoesNotResolveShot(t *testing.T) {
 	room := syncTestRoom()
 	room.activeShots = append(room.activeShots, Shot{ShotID: 5, OwnerPlayerID: 2, ClientShotTick: 15, IsAlive: true})

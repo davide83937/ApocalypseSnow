@@ -3,13 +3,14 @@ using System.Buffers.Binary;
 
 namespace ApocalypseSnow;
 
-/// <summary>Shot metadata broadcast by the authoritative server.</summary>
+// Dati del tiro ricevuti dal server per il pinguino remoto.
 public readonly record struct RemoteShotMessage(
     float TargetX, float TargetY, int Charge, ShotType Type, ShotKey Key)
 {
     // MsgRemoteShot is 22 bytes including the leading message type byte.
     public const int PayloadLength = 21;
 
+    // Legge il tiro remoto dal payload TCP.
     public static RemoteShotMessage Parse(ReadOnlySpan<byte> payload)
     {
         if (payload.Length != PayloadLength)

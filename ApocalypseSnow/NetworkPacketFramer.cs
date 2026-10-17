@@ -4,20 +4,19 @@ using System.IO;
 
 namespace ApocalypseSnow;
 
-/// <summary>
-/// Reassembles complete application messages from the TCP byte stream.
-/// A fragmented payload must never consume its message type prematurely.
-/// </summary>
+// Ricompone i messaggi anche quando TCP li consegna a pezzi.
 public sealed class NetworkPacketFramer
 {
     private readonly List<byte> _pending = new(256);
 
+    // Accumula i byte appena ricevuti dalla rete.
     public void Append(ReadOnlySpan<byte> bytes)
     {
         foreach (byte value in bytes)
             _pending.Add(value);
     }
 
+    // Restituisce un messaggio solo quando e completo.
     public bool TryRead(out byte type, out byte[] payload)
     {
         type = 0;

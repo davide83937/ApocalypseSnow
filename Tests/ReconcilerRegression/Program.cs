@@ -12,6 +12,7 @@ internal static class Program
     private const float Dt = 1f / 30f;
     private const float Step = Speed * Dt;
 
+    // Esegue tutti i test e segnala eventuali errori.
     private static int Main()
     {
         var reconciler = new Reconciler(null!);
@@ -63,21 +64,25 @@ internal static class Program
         return errors == 0 ? 0 : 1;
     }
 
+    // Controlla una posizione con un piccolo margine di tolleranza.
     private static void At(Vector2 actual, float x, float y, float tolerance = 0.03f)
     {
         if (MathF.Abs(actual.X - x) > tolerance || MathF.Abs(actual.Y - y) > tolerance)
             throw new Exception($"Expected ({x:F3}, {y:F3}), got ({actual.X:F3}, {actual.Y:F3})");
     }
 
+    // Controlla che due valori siano uguali.
     private static void Equal<T>(T actual, T expected)
     {
         if (!EqualityComparer<T>.Default.Equals(actual, expected))
             throw new Exception($"Expected {expected}, got {actual}");
     }
 
+    // Applica il Reconciler con i parametri di movimento del gioco.
     private static void Apply(Reconciler r, ref Vector2 position, Func<Vector2, bool>? isBlocked = null)
         => r.Apply(ref position, Speed, Dt, isBlocked);
 
+    // Verifica che senza auth la posizione non cambi.
     private static void NoAuthDoesNotCorrect(Reconciler r)
     {
         r.Record(1, StateList.Right);
@@ -86,6 +91,7 @@ internal static class Program
         At(pos, 40, 10);
     }
 
+    // Verifica la correzione senza input in sospeso.
     private static void AuthWithoutPending(Reconciler r)
     {
         r.OnServerAuth(9, new Vector2(20, 30));
@@ -94,6 +100,7 @@ internal static class Program
         At(pos, 20, 30);
     }
 
+    // Verifica che gli input confermati vengano scartati.
     private static void AckAndReplay(Reconciler r)
     {
         r.Record(1, StateList.Right);
@@ -105,6 +112,7 @@ internal static class Program
         At(pos, 100 + Step, 100);
     }
 
+    // Verifica che una prediction corretta non venga modificata.
     private static void AccuratePrediction(Reconciler r)
     {
         r.Record(1, StateList.Right);
@@ -116,6 +124,7 @@ internal static class Program
         At(pos, Step * 3, 0);
     }
 
+    // Verifica la soglia che ignora gli errori minimi.
     private static void DeadZone(Reconciler r)
     {
         r.OnServerAuth(1, new Vector2(100, 100));
@@ -124,6 +133,7 @@ internal static class Program
         At(pos, 101, 100);
     }
 
+    // Verifica la correzione graduale degli errori medi.
     private static void SoftCorrection(Reconciler r)
     {
         r.OnServerAuth(1, new Vector2(100, 100));
@@ -132,6 +142,7 @@ internal static class Program
         At(pos, 106, 100);
     }
 
+    // Verifica lo snap sugli errori grandi.
     private static void HardCorrection(Reconciler r)
     {
         r.OnServerAuth(1, new Vector2(100, 100));
@@ -140,6 +151,7 @@ internal static class Program
         At(pos, 100, 100);
     }
 
+    // Verifica gli stati che bloccano il movimento nel replay.
     private static void ActionLocks(Reconciler r)
     {
         r.Record(1, StateList.Right | StateList.Reload);
@@ -153,6 +165,7 @@ internal static class Program
         At(pos, Step, 0);
     }
 
+    // Verifica che il replay non attraversi gli ostacoli.
     private static void ObstacleCollision(Reconciler r)
     {
         // Speed 30 => 1 pixel/step; all candidates at X>=2 are blocked.
@@ -165,6 +178,7 @@ internal static class Program
         At(pos, 1, 0);
     }
 
+    // Verifica la normalizzazione del movimento diagonale.
     private static void DiagonalMovement(Reconciler r)
     {
         r.Record(1, StateList.Right | StateList.Up);
@@ -175,6 +189,7 @@ internal static class Program
         At(pos, expected, -expected);
     }
 
+    // Verifica il recupero degli input accumulati.
     private static void InputBurst(Reconciler r)
     {
         for (uint seq = 1; seq <= 20; seq++)
@@ -185,6 +200,7 @@ internal static class Program
         At(pos, 20 * Step, 0);
     }
 
+    // Verifica due ACK successivi senza perdere input.
     private static void ConsecutiveAcknowledgements(Reconciler r)
     {
         for (uint seq = 1; seq <= 20; seq++)
@@ -203,6 +219,7 @@ internal static class Program
         At(pos, 30 * Step, 0);
     }
 
+    // Verifica la pulizia degli input tra due partite.
     private static void ResetClearsPending(Reconciler r)
     {
         r.Record(1, StateList.Right);
@@ -215,6 +232,7 @@ internal static class Program
 
     private readonly record struct Snapshot(uint Ack, Vector2 Position);
 
+    // Verifica che venga usato solo lo snapshot piu recente.
     private static void LatestSnapshot(Reconciler r)
     {
         var queue = new ConcurrentQueue<Snapshot>();
@@ -232,6 +250,7 @@ internal static class Program
         Equal(queue.Count, 0);
     }
 
+    // Verifica che ID giocatore e tick distinguano le palle.
     private static void ShotKeyEquality(Reconciler r)
     {
         var key = new ShotKey(1, 33);
@@ -240,6 +259,7 @@ internal static class Program
             throw new Exception("ShotKey collision between different shooter/tick pairs");
     }
 
+    // Verifica unicita e lunghezza dei tag delle palle.
     private static void BallCollisionTags(Reconciler r)
     {
         var first = new ShotKey(1, 33);
@@ -260,6 +280,7 @@ internal static class Program
         }
     }
 
+    // Verifica la lettura del messaggio di tiro remoto.
     private static void RemoteShotPayload(Reconciler r)
     {
         // The Go server transmits [targetX:f32][targetY:f32][charge:u32]
@@ -279,6 +300,7 @@ internal static class Program
         Equal(shot.Key, new ShotKey(2, 33));
     }
 
+    // Verifica il rifiuto di un messaggio incompleto.
     private static void RejectMalformedRemoteShot(Reconciler r)
     {
         try
@@ -292,6 +314,7 @@ internal static class Program
         throw new Exception("Truncated MsgRemoteShot payload was accepted");
     }
 
+    // Prepara un pacchetto di esito per i test.
     private static byte[] ResolutionPacket(
         uint owner = 1, uint shotTick = 33, ShotOutcome outcome = ShotOutcome.Penguin,
         uint hitPlayerId = 2, uint serverTick = 500)
@@ -306,6 +329,7 @@ internal static class Program
         return packet;
     }
 
+    // Verifica la lettura dei tre esiti possibili.
     private static void ShotResolutionPayload(Reconciler r)
     {
         foreach (var (outcome, victim) in new[]
@@ -322,6 +346,7 @@ internal static class Program
         }
     }
 
+    // Verifica il rifiuto degli esiti incoerenti.
     private static void ShotResolutionRejectsInvalid(Reconciler r)
     {
         static void Reject(byte[] payload)
@@ -338,6 +363,7 @@ internal static class Program
         Reject(ResolutionPacket(outcome: ShotOutcome.Penguin, hitPlayerId: 0)[1..]);
     }
 
+    // Verifica un esito TCP ricevuto un byte alla volta.
     private static void FragmentedShotResolution(Reconciler r)
     {
         var framer = new NetworkPacketFramer();
@@ -359,6 +385,7 @@ internal static class Program
             throw new Exception("Framer replayed already consumed message");
     }
 
+    // Verifica messaggi accorpati e spezzati.
     private static void FramingBatchAndSplit(Reconciler r)
     {
         var framer = new NetworkPacketFramer();
@@ -383,6 +410,7 @@ internal static class Program
         if (framer.TryRead(out _, out _)) throw new Exception("Leftover bytes after batch");
     }
 
+    // Verifica il rifiuto di tipi di messaggio sconosciuti.
     private static void FramingRejectsUnknown(Reconciler r)
     {
         var framer = new NetworkPacketFramer();
@@ -392,6 +420,7 @@ internal static class Program
         throw new Exception("Unknown message was silently accepted");
     }
 
+    // Verifica che la stessa auth non venga applicata due volte.
     private static void SingleUseAuth(Reconciler r)
     {
         r.OnServerAuth(1, Vector2.Zero);

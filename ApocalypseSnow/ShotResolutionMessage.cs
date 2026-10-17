@@ -10,17 +10,14 @@ public enum ShotOutcome : byte
     Penguin = 3
 }
 
-/// <summary>
-/// Final authoritative fate of a ball. The ShotKey is shared with the predicted
-/// ball and MsgRemoteShot. HitPlayerId is zero for non-penguin outcomes.
-/// ServerTick is diagnostic/event ordering metadata, not a local client tick.
-/// </summary>
+// Esito definitivo della palla deciso dal server.
 public readonly record struct ShotResolutionMessage(
     ShotKey Key, ShotOutcome Outcome, uint HitPlayerId, uint ServerTick)
 {
     // MsgShotResolved: 18 bytes including the message type.
     public const int PayloadLength = 17;
 
+    // Legge e controlla l'esito autoritativo ricevuto.
     public static ShotResolutionMessage Parse(ReadOnlySpan<byte> payload)
     {
         if (payload.Length != PayloadLength)

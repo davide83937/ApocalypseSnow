@@ -49,12 +49,13 @@ public class Events:GameComponent
         //_redPenguin._penguinInputHandler._stateStruct.Current = (StateList)mask;
     }
     
+    // Registra l'esito della palla senza applicare ancora il freeze.
     private void HandleShotResolved(ShotResolutionMessage resolution)
     {
-        // Receipt is recorded but must NOT yet change freezing or predicted movement.
         _shotResolutions.TryAdd(resolution.Key, resolution);
     }
 
+    // Crea la palla remota usando i dati del server.
     private void HandleRemoteShot(RemoteShotMessage shot)
     {
         Vector2 target = new Vector2(shot.TargetX, shot.TargetY);

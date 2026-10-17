@@ -98,6 +98,7 @@ public class NetworkManager : GameComponent
         }
     }
 
+    // Riceve i messaggi completi e li passa agli handler.
     public void Receive()
     {
         if (_stream == null || _tcpClient == null || !_tcpClient.Connected)

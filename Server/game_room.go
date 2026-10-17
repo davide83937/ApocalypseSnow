@@ -673,9 +673,7 @@ func (gameRoom *GameRoom) updateShotColliders() {
 	}
 }
 
-// resolveShot is the single terminal transition for a server-created ball.
-// It removes the collider and reports the immutable outcome to BOTH peers.
-// The IsAlive guard prevents duplicate outcomes from multiple C++ collision pairs.
+// resolveShot chiude la palla e manda l'esito a entrambi, una sola volta.
 func (gameRoom *GameRoom) resolveShot(shot *Shot, outcome ShotOutcome, hitPlayerID uint32) {
 	if shot == nil || !shot.IsAlive {
 		return
