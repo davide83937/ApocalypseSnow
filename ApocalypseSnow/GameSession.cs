@@ -173,7 +173,7 @@ public sealed class GameSession : GameComponent
         //SUPER NOTA: dentro il while siamo a 30 HZ, fuori dal while ma dentro questo Update siamo a 60 FPS
 
         // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
-        Reconciler.Instance.GetLatest(_events._authQueue, auth =>
+        Reconciler.Instance.GetLatest(_events._authPositionQueue, auth =>
         {
             Reconciler.Instance.OnServerAuth(auth.Ack, auth.Position);
             Reconciler.Instance.Apply(

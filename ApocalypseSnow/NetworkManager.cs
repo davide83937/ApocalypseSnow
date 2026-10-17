@@ -13,9 +13,12 @@ public class NetworkManager : GameComponent
     private readonly string _ip;
     private readonly int _port;
 
-    public event Action<uint, float, float> OnAuthReceived;
-    public event Action<float, float, int> OnRemoteReceived;
+    public event Action<uint, float, float> OnAuthStateReceived; //posizione autoritativa del player locale
+    public event Action<uint, float, int, ShotType> OnAuthShotReceived; //shot autoritativo del player locale (seqN, mouseY, charge, shotType) rivedere la firma
+
+    public event Action<float, float, int> OnRemoteStateReceived;
     public event Action<float, float, int, ShotType> OnRemoteShotReceived; // mouseX, mouseY, charge, shotType
+
     public event Action<int, float, float> OnEggReceived;
     public event Action<float, float> OnObstacleReceived;
 
@@ -142,7 +145,7 @@ public class NetworkManager : GameComponent
                         uint ackSeq = BitConverter.ToUInt32(payload, 0);
                         float x = BitConverter.ToSingle(payload, 4);
                         float y = BitConverter.ToSingle(payload, 8);
-                        OnAuthReceived?.Invoke(ackSeq, x, y);
+                        OnAuthStateReceived?.Invoke(ackSeq, x, y);
                         break;
                     }
 
@@ -154,7 +157,7 @@ public class NetworkManager : GameComponent
                         float x = BitConverter.ToSingle(payload, 0);
                         float y = BitConverter.ToSingle(payload, 4);
                         int mask = BitConverter.ToInt32(payload, 8);
-                        OnRemoteReceived?.Invoke(x, y, mask);
+                        OnRemoteStateReceived?.Invoke(x, y, mask);
                         break;
                     }
 

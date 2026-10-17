@@ -160,6 +160,4 @@ public sealed class Reconciler
         // Errore grave (es. il server ti ha visto sbattere contro un muro)
         pos = replayPos;
     }
-
-
 }

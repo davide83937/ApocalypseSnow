@@ -21,14 +21,15 @@ type Shot struct {
 
 	Type ShotType
 
-	/*FlightTime float32
-	MaxHeight  float32
+	// Runtime server-side
+	StartX    float32
+	StartY    float32
+	SpawnTick uint32
+	IsAlive   bool
 
-	CurrentX float32
-	CurrentY float32
-	CurrentZ float32
-
-	IsPredicted     bool
-	IsAuthoritative bool
-	IsAlive         bool*/
+	GroundVelX         float32
+	GroundVelY         float32
+	StartVerticalSpeed float32
+	Gravity            float32
+	FlightDuration     float32
 }

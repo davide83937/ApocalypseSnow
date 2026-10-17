@@ -18,7 +18,7 @@ public class MovementsManagerRed:IMovements
         if (NetworkManager.Instance != null)
         {
             // Ci iscriviamo all'evento per ricevere i dati remoti
-            NetworkManager.Instance.OnRemoteReceived += HandleRemoteState;
+            NetworkManager.Instance.OnRemoteStateReceived += HandleRemoteState;
         }
     }
     private void HandleRemoteState(float x, float y, int mask)
