@@ -282,15 +282,14 @@ func (gameRoom *GameRoom) drainEventChannelToPending(
 			drain++
 
 			if event.Type == EventInput {
-				// Sequenze client monotone; non confrontarle con il tick della room.
-				// Scarta anche i duplicati gi? accodati nello stesso burst.
-				if event.Input.SeqN <= player.LastSeqN || event.Input.SeqN <= player.RecvSeqN {
-					droppedOld++
-					continue
-				}
 				player.LastRx = now
 				player.RecvMask = event.Input.Mask
 				player.RecvSeqN = event.Input.SeqN
+
+				if event.Input.SeqN <= player.LastSeqN {
+					droppedOld++
+					continue
+				}
 			}
 
 			*pending = append(*pending, event)
@@ -372,9 +371,7 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 	}
 }
 
-// applyMaturePendingEvents preserva l'ordine TCP tra MsgState e MsgShot.
-// Ogni tick elabora al massimo un input (un passo di movimento e un ACK).
-// Gli altri eventi restano pending, inclusi i tiri collegati a input futuri.
+// applyMaturePendingEvents applica tutti gli eventi con seq <= matchTick.
 func (gameRoom *GameRoom) applyMaturePendingEvents(
 	player *Player,
 	pending *[]PlayerEvent,
@@ -382,11 +379,11 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 	deltaTime float32,
 ) (applied int, futureCount int) {
 	consumeCount := 0
-	processedInput := false
 
 	for consumeCount < len(*pending) {
 		event := (*pending)[consumeCount]
-		if event.Type == EventInput && processedInput {
+
+		if event.SeqN() > gameRoom.matchTick {
 			break
 		}
 
@@ -401,23 +398,35 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 
 			gameRoom.updatePendingShot(player, inputState.Mask, inputState.SeqN)
 
-			// Un tick server = un solo input e un solo passo fisico.
 			oldX, oldY := player.X, player.Y
 			newX, newY := StepFromState(player.X, player.Y, inputState.Mask, deltaTime)
+
 			if gameRoom.collisionManager.CheckPlayerCollisionAt(
-				playerCollisionTag(player.ID), newX, newY, gameRoom.Obstacles,
+				playerCollisionTag(player.ID),
+				newX,
+				newY,
+				gameRoom.Obstacles,
 			) {
-				log.Printf("[COLLISION] player=%d old=(%.1f, %.1f) attempted=(%.1f, %.1f)",
-					player.ID, oldX, oldY, newX, newY)
+				log.Printf(
+					"[COLLISION] player=%d tag=%s old=(%.1f, %.1f) attempted=(%.1f, %.1f)",
+					player.ID,
+					playerCollisionTag(player.ID),
+					oldX,
+					oldY,
+					newX,
+					newY,
+				)
+
+				player.X, player.Y = oldX, oldY
 			} else {
 				player.X, player.Y = newX, newY
 			}
 
 			player.LastMask = inputState.Mask
 			player.LastSeqN = inputState.SeqN
-			// RecvSeqN resta l'ultima sequenza arrivata dalla rete, anche con backlog.
+			player.RecvMask = inputState.Mask
+			player.RecvSeqN = inputState.SeqN
 			applied++
-			processedInput = true
 
 			ps := &player.PendingShot
 			if ps.Active && ps.WaitingShotPacket && ps.ReleaseTick == inputState.SeqN {
