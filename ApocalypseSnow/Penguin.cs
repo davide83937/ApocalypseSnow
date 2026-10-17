@@ -30,13 +30,13 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
 
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed,
-        IMovements movements, float physicsDeltaTime) : base(game, tag, startPosition)
+        IMovements movements, float physicsDeltaTime, uint ownerPlayerId) : base(game, tag, startPosition)
     {
         _gameContext = game;
         _movementsManager = movements;
         _shotStruct = new ShotStruct();
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
-        _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
+        _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag, ownerPlayerId);
         _penguinInputHandler = new PenguinInputHandler(_tag);
         _physicsDeltaTime = physicsDeltaTime;
         
@@ -89,7 +89,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         );
     }
 
-    public void HandleRemoteShot(Vector2 target, int charge, ShotType shotType)
+    public void HandleRemoteShot(Vector2 target, int charge, ShotType shotType, ShotKey shotKey)
     {
         _penguinShotHandler.pressedTime = charge/1000f; //riportiamo charge in secondi
 
@@ -98,7 +98,8 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             target,
             _position,
             _penguinInputHandler._animationManager._ballTag,
-            shotType
+            shotType,
+            shotKey
         );
     }
 

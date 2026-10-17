@@ -138,8 +138,14 @@ func TestOriginalMaturePendingPreservesShotBeforeReleaseState(t *testing.T) {
 	if len(room.activeShots) != 1 {
 		t.Fatalf("expected one shot, got %d", len(room.activeShots))
 	}
-	if shot := room.activeShots[0]; shot.PressedTick != 1 || shot.ReleasedTick != 3 || shot.AuthCharge != 2 {
+	if shot := room.activeShots[0]; shot.PressedTick != 1 || shot.ReleasedTick != 3 || shot.AuthCharge != 2 || shot.ClientShotTick != 3 || shot.OwnerPlayerID != 1 {
 		t.Fatalf("wrong shot reconstruction: %+v", shot)
+	}
+	select {
+	case pkt := <-room.secondPlayerConnection.OutgoingPacketChannel:
+		checkRemoteShotPayload(t, pkt, 1, 3, ShotTypeLeft)
+	default:
+		t.Fatal("server did not forward the authoritative shot identity")
 	}
 	if room.firstPlayer.LastSeqN != 3 {
 		t.Fatalf("ACK did not reach release: %d", room.firstPlayer.LastSeqN)

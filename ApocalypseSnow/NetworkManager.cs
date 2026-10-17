@@ -17,7 +17,7 @@ public class NetworkManager : GameComponent
     public event Action<uint, float, int, ShotType> OnAuthShotReceived; //shot autoritativo del player locale (seqN, mouseY, charge, shotType) rivedere la firma
 
     public event Action<float, float, int> OnRemoteStateReceived;
-    public event Action<float, float, int, ShotType> OnRemoteShotReceived; // mouseX, mouseY, charge, shotType
+    public event Action<RemoteShotMessage> OnRemoteShotReceived; // authoritative remote shot metadata
 
     public event Action<int, float, float> OnEggReceived;
     public event Action<float, float> OnObstacleReceived;
@@ -161,17 +161,11 @@ public class NetworkManager : GameComponent
                         break;
                     }
 
-                case 7: // MsgRemoteShot -> 13 byte payload (4 + 4 + 4 + 1)
+                case 7: // MsgRemoteShot -> 21 byte payload
                     {
-                        if (_tcpClient.Available < 13) return;
-                        byte[] payload = ReadExactPayload(13);
-
-                        float mx = BitConverter.ToSingle(payload, 0);
-                        float my = BitConverter.ToSingle(payload, 4);
-                        int charge = BitConverter.ToInt32(payload, 8);
-                        ShotType shotType = (ShotType)payload[12];
-
-                        OnRemoteShotReceived?.Invoke(mx, my, charge, shotType);
+                        if (_tcpClient.Available < RemoteShotMessage.PayloadLength) return;
+                        byte[] payload = ReadExactPayload(RemoteShotMessage.PayloadLength);
+                        OnRemoteShotReceived?.Invoke(RemoteShotMessage.Parse(payload));
                         break;
                     }
 
@@ -214,7 +208,7 @@ public class NetworkManager : GameComponent
         byte[] packet = new byte[17];
         packet[0] = (byte)shot.Type;
 
-        Buffer.BlockCopy(BitConverter.GetBytes(GameSession.LocalTick), 0, packet, 1, 4);
+        Buffer.BlockCopy(BitConverter.GetBytes(shot.localTick), 0, packet, 1, 4);
         Buffer.BlockCopy(BitConverter.GetBytes(shot.mouseX), 0, packet, 5, 4);
         Buffer.BlockCopy(BitConverter.GetBytes(shot.mouseY), 0, packet, 9, 4);
         Buffer.BlockCopy(BitConverter.GetBytes(shot.charge), 0, packet, 13, 4);

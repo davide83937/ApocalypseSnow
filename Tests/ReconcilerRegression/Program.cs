@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Buffers.Binary;
 using ApocalypseSnow;
 using Microsoft.Xna.Framework;
 
@@ -30,7 +31,11 @@ internal static class Program
             ("Subsequent ACK replays only new pending inputs", ConsecutiveAcknowledgements),
             ("Reset discards pending movement from previous match", ResetClearsPending),
             ("GetLatest consumes queue and emits only final snapshot", LatestSnapshot),
-            ("Repeated Apply without fresh auth does nothing", SingleUseAuth)
+            ("Repeated Apply without fresh auth does nothing", SingleUseAuth),
+            ("Shot keys disambiguate shooters and ticks", ShotKeyEquality),
+            ("Every ball collider tag is unique and fits native 16-byte buffer", BallCollisionTags),
+            ("RemoteShot wire payload preserves identity and trajectory fields", RemoteShotPayload),
+            ("RemoteShot decoder rejects malformed length", RejectMalformedRemoteShot)
         ];
 
         var errors = 0;
@@ -220,6 +225,66 @@ internal static class Program
         });
         Equal(count, 1);
         Equal(queue.Count, 0);
+    }
+
+    private static void ShotKeyEquality(Reconciler r)
+    {
+        var key = new ShotKey(1, 33);
+        Equal(key, new ShotKey(1, 33));
+        if (key == new ShotKey(2, 33) || key == new ShotKey(1, 34))
+            throw new Exception("ShotKey collision between different shooter/tick pairs");
+    }
+
+    private static void BallCollisionTags(Reconciler r)
+    {
+        var first = new ShotKey(1, 33);
+        var second = new ShotKey(2, 34);
+        Equal(first.CollisionTag("Ball"), "Ball00000021");
+        Equal(second.CollisionTag("RedBall"), "RedBall00000022");
+        var longTag = new ShotKey(2, uint.MaxValue).CollisionTag("RedBall");
+        Equal(longTag.Length, 15);
+        Equal(longTag, "RedBallffffffff");
+        try
+        {
+            first.CollisionTag("Unexpected");
+            throw new Exception("Unknown collision prefix was accepted");
+        }
+        catch (ArgumentException)
+        {
+            // Expected.
+        }
+    }
+
+    private static void RemoteShotPayload(Reconciler r)
+    {
+        // The Go server transmits [targetX:f32][targetY:f32][charge:u32]
+        // [shotType:u8][owner:u32][shotTick:u32] after MsgRemoteShot.
+        Span<byte> payload = stackalloc byte[RemoteShotMessage.PayloadLength];
+        BinaryPrimitives.WriteInt32LittleEndian(payload[..4], BitConverter.SingleToInt32Bits(412.5f));
+        BinaryPrimitives.WriteInt32LittleEndian(payload[4..8], BitConverter.SingleToInt32Bits(13.25f));
+        BinaryPrimitives.WriteInt32LittleEndian(payload[8..12], 600);
+        payload[12] = (byte)ShotType.Right;
+        BinaryPrimitives.WriteUInt32LittleEndian(payload[13..17], 2u);
+        BinaryPrimitives.WriteUInt32LittleEndian(payload[17..21], 33u);
+        var shot = RemoteShotMessage.Parse(payload);
+        Equal(shot.TargetX, 412.5f);
+        Equal(shot.TargetY, 13.25f);
+        Equal(shot.Charge, 600);
+        Equal(shot.Type, ShotType.Right);
+        Equal(shot.Key, new ShotKey(2, 33));
+    }
+
+    private static void RejectMalformedRemoteShot(Reconciler r)
+    {
+        try
+        {
+            RemoteShotMessage.Parse(new byte[20]);
+        }
+        catch (ArgumentException)
+        {
+            return;
+        }
+        throw new Exception("Truncated MsgRemoteShot payload was accepted");
     }
 
     private static void SingleUseAuth(Reconciler r)

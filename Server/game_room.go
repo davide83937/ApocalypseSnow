@@ -870,12 +870,14 @@ func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnectio
 		chargeMs = chargeCap
 	}
 
-	packet := make([]byte, 14)
+	packet := make([]byte, 22)
 	packet[0] = MsgRemoteShot
 	binary.LittleEndian.PutUint32(packet[1:5], math.Float32bits(shot.TargetX))
 	binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(shot.TargetY))
 	binary.LittleEndian.PutUint32(packet[9:13], chargeMs)
 	packet[13] = byte(shot.Type)
+	binary.LittleEndian.PutUint32(packet[14:18], shot.OwnerPlayerID)
+	binary.LittleEndian.PutUint32(packet[18:22], shot.ClientShotTick)
 
 	targetConn.TryEnqueueOutgoingPacket(packet, false)
 }
@@ -926,15 +928,16 @@ func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEven
 		flightDuration := gameRoom.buildServerShotRuntime(player, shotEvent, shotType, authChargeMs)
 
 	shot := Shot{
-		ShotID:        gameRoom.nextShotID,
-		OwnerPlayerID: player.ID,
-		TargetX:       shotEvent.X,
-		TargetY:       shotEvent.Y,
-		LocalCharge:   shotEvent.Charge,
-		PressedTick:   ps.PressTick,
-		ReleasedTick:  ps.ReleaseTick,
-		AuthCharge:    authCharge,
-		Type:          shotType,
+		ShotID:         gameRoom.nextShotID,
+		ClientShotTick: shotEvent.SeqN,
+		OwnerPlayerID:  player.ID,
+		TargetX:        shotEvent.X,
+		TargetY:        shotEvent.Y,
+		LocalCharge:    shotEvent.Charge,
+		PressedTick:    ps.PressTick,
+		ReleasedTick:   ps.ReleaseTick,
+		AuthCharge:     authCharge,
+		Type:           shotType,
 
 		StartX:             startX,
 		StartY:             startY,

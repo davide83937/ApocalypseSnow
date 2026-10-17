@@ -8,8 +8,9 @@ const (
 )
 
 type Shot struct {
-	ShotID        uint32
-	OwnerPlayerID uint32
+	ShotID         uint32
+	ClientShotTick uint32
+	OwnerPlayerID  uint32
 
 	TargetX float32
 	TargetY float32

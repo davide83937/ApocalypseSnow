@@ -7,6 +7,7 @@ public class PenguinShotHandler
 {
     public readonly Game _gameContext;
     private readonly string _tag;
+    private readonly uint _ownerPlayerId;
 
     private int _ammo;
     public int Ammo { get => _ammo; set => _ammo = value; }
@@ -33,10 +34,11 @@ public class PenguinShotHandler
     // Non legge più il mouse direttamente.
     private ShotType? _armedShotType = null;
 
-    public PenguinShotHandler(Game gameContext, string tag)
+    public PenguinShotHandler(Game gameContext, string tag, uint ownerPlayerId)
     {
         _gameContext = gameContext;
         _tag = tag;
+        _ownerPlayerId = ownerPlayerId;
         _ammo = 100;
     }
 
@@ -143,7 +145,8 @@ public class PenguinShotHandler
         return MathF.Sqrt(maxWorldRangeSq);
     }
 
-    public void Shot(StateStruct stateStruct, Vector2 mousePosition, Vector2 position, string tagBall, ShotType? remoteShotType = null)
+    public void Shot(StateStruct stateStruct, Vector2 mousePosition, Vector2 position, string tagBall,
+        ShotType? remoteShotType = null, ShotKey? remoteShotKey = null)
     {
         bool isRemoteShot = _tag.EndsWith("Red");
         ShotType? shotTypeToFire = null;
@@ -229,13 +232,20 @@ public class PenguinShotHandler
 
         Vector2 spawnPosition = muzzleBase + aimScreenDirection * MuzzleDistance;
 
-        Ball b = new Ball(_gameContext, _tag, spawnPosition, startSpeed, _currentVerticalSpeed, tagBall, gravity);
+        // Sample LocalTick once: the predicted ball and MsgShot must share one key.
+        ShotKey shotKey = isRemoteShot
+            ? remoteShotKey ?? throw new ArgumentException("Remote shot must carry a ShotKey.", nameof(remoteShotKey))
+            : new ShotKey(_ownerPlayerId, GameSession.LocalTick);
+
+        Ball b = new Ball(_gameContext, _tag, spawnPosition, startSpeed, _currentVerticalSpeed,
+            shotKey.CollisionTag(tagBall), gravity, shotKey);
         _gameContext.Components.Add(b);
 
         if (!isRemoteShot)
         {
             ShotStruct shotStruct = new ShotStruct
             {
+                localTick = shotKey.ShotTick,
                 mouseX = mousePosition.X,
                 mouseY = mousePosition.Y,
                 charge = (int)MathF.Round(pressedTime * 1000f)

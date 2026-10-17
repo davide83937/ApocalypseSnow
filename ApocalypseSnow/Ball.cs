@@ -29,6 +29,7 @@ public class Ball : CollisionExtensions
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
     private readonly string tagPenguin;
+    public ShotKey ShotKey { get; }
 
     private bool _hitObstacle = false;
 
@@ -60,9 +61,11 @@ public class Ball : CollisionExtensions
         Vector2 groundVelocityWorld,
         float startVerticalVelocity,
         string tag,
-        float gravity
+        float gravity,
+        ShotKey shotKey
     ) : base(game, tag, startPosition)
     {
+        ShotKey = shotKey;
         _startPosition = startPosition;
         _groundVelocityWorld = groundVelocityWorld;
         _startVerticalVelocity = startVerticalVelocity;

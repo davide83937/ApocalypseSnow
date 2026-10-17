@@ -95,8 +95,8 @@ public sealed class GameSession : GameComponent
 
         _bluePlatform = new BasePlatform(_game, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
         _redPlatform =  new BasePlatform(_game, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
-        _myPenguin = new Penguin(_game,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt);
-        _redPenguin = new Penguin(_game,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt);
+        _myPenguin = new Penguin(_game,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt, ack.PlayerId);
+        _redPenguin = new Penguin(_game,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt, ack.PlayerId == 1 ? 2u : 1u);
         //_obstacle = new Obstacle(_game, new Vector2(100, 100));
         _eggsEvent = new EggsEvent(_game, _myPenguin, _redPenguin);
         _events = new Events(_game, _redPenguin);
