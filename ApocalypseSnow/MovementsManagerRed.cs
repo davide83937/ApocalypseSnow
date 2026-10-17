@@ -40,9 +40,13 @@ public class MovementsManagerRed:IMovements
         // 2. Applichiamo la maschera di bit che il server ci ha inviato dietro le quinte
         inputList.Current = _remoteState;
 
-        // 3. Forziamo gli stati di gioco locali
-        //if (isWithEgg) inputList.Current |= StateList.WithEgg;
-        //f (isFreezing) inputList.Current |= StateList.Freezing;
-        //inputList.Old = inputList.Current;
+        // La prediction locale blocca il remoto anche prima della conferma server.
+        if (isFreezing)
+            inputList.Current |= StateList.Freezing;
+
+        if (inputList.IsPressed(StateList.Freezing))
+            inputList.Current &= ~(StateList.Moving | StateList.Up | StateList.Down |
+                                   StateList.Left | StateList.Right | StateList.ShootLeft |
+                                   StateList.ShootRight);
     }
 }

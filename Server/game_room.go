@@ -407,10 +407,15 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 				continue
 			}
 
-			gameRoom.updatePendingShot(player, inputState.Mask, inputState.SeqN)
+			effectiveMask := inputState.Mask &^ Freezing
+			if inputState.SeqN <= player.FreezeEndSeq {
+				effectiveMask |= Freezing
+				effectiveMask &^= ShootLeft | ShootRight
+			}
+			gameRoom.updatePendingShot(player, effectiveMask, inputState.SeqN)
 
 			oldX, oldY := player.X, player.Y
-			newX, newY := StepFromState(player.X, player.Y, inputState.Mask, deltaTime)
+			newX, newY := StepFromState(player.X, player.Y, effectiveMask, deltaTime)
 
 			if gameRoom.collisionManager.CheckPlayerCollisionAt(
 				playerCollisionTag(player.ID),
@@ -433,7 +438,7 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 				player.X, player.Y = newX, newY
 			}
 
-			player.LastMask = inputState.Mask
+			player.LastMask = effectiveMask
 			player.LastSeqN = inputState.SeqN
 			player.RecvMask = inputState.Mask
 			player.RecvSeqN = inputState.SeqN
@@ -463,6 +468,10 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 
 		case EventShot:
 			shotEvent := event.Shot
+			if shotEvent.SeqN <= player.FreezeEndSeq {
+				consumeCount++
+				continue
+			}
 			ps := &player.PendingShot
 
 			log.Printf(
@@ -691,16 +700,38 @@ func (gameRoom *GameRoom) resolveShot(shot *Shot, outcome ShotOutcome, hitPlayer
 	}
 
 	shot.IsAlive = false
+	log.Printf("[SHOT_TRACE] role=SERVER event=RESOLVED key=%d:%d spawnTick=%d hitTick=%d flightTicks=%d outcome=%d victim=%d utc=%s", shot.OwnerPlayerID, shot.ClientShotTick, shot.SpawnTick, gameRoom.matchTick, gameRoom.matchTick-shot.SpawnTick, outcome, hitPlayerID, time.Now().UTC().Format(time.RFC3339Nano))
 	shotTag := shotCollisionTag(shot.ShotID)
 	gameRoom.collisionManager.RemoveObject(shotTag)
 
-	packet := make([]byte, 18)
+	// Per l'HIT invia anche la posizione e l'ACK del bersaglio al momento dell'impatto.
+	var hitAck uint32
+	var hitX, hitY float32
+	if outcome == ShotOutcomePenguin {
+		victim := &gameRoom.firstPlayer
+		if hitPlayerID == 2 {
+			victim = &gameRoom.secondPlayer
+		}
+		hitAck, hitX, hitY = victim.LastSeqN, victim.X, victim.Y
+		freezeEnd := hitAck + 90
+		if freezeEnd > victim.FreezeEndSeq {
+			victim.FreezeEndSeq = freezeEnd
+		}
+		victim.LastMask |= Freezing
+		victim.PendingShot = PendingShot{}
+	}
+
+	packet := make([]byte, 34)
 	packet[0] = MsgShotResolved
 	binary.LittleEndian.PutUint32(packet[1:5], shot.OwnerPlayerID)
 	binary.LittleEndian.PutUint32(packet[5:9], shot.ClientShotTick)
 	packet[9] = byte(outcome)
 	binary.LittleEndian.PutUint32(packet[10:14], hitPlayerID)
 	binary.LittleEndian.PutUint32(packet[14:18], gameRoom.matchTick)
+	binary.LittleEndian.PutUint32(packet[18:22], hitAck)
+	binary.LittleEndian.PutUint32(packet[22:26], math.Float32bits(hitX))
+	binary.LittleEndian.PutUint32(packet[26:30], math.Float32bits(hitY))
+	binary.LittleEndian.PutUint32(packet[30:34], gameRoom.matchTick-shot.SpawnTick)
 
 	// Terminal outcomes must not be silently dropped when outgoing queues are full.
 	gameRoom.firstPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
@@ -955,6 +986,7 @@ func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEven
 		gravity,
 		flightDuration := gameRoom.buildServerShotRuntime(player, shotEvent, shotType, authChargeMs)
 
+	log.Printf("[SHOT_TRACE] role=SERVER event=START key=%d:%d tick=%d utc=%s", player.ID, shotEvent.SeqN, gameRoom.matchTick, time.Now().UTC().Format(time.RFC3339Nano))
 	shot := Shot{
 		ShotID:         gameRoom.nextShotID,
 		ClientShotTick: shotEvent.SeqN,

@@ -240,6 +240,7 @@ public class PenguinShotHandler
         Ball b = new Ball(_gameContext, _tag, spawnPosition, startSpeed, _currentVerticalSpeed,
             shotKey.CollisionTag(tagBall), gravity, shotKey);
         _gameContext.Components.Add(b);
+        b.MarkObservedStart(GameSession.LocalTick, isRemoteShot ? "REMOTE" : "OWNER");
 
         if (!isRemoteShot)
         {

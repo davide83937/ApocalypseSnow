@@ -20,12 +20,19 @@ internal static class Program
         [
             ("No auth: never touch predicted position", NoAuthDoesNotCorrect),
             ("Auth only: authoritative position wins", AuthWithoutPending),
+            ("Older ACK cannot rewind after newer ACK", OlderAckNeverRewinds),
+            ("False predicted HIT unfreezes immediately", FalsePredictedHitUnfreezes),
+            ("Wire MISS rejects predicted freeze without ghost movement", WireMissRejectsPredictedFreeze),
+            ("Rejected HIT preserves another active freeze", FalseHitDoesNotClearOtherFreeze),
             ("ACK removes acknowledged moves, replay keeps the rest", AckAndReplay),
             ("Replay matches prediction: no correction", AccuratePrediction),
             ("Dead zone ignores sub-2px mismatch", DeadZone),
             ("Soft correction interpolates medium mismatch", SoftCorrection),
             ("Large mismatch snaps to replayed position", HardCorrection),
             ("Reload, freezing, egg actions skip movement in replay", ActionLocks),
+            ("Late HIT removes previously predicted movements", RetroactiveFrozenInputs),
+            ("Predicted freeze, confirmed freeze and false HIT use tick deadlines", FreezeTimelines),
+            ("Remote penguin obeys predicted freeze and clears it on rejection", RemotePredictedFreeze),
             ("Blocked collision rejects candidate without stepping backward", ObstacleCollision),
             ("Diagonal movement uses normalized native physics", DiagonalMovement),
             ("Twenty buffered inputs replay despite partial ACK", InputBurst),
@@ -83,6 +90,77 @@ internal static class Program
         => r.Apply(ref position, Speed, Dt, isBlocked);
 
     // Verifica che senza auth la posizione non cambi.
+    private static void WireMissRejectsPredictedFreeze(Reconciler r)
+    {
+        var freeze = new FreezeTimeline();
+        var key = new ShotKey(1, 33);
+        freeze.Predict(key, 100);
+        Vector2 pos = new Vector2(100, 80);
+        for (uint tick = 100; tick <= 104; tick++)
+        {
+            Equal(freeze.IsFrozen(tick), true);
+            r.Record(tick, StateList.None);
+        }
+        byte[] packet = ResolutionPacket(outcome: ShotOutcome.Expired, hitPlayerId: 0);
+        var framer = new NetworkPacketFramer();
+        framer.Append(packet);
+        if (!framer.TryRead(out _, out var payload))
+            throw new Exception("MISS packet not received");
+        var result = ShotResolutionMessage.Parse(payload);
+        Equal(result.Key, key);
+        Equal(result.Outcome, ShotOutcome.Expired);
+        freeze.Resolve(result.Key, false, 0);
+        Equal(freeze.IsFrozen(105), false);
+        r.OnServerAuth(99, pos);
+        Apply(r, ref pos);
+        At(pos, 100, 80);
+        r.Record(105, StateList.Right);
+        var lastAuthPos = pos;
+        pos.X += Step; // il client predice il nuovo input visibile
+        r.OnServerAuth(104, lastAuthPos);
+        Apply(r, ref pos);
+        At(pos, 100 + Step, 80);
+    }
+
+    private static void FalsePredictedHitUnfreezes(Reconciler r)
+    {
+        var f = new FreezeTimeline();
+        var key = new ShotKey(2, 40);
+        f.Predict(key, 100);
+        Equal(f.IsFrozen(105), true);
+        r.Record(105, StateList.None); // client sent neutral movement while predicting HIT
+        f.Resolve(key, false, 0);
+        Equal(f.IsFrozen(105), false);
+        r.OnServerAuth(104, Vector2.Zero);
+        Vector2 pos = Vector2.Zero;
+        Apply(r, ref pos);
+        At(pos, 0, 0); // no invisible input replay
+    }
+
+    private static void FalseHitDoesNotClearOtherFreeze(Reconciler r)
+    {
+        var f = new FreezeTimeline();
+        var rejected = new ShotKey(2, 41);
+        var confirmed = new ShotKey(2, 42);
+        f.Predict(rejected, 100);
+        f.Predict(confirmed, 103);
+        f.Resolve(rejected, false, 0);
+        Equal(f.IsFrozen(105), true);
+        f.ConfirmLocal(confirmed, 103);
+        Equal(f.IsFrozen(105), true);
+        Equal(f.IsFrozen(194), false);
+    }
+
+    private static void OlderAckNeverRewinds(Reconciler r)
+    {
+        Vector2 pos = Vector2.Zero;
+        r.OnServerAuth(30, new Vector2(200, 100));
+        Apply(r, ref pos);
+        r.OnServerAuth(29, new Vector2(5, 5));
+        Apply(r, ref pos);
+        At(pos, 200, 100);
+    }
+
     private static void NoAuthDoesNotCorrect(Reconciler r)
     {
         r.Record(1, StateList.Right);
@@ -163,6 +241,52 @@ internal static class Program
         var pos = new Vector2(100, 0);
         Apply(r, ref pos);
         At(pos, Step, 0);
+    }
+
+    // Verifica che un HIT tardivo annulli solo gli input nell'intervallo congelato.
+    private static void RetroactiveFrozenInputs(Reconciler r)
+    {
+        for (uint seq = 41; seq <= 131; seq++)
+            r.Record(seq, StateList.Right);
+        r.BlockMovement(41, 130);
+        r.OnServerAuth(40, new Vector2(100, 30));
+        var pos = new Vector2(500, 30);
+        Apply(r, ref pos);
+        At(pos, 100 + Step, 30);
+    }
+
+    // Verifica che una prediction smentita non prolunghi il freeze.
+    private static void FreezeTimelines(Reconciler r)
+    {
+        var freeze = new FreezeTimeline();
+        var first = new ShotKey(1, 17);
+        var second = new ShotKey(1, 22);
+        freeze.Predict(first, 50);
+        Equal(freeze.IsFrozen(70), true);
+        freeze.Resolve(first, false, 0);
+        Equal(freeze.IsFrozen(70), false);
+        freeze.Predict(second, 51);
+        freeze.Resolve(second, true, 130);
+        Equal(freeze.IsFrozen(60), true);
+        Equal(freeze.IsFrozen(130), true);
+        Equal(freeze.IsFrozen(131), false);
+    }
+
+    // Il pinguino remoto si blocca subito e riparte se l'HIT viene smentito.
+    private static void RemotePredictedFreeze(Reconciler r)
+    {
+        var timeline = new FreezeTimeline();
+        var manager = new MovementsManagerRed();
+        var input = new StateStruct();
+        var key = new ShotKey(1, 77);
+
+        timeline.Predict(key, 100);
+        manager.UpdateInput(ref input, timeline.IsFrozen(101), false, Dt, Vector2.Zero);
+        Equal(input.IsPressed(StateList.Freezing), true);
+
+        timeline.Resolve(key, false, 0);
+        manager.UpdateInput(ref input, timeline.IsFrozen(102), false, Dt, Vector2.Zero);
+        Equal(input.IsPressed(StateList.Freezing), false);
     }
 
     // Verifica che il replay non attraversi gli ostacoli.
@@ -326,6 +450,10 @@ internal static class Program
         packet[9] = (byte)outcome;
         BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(10, 4), hitPlayerId);
         BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(14, 4), serverTick);
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(18, 4), 40u);
+        BinaryPrimitives.WriteInt32LittleEndian(packet.AsSpan(22, 4), BitConverter.SingleToInt32Bits(123.5f));
+        BinaryPrimitives.WriteInt32LittleEndian(packet.AsSpan(26, 4), BitConverter.SingleToInt32Bits(45.25f));
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(30, 4), 12u);
         return packet;
     }
 
@@ -343,6 +471,9 @@ internal static class Program
             Equal(decoded.Outcome, outcome);
             Equal(decoded.HitPlayerId, victim);
             Equal(decoded.ServerTick, 500u);
+            Equal(decoded.HitAck, 40u);
+            Equal(decoded.FlightTicks, 12u);
+            At(decoded.HitPosition, 123.5f, 45.25f);
         }
     }
 

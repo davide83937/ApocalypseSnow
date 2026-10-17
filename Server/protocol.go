@@ -11,7 +11,7 @@ const (
 	MsgRemoteShot    byte = 7 // 22B [type][x:float32][y:float32][charge:uint32][shotType:uint8][ownerId:uint32][shotTick:uint32]
 	MsgSpawnEgg      byte = 8 // 13B [type][id:int32][x:float32][y:float32]
 	MsgSpawnObstacle byte = 10
-	MsgShotResolved  byte = 11 // 18B [type][ownerId:uint32][shotTick:uint32][outcome:uint8][hitPlayerId:uint32][serverTick:uint32]
+	MsgShotResolved  byte = 11 // 34B [type][ownerId:uint32][shotTick:uint32][outcome:uint8][hitPlayerId:uint32][serverTick:uint32][hitAck:uint32][hitX:float32][hitY:float32][flightTicks:uint32]
 )
 
 // Input mask bit

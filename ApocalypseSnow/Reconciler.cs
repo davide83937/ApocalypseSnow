@@ -26,6 +26,8 @@ public sealed class Reconciler
 
     private bool _hasAuth;
     private uint _ack;
+    private bool _hasAcceptedAck;
+    private uint _lastAcceptedAck;
     private Vector2 _authPos;
     
     private static Reconciler _instance;
@@ -57,6 +59,8 @@ public sealed class Reconciler
         //_nextSeq = 1;
         _hasAuth = false;
         _ack = 0;
+        _hasAcceptedAck = false;
+        _lastAcceptedAck = 0;
         _authPos = Vector2.Zero;
     }
 
@@ -69,8 +73,25 @@ public sealed class Reconciler
         Debug.WriteLine($"Recorded input seq={seq} moveMask={moveMask} pending={_pending.Count}");
     }
 
+    // Segna come congelati anche gli input gia predetti, senza cambiare il replay.
+    public void BlockMovement(uint firstSeq, uint lastSeq)
+    {
+        for (int i = 0; i < _pending.Count; i++)
+        {
+            Pending input = _pending[i];
+            if (input.Seq < firstSeq || input.Seq > lastSeq)
+                continue;
+            input.MoveMask |= StateList.Freezing;
+            _pending[i] = input;
+        }
+    }
+
     public void OnServerAuth(uint ack, Vector2 serverPos)
     {
+        if (_hasAcceptedAck && ack < _lastAcceptedAck)
+            return;
+        _hasAcceptedAck = true;
+        _lastAcceptedAck = ack;
         _ack = ack;
         _authPos = serverPos;
         _hasAuth = true;

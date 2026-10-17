@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Color = Microsoft.Xna.Framework.Color;
@@ -30,6 +30,12 @@ public class Ball : CollisionExtensions
     private int _halfTextureFractionHeight;
     private readonly string tagPenguin;
     public ShotKey ShotKey { get; }
+    public uint ObservedStartTick { get; private set; }
+    public void MarkObservedStart(uint tick, string role)
+    {
+        ObservedStartTick = tick;
+        ShotTrace.Log($"[SHOT_TRACE] role={role} event=START key={ShotKey} tick={tick} utc={DateTime.UtcNow:O}");
+    }
 
     private bool _hitObstacle = false;
 

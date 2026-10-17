@@ -15,6 +15,20 @@ public class Events:GameComponent
     // Final server outcomes, indexed by the same key used by Ball.
     private readonly Dictionary<ShotKey, ShotResolutionMessage> _shotResolutions = new();
     public IReadOnlyDictionary<ShotKey, ShotResolutionMessage> ShotResolutions => _shotResolutions;
+    public readonly Queue<ShotResolutionMessage> PendingShotResolutions = new();
+    private readonly Dictionary<ShotKey, uint> _remoteShotStartTicks = new();
+
+    public bool TryTakeRemoteShotStart(ShotKey key, out uint startTick)
+    {
+        if (_remoteShotStartTicks.TryGetValue(key, out startTick))
+        {
+            _remoteShotStartTicks.Remove(key);
+            return true;
+        }
+        return false;
+    }
+    public Vector2 LatestRemotePosition { get; private set; }
+    public bool HasRemotePosition { get; private set; }
     
     public Events(Game game, Penguin redPenguin) : base(game)
     {
@@ -44,21 +58,28 @@ public class Events:GameComponent
     
     private void HandleRedState(float x, float y, int mask)
     {
-        _redPenguin._position.X = x;
-        _redPenguin._position.Y = y;
-        //_redPenguin._penguinInputHandler._stateStruct.Current = (StateList)mask;
+        LatestRemotePosition = new Vector2(x, y);
+        HasRemotePosition = true;
+
+        // Durante un HIT predetto non sovrascrive il remoto con stati ancora non congelati.
+        bool predictedFreeze = _redPenguin.LocalFreeze.IsFrozen(GameSession.LocalTick);
+        bool serverFreezing = (((StateList)mask & StateList.Freezing) != StateList.None);
+        if (!predictedFreeze || serverFreezing)
+            _redPenguin._position = LatestRemotePosition;
     }
     
-    // Registra l'esito della palla senza applicare ancora il freeze.
+    // Accoda ogni esito autoritativo per applicarlo nel GameSession.
     private void HandleShotResolved(ShotResolutionMessage resolution)
     {
-        _shotResolutions.TryAdd(resolution.Key, resolution);
+        if (_shotResolutions.TryAdd(resolution.Key, resolution))
+            PendingShotResolutions.Enqueue(resolution);
     }
 
     // Crea la palla remota usando i dati del server.
     private void HandleRemoteShot(RemoteShotMessage shot)
     {
         Vector2 target = new Vector2(shot.TargetX, shot.TargetY);
+        _remoteShotStartTicks[shot.Key] = GameSession.LocalTick;
         _redPenguin.HandleRemoteShot(target, shot.Charge, shot.Type, shot.Key);
         _redPenguin._myEgg = null;
     }

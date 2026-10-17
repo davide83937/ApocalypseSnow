@@ -32,6 +32,9 @@ type Player struct {
 	// Ultimo seq ACKato al client (MsgAuthState)
 	LastSeqN uint32
 
+	// Ultimo input da bloccare dopo un HIT autoritativo.
+	FreezeEndSeq uint32
+
 	// Mask effettivamente usata nello step (serve anche per RemoteState)
 	LastMask int32
 

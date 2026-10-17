@@ -2,13 +2,14 @@ package main
 
 import (
 	"encoding/binary"
+	"math"
 	"testing"
 )
 
 // checkShotResolution controlla tutti i campi dell'esito ricevuto.
 func checkShotResolution(t *testing.T, packet []byte, owner, clientTick uint32, outcome ShotOutcome, victim, serverTick uint32) {
 	t.Helper()
-	if len(packet) != 18 || packet[0] != MsgShotResolved {
+	if len(packet) != 34 || packet[0] != MsgShotResolved {
 		t.Fatalf("invalid resolution packet (len=%d bytes=%v)", len(packet), packet)
 	}
 	if v := binary.LittleEndian.Uint32(packet[1:5]); v != owner {
@@ -25,6 +26,9 @@ func checkShotResolution(t *testing.T, packet []byte, owner, clientTick uint32, 
 	}
 	if v := binary.LittleEndian.Uint32(packet[14:18]); v != serverTick {
 		t.Fatalf("server tick=%d want %d", v, serverTick)
+	}
+	if outcome != ShotOutcomePenguin && binary.LittleEndian.Uint32(packet[18:22]) != 0 {
+		t.Fatal("non-hit outcome contains a victim ACK")
 	}
 }
 
@@ -122,6 +126,60 @@ func TestObstacleCollisionResolvesByShotKey(t *testing.T) {
 	room.resolveCollisionResults()
 	checkShotResolution(t, <-room.firstPlayerConnection.OutgoingPacketChannel, 2, 33, ShotOutcomeObstacle, 0, 66)
 	checkShotResolution(t, <-room.secondPlayerConnection.OutgoingPacketChannel, 2, 33, ShotOutcomeObstacle, 0, 66)
+}
+
+// Un HIT blocca gli input 41..130, ma il 131 torna a muovere il pinguino.
+func TestAuthoritativeFreezeBlocksNinetyInputSequences(t *testing.T) {
+	room := syncTestRoom()
+	room.matchTick = 200
+	victim := &room.secondPlayer
+	victim.LastSeqN = 40
+	startX, startY := victim.X, victim.Y
+	shot := Shot{ShotID: 23, OwnerPlayerID: 1, ClientShotTick: 11, IsAlive: true}
+	room.resolveShot(&shot, ShotOutcomePenguin, 2)
+	if victim.FreezeEndSeq != 130 {
+		t.Fatalf("freeze end=%d, want 130", victim.FreezeEndSeq)
+	}
+	packet := <-room.secondPlayerConnection.OutgoingPacketChannel
+	checkShotResolution(t, packet, 1, 11, ShotOutcomePenguin, 2, 200)
+	if ack := binary.LittleEndian.Uint32(packet[18:22]); ack != 40 {
+		t.Fatalf("hit ACK=%d, want 40", ack)
+	}
+	if x := math.Float32frombits(binary.LittleEndian.Uint32(packet[22:26])); x != startX {
+		t.Fatalf("hit X=%f, want %f", x, startX)
+	}
+	if y := math.Float32frombits(binary.LittleEndian.Uint32(packet[26:30])); y != startY {
+		t.Fatalf("hit Y=%f, want %f", y, startY)
+	}
+	for seq := uint32(41); seq <= 130; seq++ {
+		room.secondPlayerPendingEvents = append(room.secondPlayerPendingEvents, syncInput(seq, Right))
+	}
+	room.applyMaturePendingEvents(victim, &room.secondPlayerPendingEvents, room.firstPlayerConnection, MoveDt)
+	if victim.LastSeqN != 130 || victim.X != startX || victim.Y != startY || victim.LastMask&Freezing == 0 {
+		t.Fatalf("frozen player moved: %+v", victim)
+	}
+	room.secondPlayerPendingEvents = append(room.secondPlayerPendingEvents, syncInput(131, Right|Freezing))
+	room.applyMaturePendingEvents(victim, &room.secondPlayerPendingEvents, room.firstPlayerConnection, MoveDt)
+	if victim.LastSeqN != 131 || victim.LastMask&Freezing != 0 || victim.X <= startX {
+		t.Fatalf("player did not move at 131: %+v", victim)
+	}
+}
+
+// Verifica che un secondo HIT estenda il blocco senza abbreviare il precedente.
+func TestRepeatedHitExtendsFreezeDeadline(t *testing.T) {
+	room := syncTestRoom()
+	room.secondPlayer.LastSeqN = 40
+	first := Shot{ShotID: 1, OwnerPlayerID: 1, ClientShotTick: 1, IsAlive: true}
+	room.resolveShot(&first, ShotOutcomePenguin, 2)
+	if room.secondPlayer.FreezeEndSeq != 130 {
+		t.Fatal("first freeze deadline mismatch")
+	}
+	room.secondPlayer.LastSeqN = 70
+	second := Shot{ShotID: 2, OwnerPlayerID: 1, ClientShotTick: 2, IsAlive: true}
+	room.resolveShot(&second, ShotOutcomePenguin, 2)
+	if room.secondPlayer.FreezeEndSeq != 160 {
+		t.Fatal("second hit did not extend freeze")
+	}
 }
 
 // Verifica che una palla non colpisca il suo tiratore.

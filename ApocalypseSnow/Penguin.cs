@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Microsoft.Xna.Framework.Input;
 
@@ -11,6 +11,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 {
     private readonly Game _gameContext;
     private readonly IMovements _movementsManager;
+    public readonly FreezeTimeline LocalFreeze = new();
     public PenguinColliderHandler _penguinColliderHandler;
     public PenguinShotHandler _penguinShotHandler;
     public PenguinInputHandler _penguinInputHandler;
@@ -117,10 +118,15 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                     _deltaTime, ref _myEgg);
                 break;
             case string t when _penguinColliderHandler.IsEnemyBall(t):
-                // Controlla se la palla esiste e se è "abbastanza bassa" per colpire
-                    _penguinColliderHandler.HandleHitByBall(ref _myEgg);
-                
-                
+                // Anticipa l'HIT su entrambi i pinguini, senza applicare effetti definitivi.
+                Ball ball = _gameContext.Components.OfType<Ball>().FirstOrDefault(b => b._tag == t);
+                if (ball != null)
+                {
+                    uint hitTick = GameSession.LocalTick;
+                    ShotTrace.Log($"[SHOT_TRACE] role={(_tag.EndsWith("Red") ? "REMOTE_TARGET" : "LOCAL_TARGET")} event=PRED_HIT key={ball.ShotKey} tick={hitTick} startTick={ball.ObservedStartTick} flightTicks={hitTick - ball.ObservedStartTick} utc={DateTime.UtcNow:O}");
+                    LocalFreeze.Predict(ball.ShotKey, hitTick);
+                    _penguinColliderHandler.isFrozen = true;
+                }
                 break;
             case "blueP" or "redP":
                 _penguinColliderHandler.HandleEggDelivery(otherTag,
@@ -144,6 +150,8 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         //   Con un semplice if invece droppiamo tick (fisica rallenta sotto carico).
         if (_accumulator >= _physicsDeltaTime)
         {
+            _penguinColliderHandler.isFrozen = LocalFreeze.IsFrozen(GameSession.LocalTick);
+
             _movementsManager.UpdateInput(
                 ref _penguinInputHandler._stateStruct,
                 _penguinColliderHandler.isFrozen,
@@ -155,8 +163,6 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
             resetTakingTimer();
             resetPuttingTimer();
-            _penguinInputHandler.increaseTimeFreezing(_physicsDeltaTime, ref _penguinColliderHandler.isFrozen);
-
             _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _physicsDeltaTime);
 
             if (!_tag.EndsWith("Red") && _gameContext.IsActive)
