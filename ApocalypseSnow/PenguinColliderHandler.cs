@@ -103,6 +103,7 @@ public class PenguinColliderHandler
     
         // TRUCCO: Se abbiamo già fatto punto (deleteEggBool = true), 
         // forziamo il gioco a credere che il tasto sia ancora premuto per finire gli 0.2s!
+        //verificare se funziona anche senza.......
         if (deleteEggBool)
         {
             stateStruct.Current |= StateList.PuttingEgg;

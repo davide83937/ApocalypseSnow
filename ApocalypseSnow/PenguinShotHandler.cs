@@ -104,7 +104,7 @@ public class PenguinShotHandler
     private static float ComputeGravityForLowShot(float maxWorldRange)
     {
         float thetaLowRad = MathHelper.ToRadians(ThetaLeftDeg);
-
+        // g = (2*R*tan(theta))/T^2 
         return (2f * maxWorldRange * MathF.Tan(thetaLowRad)) /
                (DesiredFullChargeFlightTimeLowShot * DesiredFullChargeFlightTimeLowShot);
     }
@@ -112,7 +112,7 @@ public class PenguinShotHandler
     private static float ComputeMaxV0(float gravity)
     {
         float thetaLowRad = MathHelper.ToRadians(ThetaLeftDeg);
-
+        // v0 = g*T/2*sin(theta)
         return (gravity * DesiredFullChargeFlightTimeLowShot) /
                (2f * MathF.Sin(thetaLowRad));
     }
@@ -198,11 +198,17 @@ public class PenguinShotHandler
         else
             _currentThetaDeg = ThetaRightDeg;
 
-        Vector2 muzzleBase = new Vector2(position.X + 48f, position.Y + MuzzleOffsetY);
-
+        Vector2 muzzleBase = new Vector2(position.X + 48f, position.Y + MuzzleOffsetY); 
+       /*
+       Siccome il gioco ha una visuale dall'alto ma inclinata,
+       il mondo a schermo è "schiacciato" sull'asse Y (definito da PlanePerspectiveY = 0.70f).
+       Se miri in diagonale, la distanza a schermo non corrisponde alla distanza nel mondo di gioco.
+       Dividendo differenceY per 0.70f, il codice "stira" virtualmente il mondo facendolo tornare perfettamente quadrato,
+       calcola la direzione corretta verso cui il mouse sta puntando nel mondo reale 3D,
+       e infine normalizza il vettore (lo fa diventare di lunghezza 1, cioè una pura "direzione" senza forza).
+       */
         float differenceX = mousePosition.X - muzzleBase.X;
         float differenceY = mousePosition.Y - muzzleBase.Y;
-
         differenceY /= PlanePerspectiveY;
         PhysicsAPI.normalizeVelocity(ref differenceX, ref differenceY);
 
@@ -210,25 +216,45 @@ public class PenguinShotHandler
         float gravity = ComputeGravityForLowShot(maxWorldRange);
         float maxV0 = ComputeMaxV0(gravity);
 
+        /*
+         Trasforma il tempo di pressione in una percentuale da 0 a 1 (charge01).
+         Usa la radice quadrata (MathF.Sqrt) per calcolare la potenza (power01). 
+         Questo è un trucco classico di game design: crea una curva non lineare. 
+         Significa che basta tenere premuto poco per avere subito un tiro decente (es. al 25% di tempo hai già il 50% della potenza), 
+         ma per arrivare al 100% devi aspettare tutto il tempo. Rende i tiri rapidi molto più responsivi.
+         Moltiplica questa percentuale per la velocità massima calcolata dalle tre funzioni che abbiamo visto prima, 
+         ottenendo la velocità iniziale reale (v0).
+         */
         float charge01 = MathHelper.Clamp(pressedTime / MaxChargeSeconds, 0f, 1f);
         float power01 = MathF.Sqrt(charge01);
         float v0 = power01 * maxV0;
 
+        /*
+         groundSpeed (Sull'asse orizzontale/terreno): Usa il Coseno dell'angolo. 
+         Moltiplicato per la direzione normalizzata di prima, ti dice quanto velocemente la palla si sposterà sulla mappa.
+         _currentVerticalSpeed (Sull'asse Z / altezza): Usa il Seno dell'angolo. 
+         Questa è la velocità con cui la palla si "staccherà" da terra verso lo schermo.
+         */
         float thetaRad = MathHelper.ToRadians(_currentThetaDeg);
-
         float groundSpeed = v0 * MathF.Cos(thetaRad);
         _currentVerticalSpeed = v0 * MathF.Sin(thetaRad);
 
         Vector2 startSpeed = new Vector2(differenceX, differenceY) * groundSpeed;
 
+        /*
+         Per evitare che il proiettile compaia esattamente dentro o dietro il personaggio 
+         (rischiando di colpirlo istantaneamente o di sembrare brutto visivamente), 
+         calcola un punto di spawn spostato in avanti di MuzzleDistance (22 pixel) in direzione del mouse.
+         */
         Vector2 aimScreenDirection = mousePosition - muzzleBase;
         if (aimScreenDirection.LengthSquared() > 0.0001f)
             aimScreenDirection.Normalize();
         else
             aimScreenDirection = new Vector2(1f, 0f);
-
         Vector2 spawnPosition = muzzleBase + aimScreenDirection * MuzzleDistance;
 
+        //Generazione palla e invio info sul tiro
+        
         Ball b = new Ball(_gameContext, _tag, spawnPosition, startSpeed, _currentVerticalSpeed, tagBall, gravity);
         _gameContext.Components.Add(b);
 
