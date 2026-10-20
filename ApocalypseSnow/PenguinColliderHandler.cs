@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic; // Necessario per le Liste
 using Microsoft.Xna.Framework;
 
 namespace ApocalypseSnow;
@@ -15,69 +16,110 @@ public class PenguinColliderHandler
     private float timePuttingEgg = 0;
     private bool deleteEggBool = false;
 
+    // Variabile per memorizzare l'uovo con ID minore scelto
+    private string _lockedEggTag = null; 
+
     public PenguinColliderHandler(string myTag)
     {
         _tag = myTag;
         Console.WriteLine(_tag);
     }
 
-
     public void resetTakingTimer()
     {
         timeTakingEgg = 0;
+        _lockedEggTag = null; // Resetta l'uovo target
     }   
     
     public void resetPuttingTimer()
     {
         timePuttingEgg = 0;
     }  
-    
-    // In PenguinColliderHandler.cs
 
-
-    
-    public void HandleEggPickup(string eggTag, StateStruct stateStruct, 
-        float deltaTime, ref string myEgg)
+    // Metodo helper per trovare l'uovo con ID minore nella lista
+    private string GetLowestIdEgg(List<string> eggs)
     {
-        
-        // Il congelamento impedisce di iniziare o completare la raccolta.
-        if (isFrozen || stateStruct.IsPressed(StateList.Freezing))
-            return;
+        string lowestEgg = eggs[0];
+        int minId = int.Parse(lowestEgg.Replace("egg", ""));
 
-        // Il remoto raccoglie soltanto se WithEgg arriva dalla rete;
-        // il tempo di pressione di E non viene simulato sul client avversario.
+        for (int i = 1; i < eggs.Count; i++)
+        {
+            int currentId = int.Parse(eggs[i].Replace("egg", ""));
+            if (currentId < minId)
+            {
+                minId = currentId;
+                lowestEgg = eggs[i];
+            }
+        }
+        return lowestEgg;
+    }
+
+    // MODIFICATO: ora riceve la lista delle uova in collisione
+    public void HandleEggPickup(List<string> collidingEggs, StateStruct stateStruct, float deltaTime, ref string myEgg)
+    {
+        if (isFrozen || stateStruct.IsPressed(StateList.Freezing))
+        {
+            _lockedEggTag = null;
+            return;
+        }
+
+        // Il remoto raccoglie soltanto se WithEgg arriva dalla rete
         if (_tag.EndsWith("Red"))
         {
-            if (stateStruct.IsPressed(StateList.WithEgg) && myEgg == null)
+            if (stateStruct.IsPressed(StateList.WithEgg) && myEgg == null && collidingEggs.Count > 0)
             {
+                // Anche in remoto prende quello con ID minore
+                string targetEgg = GetLowestIdEgg(collidingEggs);
                 isWithEgg = true;
                 timeTakingEgg = 0;
-                myEgg = eggTag;
-                eggTakenEventFunction(eggTag);
+                myEgg = targetEgg;
+                eggTakenEventFunction(targetEgg);
             }
             return;
         }
 
-        // Il locale deve tenere premuto E per oltre un secondo.
+        // --- LA TUA LOGICA QUI ---
         if (stateStruct.IsPressed(StateList.TakingEgg) && !stateStruct.IsPressed(StateList.WithEgg))
         {
-            //Console.WriteLine("HandleEggPickup conteggio in corso");
-            //Console.WriteLine("HandleEggPickup conteggio in corso dt: "+deltaTime);
-            timeTakingEgg += deltaTime;
-            //Console.WriteLine("HandleEggPickup conteggio in corso tt: "+timeTakingEgg);
-            //Console.WriteLine(t);
-            if (timeTakingEgg > 1)
+            if (collidingEggs.Count > 0)
             {
-                //Console.WriteLine("HandleEggPickup uovo settato: "+eggTag);
-                isWithEgg = true;
-                timeTakingEgg = 0;
-                myEgg = eggTag;
-                Console.WriteLine(eggTag);
-                eggTakenEventFunction(eggTag);
+                // Appena premo il tasto, se non ho bloccato un uovo, prendo quello con ID minore dalla lista
+                if (_lockedEggTag == null)
+                {
+                    _lockedEggTag = GetLowestIdEgg(collidingEggs);
+                }
+
+                // Inizio il timer SOLO per l'uovo bloccato (e mi assicuro di esserci ancora in collisione)
+                if (collidingEggs.Contains(_lockedEggTag))
+                {
+                    timeTakingEgg += deltaTime;
+
+                    if (timeTakingEgg > 1)
+                    {
+                        isWithEgg = true;
+                        timeTakingEgg = 0;
+                        myEgg = _lockedEggTag;
+                        Console.WriteLine(_lockedEggTag);
+                        eggTakenEventFunction(_lockedEggTag);
+                        _lockedEggTag = null; // Finito, lo resetto
+                    }
+                }
+                else
+                {
+                    // Se esce dalla collisione con l'uovo bersaglio, resetta
+                    timeTakingEgg = 0;
+                    _lockedEggTag = null;
+                }
             }
         }
+        else
+        {
+            // Se rilascio il tasto prima, si resetta tutto
+            timeTakingEgg = 0;
+            _lockedEggTag = null;
+        }
     }
- 
+
     public void HandleHitByBall(ref string myEgg)
     {
         if (isWithEgg)
@@ -89,7 +131,10 @@ public class PenguinColliderHandler
         timePuttingEgg = 0;
         isWithEgg = false;
         myEgg = null;
+        _lockedEggTag = null; // Resetta l'uovo target
     }
+    
+    // ... RESTO DEL CODICE IDENTICO A PRIMA (IsEnemyBall, HandleEggDelivery, ecc.) ...
     
     public bool IsEnemyBall(string otherTag)
     {
@@ -106,7 +151,6 @@ public class PenguinColliderHandler
     
         // TRUCCO: Se abbiamo già fatto punto (deleteEggBool = true), 
         // forziamo il gioco a credere che il tasto sia ancora premuto per finire gli 0.2s!
-        //verificare se funziona anche senza.......
         if (deleteEggBool)
         {
             stateStruct.Current |= StateList.PuttingEgg;

@@ -1,21 +1,21 @@
 using System;
+using System.Collections.Generic; // Aggiunto per l'uso delle Liste
 using System.Linq;
 using Microsoft.Xna.Framework.Input;
-
-namespace ApocalypseSnow;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
+namespace ApocalypseSnow;
 
 public class Penguin : CollisionExtensions //, DrawableGameComponent
 {
     private readonly Game _gameContext;
     private readonly IMovements _movementsManager;
+    public readonly FreezeTimeline LocalFreeze = new();
     public PenguinColliderHandler _penguinColliderHandler;
     public PenguinShotHandler _penguinShotHandler;
     public PenguinInputHandler _penguinInputHandler;
 
-    //private Vector2 _speed;
     private float _deltaTime;
     private float _physicsDeltaTime;
 
@@ -26,20 +26,22 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
     private int _textureFractionHeight;
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
-    public string _myEgg=null;
+    public string _myEgg = null;
+
+    // --- NUOVA LISTA PER GESTIRE LE COLLISIONI MULTIPLE DELLE UOVA ---
+    private List<string> _collidingEggs = new List<string>();
 
 
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed,
-        IMovements movements, float physicsDeltaTime) : base(game, tag, startPosition)
+        IMovements movements, float physicsDeltaTime, uint ownerPlayerId) : base(game, tag, startPosition)
     {
         _gameContext = game;
         _movementsManager = movements;
         _shotStruct = new ShotStruct();
         _penguinColliderHandler = new PenguinColliderHandler(_tag);
-        _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag);
+        _penguinShotHandler = new PenguinShotHandler(_gameContext, _tag, ownerPlayerId);
         _penguinInputHandler = new PenguinInputHandler(_tag);
         _physicsDeltaTime = physicsDeltaTime;
-        
     }
     
 
@@ -66,14 +68,12 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y,
             _penguinInputHandler._animationManager.Texture.Width,
             _penguinInputHandler._animationManager.Texture.Height);
-        //CollisionManager.Instance.sendCollisionEvent += OnColliderEnter;
         base.LoadContent();
         _textureFractionWidth = _penguinInputHandler._animationManager.Texture.Width / 3;
         _textureFractionHeight = _penguinInputHandler._animationManager.Texture.Height / 3;
         _halfTextureFractionWidth = _textureFractionWidth / 2;
         _halfTextureFractionHeight = _textureFractionHeight / 2;
     }
-
 
 
     public void Draw(SpriteBatch spriteBatch)
@@ -89,37 +89,42 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         );
     }
 
-    public void HandleRemoteShot(Vector2 target, int charge, ShotType shotType)
+    public void HandleRemoteShot(Vector2 target, int charge, ShotType shotType, ShotKey shotKey)
     {
-        _penguinShotHandler.pressedTime = charge/1000f; //riportiamo charge in secondi
+        _penguinShotHandler.pressedTime = charge/1000f; 
 
         _penguinShotHandler.Shot(
             _penguinInputHandler._stateStruct,
             target,
             _position,
             _penguinInputHandler._animationManager._ballTag,
-            shotType
+            shotType,
+            shotKey
         );
     }
 
 
     protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
     {
-        //if (!collisionRecordOut.Involves(_tag)) return;
-        // string otherTag = collisionRecordOut.GetOtherTag(_tag);
-
         switch (otherTag)
         {
             case string t when t.StartsWith("egg"):
-                _penguinColliderHandler.HandleEggPickup(t, _penguinInputHandler._stateStruct,
-
-                    _deltaTime, ref _myEgg);
+                // Invece di gestire subito la raccolta, inseriamo l'uovo nella nostra lista
+                if (!_collidingEggs.Contains(t))
+                {
+                    _collidingEggs.Add(t);
+                }
                 break;
             case string t when _penguinColliderHandler.IsEnemyBall(t):
-                // Controlla se la palla esiste e se è "abbastanza bassa" per colpire
-                    _penguinColliderHandler.HandleHitByBall(ref _myEgg);
-                
-                
+                Ball ball = _gameContext.Components.OfType<Ball>().FirstOrDefault(b => b._tag == t);
+                if (ball != null && ball._currentHeight < 30f)
+                {
+                    uint hitTick = GameSession.LocalTick;
+                    ShotTrace.Log($"[SHOT_TRACE] role={(_tag.EndsWith("Red") ? "REMOTE_TARGET" : "LOCAL_TARGET")} event=PRED_HIT key={ball.ShotKey} tick={hitTick} startTick={ball.ObservedStartTick} flightTicks={hitTick - ball.ObservedStartTick} utc={DateTime.UtcNow:O}");
+                    LocalFreeze.Predict(ball.ShotKey, hitTick);
+                    ball.PredictPenguinImpact();
+                    _penguinColliderHandler.isFrozen = true;
+                }
                 break;
             case "blueP" or "redP":
                 _penguinColliderHandler.HandleEggDelivery(otherTag,
@@ -136,13 +141,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         _deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _accumulator += _deltaTime;
        
-
-        // - Il while serve quando c’è un frame lento (spike/lag/GC):
-        //   se dt è grande, _accumulator può contenere più di un passo fisico e dobbiamo
-        //   eseguire più tick nello stesso frame per “recuperare” e mantenere la fisica a 30 Hz.
-        //   Con un semplice if invece droppiamo tick (fisica rallenta sotto carico).
         if (_accumulator >= _physicsDeltaTime)
         {
+            _penguinColliderHandler.isFrozen = LocalFreeze.IsFrozen(GameSession.LastSentInputTick);
+
             _movementsManager.UpdateInput(
                 ref _penguinInputHandler._stateStruct,
                 _penguinColliderHandler.isFrozen,
@@ -152,9 +154,20 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
             _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
 
+
+            // --- ESEGUIAMO LA TUA LOGICA CON LA LISTA COMPLETA ---
+            _penguinColliderHandler.HandleEggPickup(_collidingEggs, _penguinInputHandler._stateStruct, _physicsDeltaTime, ref _myEgg);
+            
+            // Svuotiamo la lista. Verrà riempita di nuovo da OnCollisionEnter nel frame successivo
+            _collidingEggs.Clear();
+            // -----------------------------------------------------
+
+
             resetTakingTimer();
             resetPuttingTimer();
-            _penguinInputHandler.increaseTimeFreezing(_physicsDeltaTime, ref _penguinColliderHandler.isFrozen);
+
+            if (!_tag.EndsWith("Red"))
+                _penguinColliderHandler.putEgg(_penguinInputHandler._stateStruct, ref _myEgg);
 
             _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _physicsDeltaTime);
 
@@ -163,35 +176,25 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _physicsDeltaTime);
             }
 
-            // AGGIUNGI QUESTO:
             if (_tag.EndsWith("Red"))
-            {
-                
                 _penguinColliderHandler.SyncStateWithNetwork(_penguinInputHandler._stateStruct, ref _myEgg);
-            }
             
-            // pinguino locale, finestra attiva
             if (!_tag.EndsWith("Red") && _gameContext.IsActive)
             {
                 KeyboardState _newState = Keyboard.GetState();
 
-                //trucco
                 if (_newState.IsKeyDown(Keys.P))
                 {
                     _penguinInputHandler.getMotion(ref _position.X, 200f, _physicsDeltaTime);
                 }
                 
-                
                 Vector2 mousePosition = _movementsManager.GetMousePosition();
                 _shotStruct.mouseX = (int)mousePosition.X;
                 _shotStruct.mouseY = (int)mousePosition.Y;
 
-                //questo deve stare ancora qui?
                 _penguinShotHandler.Shot(_penguinInputHandler._stateStruct, mousePosition,
                     _position, _penguinInputHandler._animationManager._ballTag);
             }
-
-            //_networkManager.SendState(_movementsManager.State);------------------------------------------------------------------------------------
 
             int posCollX = (int)_position.X + _halfTextureFractionWidth;
             int posCollY = (int)_position.Y + _halfTextureFractionHeight;
@@ -207,14 +210,5 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             _penguinInputHandler._stateStruct.IsPressed(StateList.Reload),
             _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg)
         );
-
-
-
-
-
-        //_networkManager.SendState(_movementsManager.State);------------------------------------------------------------------------------------
-
-    
-}
-
+    }
 }
