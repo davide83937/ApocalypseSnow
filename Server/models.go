@@ -32,6 +32,10 @@ type Player struct {
 	// Ultimo seq ACKato al client (MsgAuthState)
 	LastSeqN uint32
 
+	// Congelamento sulla timeline esclusiva del server [start, end).
+	FreezeStartTick uint32
+	FreezeEndTick   uint32
+
 	// Mask effettivamente usata nello step (serve anche per RemoteState)
 	LastMask int32
 

@@ -450,3 +450,6 @@ Physics/cmake_install.cmake
 # ===============================
 # Go
 # ===============================
+
+# Temporary Go test executable
+Server/apocalypse-server-test.exe

@@ -18,7 +18,7 @@ public class MovementsManagerRed:IMovements
         if (NetworkManager.Instance != null)
         {
             // Ci iscriviamo all'evento per ricevere i dati remoti
-            NetworkManager.Instance.OnRemoteReceived += HandleRemoteState;
+            NetworkManager.Instance.OnRemoteStateReceived += HandleRemoteState;
         }
     }
     private void HandleRemoteState(float x, float y, int mask)
@@ -37,12 +37,15 @@ public class MovementsManagerRed:IMovements
         // 1. Spostiamo lo stato attuale in quello vecchio
         inputList.Update();
 
-        // 2. Applichiamo la maschera di bit che il server ci ha inviato dietro le quinte
-        inputList.Current = _remoteState;
+        // Il server decide l'HIT; il tick di freeze visualizzato dal remoto
+        // si ricostruisce sulla timeline locale, senza copiare il suo bit Freezing.
+        inputList.Current = _remoteState & ~StateList.Freezing;
+        if (isFreezing)
+            inputList.Current |= StateList.Freezing;
 
-        // 3. Forziamo gli stati di gioco locali
-        //if (isWithEgg) inputList.Current |= StateList.WithEgg;
-        //if (isFreezing) inputList.Current |= StateList.Freezing;
-        //inputList.Old = inputList.Current;
+        if (inputList.IsPressed(StateList.Freezing))
+            inputList.Current &= ~(StateList.Moving | StateList.Up | StateList.Down |
+                                   StateList.Left | StateList.Right | StateList.ShootLeft |
+                                   StateList.ShootRight);
     }
 }

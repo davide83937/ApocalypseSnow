@@ -12,9 +12,9 @@ import "C"
 import "unsafe"
 
 const (
-	collisionTagPenguin    = "penguin"
-	collisionTagPenguinRed = "penguinRed"
-	collisionTagObstacle   = "obstacle"
+	collisionTagPenguin1 = "penguin1"
+	collisionTagPenguin2 = "penguin2"
+	collisionTagObstacle = "obstacle"
 
 	// Replica server-side della geometria usata dal client.
 	// Riferimenti:
@@ -118,41 +118,84 @@ func (cm *CollisionManager) Results() []CollisionRecordOut {
 
 func playerCollisionTag(playerID uint32) string {
 	if playerID == 2 {
-		return collisionTagPenguinRed
+		return collisionTagPenguin2
 	}
-	return collisionTagPenguin
+	return collisionTagPenguin1
 }
 
+// Replica della logica del client CollisionManager.wouldCollide():
+// modifica temporaneamente il collider del player, esegue il test,
+// poi ripristina lo stato originale del manager.
 func (cm *CollisionManager) CheckPlayerCollisionAt(playerTag string, x, y float32, obstacles []Position) bool {
-	cm.collisionRecordIns = cm.collisionRecordIns[:0]
+	index := -1
+	var original CollisionRecordIn
 
-	// Replica 1:1 della costruzione del collider del client in Penguin.Update().
+	for i := range cm.collisionRecordIns {
+		if cm.collisionRecordIns[i].Tag == playerTag {
+			index = i
+			original = cm.collisionRecordIns[i]
+			break
+		}
+	}
+
 	posCollX := x + penguinHalfTextureFractionWidth
 	posCollY := y + penguinHalfTextureFractionHeight
-	cm.AddObject(playerTag, posCollX, posCollY, penguinTextureFractionWidth, penguinHalfTextureFractionHeight)
 
-	// Replica 1:1 della costruzione del collider del client in Obstacle.LoadContent().
-	for _, obs := range obstacles {
-		posCollX := obs.X + obstacleHalfTextureFractionWidth
-		posCollY := obs.Y + obstacleHalfTextureFractionHeight
-		cm.AddObject(
-			collisionTagObstacle,
+	if index != -1 {
+		cm.ModifyObject(
+			playerTag,
 			posCollX,
-			posCollY+obstacleColliderYOffset,
-			obstacleHalfTextureFractionWidth+obstacleColliderExtraWidth,
-			obstacleHalfTextureFractionHeight,
+			posCollY,
+			penguinTextureFractionWidth,
+			penguinHalfTextureFractionHeight,
+		)
+	} else {
+		cm.AddObject(
+			playerTag,
+			posCollX,
+			posCollY,
+			penguinTextureFractionWidth,
+			penguinHalfTextureFractionHeight,
 		)
 	}
 
 	cm.SendToCpp()
 
+	collided := false
+
 	for _, result := range cm.collisionRecordOuts {
-		if result.Type != 0 && (result.MyTag == playerTag || result.OtherTag == playerTag) {
-			return true
+		if result.Type <= 0 {
+			continue
+		}
+
+		if result.MyTag != playerTag && result.OtherTag != playerTag {
+			continue
+		}
+
+		otherTag := result.OtherTag
+		if result.OtherTag == playerTag {
+			otherTag = result.MyTag
+		}
+
+		if otherTag == collisionTagObstacle || isObstacleTag(otherTag) {
+			collided = true
+			break
 		}
 	}
 
-	return false
+	if index != -1 {
+		cm.ModifyObject(
+			playerTag,
+			original.X,
+			original.Y,
+			original.Width,
+			original.Height,
+		)
+	} else {
+		cm.RemoveObject(playerTag)
+	}
+
+	return collided
 }
 
 func writeCollisionTag(dst *C.char, tag string) {

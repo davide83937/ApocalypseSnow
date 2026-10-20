@@ -4,13 +4,18 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"time"
 )
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	listener, listenError := net.Listen("tcp", ListenAddr)
+	listenAddr := os.Getenv("APOCALYPSE_SERVER_LISTEN_ADDR")
+	if listenAddr == "" {
+		listenAddr = ListenAddr
+	}
+	listener, listenError := net.Listen("tcp", listenAddr)
 	if listenError != nil {
 		log.Fatal(listenError)
 	}
@@ -20,7 +25,7 @@ func main() {
 	go matchmaker.Run()
 
 	log.Println("New Version!")
-	log.Println("Server listening on", ListenAddr)
+	log.Println("Server listening on", listenAddr)
 
 	for {
 		networkConnection, acceptError := listener.Accept()

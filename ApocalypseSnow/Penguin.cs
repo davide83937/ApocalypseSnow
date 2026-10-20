@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using Microsoft.Xna.Framework.Input;
 
@@ -112,11 +112,14 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         {
             case string t when t.StartsWith("egg"):
                 _penguinColliderHandler.HandleEggPickup(t, _penguinInputHandler._stateStruct,
+
                     _deltaTime, ref _myEgg);
                 break;
             case string t when _penguinColliderHandler.IsEnemyBall(t):
                 // Controlla se la palla esiste e se è "abbastanza bassa" per colpire
                     _penguinColliderHandler.HandleHitByBall(ref _myEgg);
+                
+                
                 break;
             case "blueP" or "redP":
                 _penguinColliderHandler.HandleEggDelivery(otherTag,

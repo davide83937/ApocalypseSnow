@@ -41,7 +41,11 @@ public class AnimationManager
 
     private void ChangeTexture(SpriteBatch spriteBatch, int ammo, bool isReloading, bool isShooting, bool isFreezing,bool isWithEgg, ref Vector2 position)
     {
-        if (ammo == 0 &&  !isReloading && !isShooting)
+        if (isFreezing)
+        {
+            Texture = _textures[4];
+        }
+        else if (ammo == 0 &&  !isReloading && !isShooting)
         {
             Texture = _textures[0];
         }
@@ -52,10 +56,6 @@ public class AnimationManager
         else if(!isReloading && isShooting)
         {
             Texture = _textures[3];
-        }
-        else if(isFreezing)
-        {
-            Texture = _textures[4];
         }
         else if(isWithEgg)
         {

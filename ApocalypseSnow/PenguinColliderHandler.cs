@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Xna.Framework;
 
 namespace ApocalypseSnow;
@@ -40,22 +40,25 @@ public class PenguinColliderHandler
         float deltaTime, ref string myEgg)
     {
         
-        // NOVITÀ: Se è il pinguino remoto e il server dice che ha l'uovo, 
-        // completiamo la raccolta immediatamente senza aspettare il timer locale.
-        //if (_tag.EndsWith("Red") && stateStruct.IsPressed(StateList.WithEgg)&& myEgg == null)
-        if (_tag.EndsWith("Red") && 
-            stateStruct.IsPressed(StateList.WithEgg) && 
-            !stateStruct.IsPressed(StateList.TakingEgg) && // AGGIUNGI QUESTO: Non raccogliere se sta premendo per posare
-            myEgg == null)
-        {
-            isWithEgg = true;
-            timeTakingEgg = 0;
-            myEgg = eggTag;
-            eggTakenEventFunction(eggTag);
+        // Il congelamento impedisce di iniziare o completare la raccolta.
+        if (isFrozen || stateStruct.IsPressed(StateList.Freezing))
             return;
-        } 
-        
-        //Console.WriteLine("HandleEggPickup scatenato");
+
+        // Il remoto raccoglie soltanto se WithEgg arriva dalla rete;
+        // il tempo di pressione di E non viene simulato sul client avversario.
+        if (_tag.EndsWith("Red"))
+        {
+            if (stateStruct.IsPressed(StateList.WithEgg) && myEgg == null)
+            {
+                isWithEgg = true;
+                timeTakingEgg = 0;
+                myEgg = eggTag;
+                eggTakenEventFunction(eggTag);
+            }
+            return;
+        }
+
+        // Il locale deve tenere premuto E per oltre un secondo.
         if (stateStruct.IsPressed(StateList.TakingEgg) && !stateStruct.IsPressed(StateList.WithEgg))
         {
             //Console.WriteLine("HandleEggPickup conteggio in corso");
@@ -143,13 +146,14 @@ public class PenguinColliderHandler
         // ma localmente risultiamo ancora "WithEgg", forziamo il reset immediato.
         if (_tag.EndsWith("Red") && !stateStruct.IsPressed(StateList.WithEgg) && isWithEgg)
         {
-            Console.WriteLine($"Uovo {myEgg} fa punto");
+            // Notificare PRIMA di cancellare il tag: EggsEvent.addEgg
+            // usa ancora il riferimento all'uovo trasportato.
+            eggPutEvent?.Invoke(this, EventArgs.Empty);
+
             isWithEgg = false;
             myEgg = null;
             timePuttingEgg = 0;
             timeTakingEgg = 0;
-            // Scatena l'uovo a terra o lo fa sparire se è stato consegnato
-            eggPutEvent?.Invoke(this, EventArgs.Empty);
         }
     }
     

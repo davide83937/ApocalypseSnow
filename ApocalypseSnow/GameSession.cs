@@ -1,52 +1,52 @@
-﻿using System;
+using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Linq;
 using Microsoft.Xna.Framework;
 
 namespace ApocalypseSnow;
 
-public record struct JoinSnapshot(uint PlayerId, Vector2 SpawnPos);
-//public record struct AuthSnapshot(uint Ack, Vector2 Position);
-public record struct RemoteSnapshot(Vector2 Position, StateList Mask);
-
+/// Gestisce il ciclo di vita di una partita.
+/// Connessione al server, creazione degli oggetti di gioco,
+/// comunicazione client-server e riconciliazione dello stato.
 public sealed class GameSession : GameComponent
 {
     private NetworkManager networkManager;
+    // task di rete che consegna l'esito del JOIN al thread principale di MonoGame.
+    private readonly ConcurrentQueue<(JoinAckStruct Ack, string Error)> _joinResults = new();
     public Penguin _myPenguin;
     public Penguin _redPenguin;
-    private Obstacle _obstacle;
-    //private Obstacle _obstacle1;
     private BasePlatform _bluePlatform;
     private BasePlatform _redPlatform;
     public float NetDt = 0;
     public EggsEvent _eggsEvent;
     public Events _events;
-    private Game _game;
     public string state = null;
 
     //copia del tick locale, che incrementiamo ad ogni update, e del tick accumulato, che invece incrementiamo con il delta time
     //e usiamo per capire quando è ora di fare un nuovo tick di gioco (e quindi inviare un nuovo input al server)
     public static uint LocalTick { get; private set; } = 0;
-    // Questo accumulatore ci serve per gestire il tick rate del gioco, che è indipendente dal frame rate. stessa logica del pinguino, per ora la metto qui
+    public static uint TickRateHz { get; private set; } = 30;
+    // Questo accumulatore ci serve per gestire il tick rate del gioco, che è indipendente dal frame rate.
     private float _tickAcc = 0f;
-    
+
+    // LocalTick e' la prossima sequenza da inviare; il movimento usa quella appena inviata.
+    public static uint LastSentInputTick => LocalTick == 0 ? 0 : LocalTick - 1;
 
     public GameSession(Game game) : base(game)
     {
-        _game = game;
-     
-        //networkManager = new NetworkManager(this, "192.168.1.27", 8080);
-        //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
-        //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
-        //networkManager = new NetworkManager(this, "18.192.31.30", 11179);
+        //richiamiamo il costruttore della classe padre GameComponent, passando l'oggetto Game come parametro.
+        //GameSession estende GameComponent, quindi eredita le funzionalità di base per essere un componente del gioco.
+        //Gamesession quindi eredita la proprietà Game, che rappresenta l'istanza del gioco a cui il componente appartiene.
     }
 
     public override void Initialize()
     {
-        networkManager = new NetworkManager(_game, "127.0.0.1", 8080);
-        //networkManager = new NetworkManager(this, "192.168.1.27", 8080);
-        //networkManager = new NetworkManager(this, "7.tcp.eu.ngrok.io", 13297);
-        //networkManager = new NetworkManager(this, "3.125.188.168", 13297);
-        //networkManager = new NetworkManager(this, "18.192.31.30", 11179);
+        string host = Environment.GetEnvironmentVariable("APOCALYPSE_SERVER_HOST") ?? "127.0.0.1";
+        int port = int.TryParse(Environment.GetEnvironmentVariable("APOCALYPSE_SERVER_PORT"), out int configuredPort)
+                   && configuredPort is > 0 and <= 65535 ? configuredPort : 8080;
+        networkManager = new NetworkManager(Game, host, port);
+        Console.WriteLine($"[NETWORK_TEST] connecting to {host}:{port}");
         state = "IN ATTESA DI UN AVVERSARIO...";
  
         System.Threading.Tasks.Task.Run(() =>
@@ -55,23 +55,18 @@ public sealed class GameSession : GameComponent
             {
                 string playerName = "Davide";
                 JoinStruct joinStruct = new JoinStruct(playerName);
-                NetworkManager.Instance.SendJoin(joinStruct);
-                
-                // Questa riga BLOCCHEREBBE il gioco, ma qui è dentro un Task, 
-                // quindi la finestra di gioco continua a girare!
-                JoinAckStruct ack = NetworkManager.Instance.WaitForJoinAck();
-                
-                // Una volta ricevuto l'ACK, creiamo i pinguini e gli oggetti
-                // Usiamo un metodo di supporto
-                StartMatch(ack);
-                
-                // Togliamo il messaggio di attesa
-                state = null;
+                networkManager.SendJoin(joinStruct);
+
+                // L'attesa bloccante resta sul thread secondario.
+                JoinAckStruct ack = networkManager.WaitForJoinAck();
+
+                // L'avvio della partita avverrà in Update, sul thread principale.
+                _joinResults.Enqueue((ack, null));
             }
             catch (Exception ex)
             {
-                state = "Errore di connessione!";
-                Console.WriteLine(ex.Message);
+                // Anche gli errori vengono comunicati al thread principale.
+                _joinResults.Enqueue((default, ex.Message));
             }
         });
         
@@ -80,79 +75,109 @@ public sealed class GameSession : GameComponent
 
     private void StartMatch(JoinAckStruct ack)
     {
-        IMovements movements = new MovementsManager(_game);
+        IMovements movements = new MovementsManager(Game);
         IMovements movementsRed = new MovementsManagerRed();
         string bluePathPlatform = "Content/images/green_logo.png";
         string redPathPlatform = "Content/images/red_logo.png";
 
         //aggiunti questi due per tenere traccia del tick del server e del client, utili per la reconciler
-        LocalTick = 0;
+        LocalTick = 1; // Il server inizializza LastSeqN=0: la prima sequenza valida è 1.
+        TickRateHz = ack.Heartz;
         _tickAcc = 0f;
         Reconciler.Instance.Reset();
         //Reconciler.Instance.SetNextSeq(1);
 
         NetDt = 1f / (float)ack.Heartz;
 
-        _bluePlatform = new BasePlatform(_game, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
-        _redPlatform =  new BasePlatform(_game, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
-        _myPenguin = new Penguin(_game,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt);
-        _redPenguin = new Penguin(_game,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt);
-        //_obstacle = new Obstacle(_game, new Vector2(100, 100));
-        _eggsEvent = new EggsEvent(_game, _myPenguin, _redPenguin);
-        _events = new Events(_game, _redPenguin);
+        _bluePlatform = new BasePlatform(Game, new Vector2(ack.SpawnX, ack.SpawnY), "blueP", bluePathPlatform);
+        _redPlatform =  new BasePlatform(Game, new Vector2(ack.OpponentSpawnX, ack.OpponentSpawnY), "redP", redPathPlatform);
+        _myPenguin = new Penguin(Game,"penguin", _bluePlatform._position, Vector2.Zero, movements, NetDt, ack.PlayerId);
+        _redPenguin = new Penguin(Game,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt, ack.PlayerId == 1 ? 2u : 1u);
 
-        // AGGIUNTA AI COMPONENTI
-        // Nota: MonoGame è solitamente thread-safe per Components.Add, 
-        // ma è buona norma farlo qui appena ricevuti i dati.
-        _game.Components.Add(_myPenguin);
-        _game.Components.Add(_redPenguin);
-        _game.Components.Add(_bluePlatform);
-        _game.Components.Add(_redPlatform);
-        //_game.Components.Add(_obstacle);
-        _game.Components.Add(_eggsEvent);
-        _game.Components.Add(_events);
+        _eggsEvent = new EggsEvent(Game, _myPenguin, _redPenguin);
+        _events = new Events(Game, _redPenguin);
+        Reconciler.Instance.AttachMatchContext(ack.PlayerId, _myPenguin, _redPenguin, _events);
+
+        // StartMatch viene eseguito da Update: registriamo i componenti sul thread principale.
+        Game.Components.Add(_myPenguin);
+        Game.Components.Add(_redPenguin);
+        Game.Components.Add(_bluePlatform);
+        Game.Components.Add(_redPlatform);
+
+        Game.Components.Add(_eggsEvent);
+        Game.Components.Add(_events);
     }
     
     public void EndSession()
     {
         // 1. Rimuovi tutti i componenti che la sessione ha aggiunto al gioco
+        // Le palle non confermate vanno rimosse anche quando si esce dal match.
+        foreach (Ball ball in Game.Components.OfType<Ball>().ToArray())
+        {
+            CollisionManager.Instance.removeObject(ball._tag);
+            Game.Components.Remove(ball);
+            ball.Dispose();
+        }
         CollisionManager.Instance.ClearAll();
         Reconciler.Instance.Reset();
         
         if (_eggsEvent != null)
         {
             _eggsEvent.RemoveAllEggs();
-            _game.Components.Remove(_eggsEvent);
+            Game.Components.Remove(_eggsEvent);
         }
-        _game.Components.Remove(_myPenguin);
-        _game.Components.Remove(_redPenguin);
-        _game.Components.Remove(_bluePlatform);
-        _game.Components.Remove(_redPlatform);
-        _game.Components.Remove(_obstacle);
-        _game.Components.Remove(_eggsEvent);
-        _game.Components.Remove(_events);
+        Game.Components.Remove(_myPenguin);
+        Game.Components.Remove(_redPenguin);
+        Game.Components.Remove(_bluePlatform);
+        Game.Components.Remove(_redPlatform);
+        Game.Components.Remove(_eggsEvent);
+        Game.Components.Remove(_events);
 
         // 2. Rimuovi la sessione stessa dai componenti del gioco
-        _game.Components.Remove(this);
+        Game.Components.Remove(this);
 
         // 3. Chiudi la connessione di rete (fondamentale!)
         // Se il tuo NetworkManager ha un metodo Close o Dispose, chiamalo qui
         // Altrimenti, assicurati che il socket venga rilasciato.
-        NetworkManager.Instance.Disconnect(); 
+        networkManager?.Disconnect();
 
         Console.WriteLine("Partita terminata e risorse pulite.");
     }
     
     public override void Update(GameTime gameTime)
     {
-        // ✅ ricevi SEMPRE
+        // L'ACK viene prodotto dal task di rete e consumato sul thread principale.
+        if (_joinResults.TryDequeue(out var result))
+        {
+            if (result.Error != null)
+            {
+                state = "Errore di connessione!";
+                Console.WriteLine(result.Error);
+            }
+            else
+            {
+                try
+                {
+                    StartMatch(result.Ack);
+                    state = null;
+                }
+                catch (Exception ex)
+                {
+                    state = "Errore di avvio partita!";
+                    Console.WriteLine(ex);
+                }
+            }
+        }
 
-
-        // se non è iniziato il match, stop qui
+        // Se il match non è iniziato, non eseguire la simulazione.
         if (state != null || _myPenguin == null || _events == null)
             return;
         
         NetworkManager.Instance?.Receive();
+
+        Reconciler.Instance.ProcessAuthoritativeUpdates(LocalTick);
+        Reconciler.Instance.ApplyScheduledHitEffects(LocalTick);
+
         // ✅ tick fisso (stesso dt della sim di rete)
         _tickAcc += (float)gameTime.ElapsedGameTime.TotalSeconds;
         while (_tickAcc >= NetDt)
@@ -161,36 +186,45 @@ public sealed class GameSession : GameComponent
             Debug.WriteLine($"LocalTick++: {LocalTick}");
 
             var st = _myPenguin._penguinInputHandler._stateStruct;
+            if (_myPenguin.LocalFreeze.IsFrozen(LocalTick))
+            {
+                st.Current |= StateList.Freezing;
+                st.Current &= ~(StateList.Up | StateList.Down | StateList.Left | StateList.Right |
+                                StateList.Moving | StateList.ShootLeft | StateList.ShootRight |
+                                StateList.Reload | StateList.TakingEgg | StateList.PuttingEgg);
+            }
+            else
+                st.Current &= ~StateList.Freezing;
 
-            // 2) pulisci SOLO UDLR per il replay
-            StateList moveMask = st.Current & (StateList.Up | StateList.Down | StateList.Left | StateList.Right);
+            // 2) Conserva anche gli stati che bloccano il movimento per il replay.
+            StateList moveMask = st.Current & (
+                StateList.Up | StateList.Down | StateList.Left | StateList.Right |
+                StateList.Reload | StateList.Freezing | StateList.TakingEgg | StateList.PuttingEgg);
 
             // 3) record + send usando QUESTO tick
-            Reconciler.Instance.Record(LocalTick, moveMask);
+            Reconciler.Instance.RecordInputForReplay(LocalTick, moveMask);
             NetworkManager.Instance.SendState(st, LocalTick);
             LocalTick++;
         }
 
         //SUPER NOTA: dentro il while siamo a 30 HZ, fuori dal while ma dentro questo Update siamo a 60 FPS
 
+        Reconciler.Instance.ApplyScheduledHitEffects(LocalTick);
+
         // Solo ora chiami GetLatest per prendere l'ultimo stato arrivato dal server
-        Reconciler.Instance.GetLatest(_events._authQueue, auth =>
-        {
-            Reconciler.Instance.OnServerAuth(auth.Ack, auth.Position);
-            Reconciler.Instance.Apply(
-                ref _myPenguin._position,
-                200f,
-                NetDt,
-                candidatePos => CollisionManager.Instance.wouldCollide(
-                    "penguin",
-                    candidatePos.X + 48f,
-                    candidatePos.Y + 64f,
-                    96,
-                    64,
-                    "obstacle"
-                )
-            );
-        });
+        Reconciler.Instance.ReconcileLocalPosition(
+            ref _myPenguin._position,
+            200f,
+            NetDt,
+            candidatePos => CollisionManager.Instance.wouldCollide(
+                "penguin",
+                candidatePos.X + 48f,
+                candidatePos.Y + 64f,
+                96,
+                64,
+                "obstacle"
+            )
+        );
 
 
         

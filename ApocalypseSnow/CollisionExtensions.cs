@@ -34,6 +34,14 @@ public abstract class CollisionExtensions : DrawableGameComponent
         OnCollisionEnter(otherTag, record);
     }
 
+    // Una palla rimossa non deve restare iscritta alle collisioni (o resta viva in memoria).
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+            CollisionManager.Instance.sendCollisionEvent -= BaseOnColliderEnter;
+        base.Dispose(disposing);
+    }
+
     // Metodo che ogni classe figlia dovrà implementare
     protected abstract void OnCollisionEnter(string otherTag, CollisionRecordOut record);
 }

@@ -10,23 +10,41 @@ public class Events:GameComponent
     Penguin _myPenguin;
     Penguin _redPenguin;
     List<Obstacle> _obstacles;
-    public record struct AuthSnapshot(uint Ack, Vector2 Position);
-    public readonly ConcurrentQueue<AuthSnapshot> _authQueue = new();
+    public record struct AuthPositionSnapshot(uint Ack, Vector2 Position);
+    public readonly ConcurrentQueue<AuthPositionSnapshot> _authPositionQueue = new();
+    // Final server outcomes, indexed by the same key used by Ball.
+    private readonly Dictionary<ShotKey, ShotResolutionMessage> _shotResolutions = new();
+    public IReadOnlyDictionary<ShotKey, ShotResolutionMessage> ShotResolutions => _shotResolutions;
+    public readonly Queue<ShotResolutionMessage> PendingShotResolutions = new();
+    private readonly Dictionary<ShotKey, uint> _remoteShotStartTicks = new();
+
+    public bool TryTakeRemoteShotStart(ShotKey key, out uint startTick)
+    {
+        if (_remoteShotStartTicks.TryGetValue(key, out startTick))
+        {
+            _remoteShotStartTicks.Remove(key);
+            return true;
+        }
+        return false;
+    }
+    public Vector2 LatestRemotePosition { get; private set; }
+    public bool HasRemotePosition { get; private set; }
     
     public Events(Game game, Penguin redPenguin) : base(game)
     {
         _redPenguin = redPenguin;
         _obstacles = new List<Obstacle>();
-        NetworkManager.Instance.OnAuthReceived += HandleServerReconciliation;
-        NetworkManager.Instance.OnRemoteReceived += HandleRedPosition;
+        NetworkManager.Instance.OnAuthStateReceived += HandleServerReconciliation;
+        NetworkManager.Instance.OnRemoteStateReceived += HandleRedState;
         NetworkManager.Instance.OnRemoteShotReceived += HandleRemoteShot;
+        NetworkManager.Instance.OnShotResolvedReceived += HandleShotResolved;
         NetworkManager.Instance.OnObstacleReceived += HandleSpawnObstacles;
     }
     
     private void HandleServerReconciliation(uint ackSeq, float x, float y)
     {
         Vector2 position = new Vector2(x, y);
-        _authQueue.Enqueue(new AuthSnapshot(ackSeq, position));
+        _authPositionQueue.Enqueue(new AuthPositionSnapshot(ackSeq, position));
     }
 
     private void HandleSpawnObstacles(float x, float y)
@@ -38,18 +56,31 @@ public class Events:GameComponent
         Game.Components.Add(obstacle);
     }
     
-    private void HandleRedPosition(float x, float y, int mask)
+    private void HandleRedState(float x, float y, int mask)
     {
-        _redPenguin._position.X = x;
-        _redPenguin._position.Y = y;
-        //_redPenguin._penguinInputHandler._stateStruct.Current = (StateList)mask;
+        LatestRemotePosition = new Vector2(x, y);
+        HasRemotePosition = true;
+
+        // Evita di anticipare il freeze remoto usando snapshot del server:
+        // il suo impatto viene ricostruito sulla timeline di questo client.
+        bool localFreeze = _redPenguin.LocalFreeze.IsFrozen(GameSession.LocalTick);
+        if (!localFreeze)
+            _redPenguin._position = LatestRemotePosition;
     }
     
-    private void HandleRemoteShot(float mx, float my, int charge, ShotType shotType)
+    // Accoda ogni esito autoritativo per applicarlo nel GameSession.
+    private void HandleShotResolved(ShotResolutionMessage resolution)
     {
-        //charge = 30000;
-        Vector2 target = new Vector2(mx, my);
-        _redPenguin.HandleRemoteShot(target,charge,shotType);
+        if (_shotResolutions.TryAdd(resolution.Key, resolution))
+            PendingShotResolutions.Enqueue(resolution);
+    }
+
+    // Crea la palla remota usando i dati del server.
+    private void HandleRemoteShot(RemoteShotMessage shot)
+    {
+        Vector2 target = new Vector2(shot.TargetX, shot.TargetY);
+        _remoteShotStartTicks[shot.Key] = GameSession.LocalTick;
+        _redPenguin.HandleRemoteShot(target, shot.Charge, shot.Type, shot.Key);
         _redPenguin._myEgg = null;
     }
 }
