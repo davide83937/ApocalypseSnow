@@ -37,11 +37,9 @@ public class MovementsManagerRed:IMovements
         // 1. Spostiamo lo stato attuale in quello vecchio
         inputList.Update();
 
-        // 2. Applichiamo la maschera di bit che il server ci ha inviato dietro le quinte
-        inputList.Current = _remoteState;
-
-        // Preserva i bit autoritativi del server; la prediction locale puo' soltanto
-        // aggiungere un blocco temporaneo finche' non arriva la risoluzione.
+        // Il server decide l'HIT; il tick di freeze visualizzato dal remoto
+        // si ricostruisce sulla timeline locale, senza copiare il suo bit Freezing.
+        inputList.Current = _remoteState & ~StateList.Freezing;
         if (isFreezing)
             inputList.Current |= StateList.Freezing;
 

@@ -61,10 +61,10 @@ public class Events:GameComponent
         LatestRemotePosition = new Vector2(x, y);
         HasRemotePosition = true;
 
-        // Durante un HIT predetto non sovrascrive il remoto con stati ancora non congelati.
-        bool predictedFreeze = _redPenguin.LocalFreeze.IsFrozen(GameSession.LocalTick);
-        bool serverFreezing = (((StateList)mask & StateList.Freezing) != StateList.None);
-        if (!predictedFreeze || serverFreezing)
+        // Evita di anticipare il freeze remoto usando snapshot del server:
+        // il suo impatto viene ricostruito sulla timeline di questo client.
+        bool localFreeze = _redPenguin.LocalFreeze.IsFrozen(GameSession.LocalTick);
+        if (!localFreeze)
             _redPenguin._position = LatestRemotePosition;
     }
     

@@ -127,6 +127,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                     uint hitTick = GameSession.LocalTick;
                     ShotTrace.Log($"[SHOT_TRACE] role={(_tag.EndsWith("Red") ? "REMOTE_TARGET" : "LOCAL_TARGET")} event=PRED_HIT key={ball.ShotKey} tick={hitTick} startTick={ball.ObservedStartTick} flightTicks={hitTick - ball.ObservedStartTick} utc={DateTime.UtcNow:O}");
                     LocalFreeze.Predict(ball.ShotKey, hitTick);
+                    ball.PredictPenguinImpact();
                     _penguinColliderHandler.isFrozen = true;
                 }
                 break;
@@ -152,7 +153,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         //   Con un semplice if invece droppiamo tick (fisica rallenta sotto carico).
         if (_accumulator >= _physicsDeltaTime)
         {
-            _penguinColliderHandler.isFrozen = LocalFreeze.IsFrozen(GameSession.LocalTick);
+            _penguinColliderHandler.isFrozen = LocalFreeze.IsFrozen(GameSession.LastSentInputTick);
 
             _movementsManager.UpdateInput(
                 ref _penguinInputHandler._stateStruct,
@@ -165,6 +166,12 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
             resetTakingTimer();
             resetPuttingTimer();
+
+            // Il pinguino locale posa l'uovo quando preme E mentre lo trasporta.
+            // Il remoto si sincronizza invece con lo stato inviato dal server.
+            if (!_tag.EndsWith("Red"))
+                _penguinColliderHandler.putEgg(_penguinInputHandler._stateStruct, ref _myEgg);
+
             _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _physicsDeltaTime);
 
             if (!_tag.EndsWith("Red") && _gameContext.IsActive)
@@ -172,12 +179,9 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _physicsDeltaTime);
             }
 
-            // AGGIUNGI QUESTO:
+            // Il pinguino remoto aggiorna l'uovo quando cambia il bit WithEgg del server.
             if (_tag.EndsWith("Red"))
-            {
-                
                 _penguinColliderHandler.SyncStateWithNetwork(_penguinInputHandler._stateStruct, ref _myEgg);
-            }
             
             // pinguino locale, finestra attiva
             if (!_tag.EndsWith("Red") && _gameContext.IsActive)

@@ -20,8 +20,12 @@ const (
 	shotMuzzleDistance                 = 22.0
 	shotColliderDisableHeightThreshold = 30.0
 
-	shotColliderWidth  int32 = 24
-	shotColliderHeight int32 = 24
+	shotColliderWidth  int32 = 20
+	shotColliderHeight int32 = 25
+
+	// Dimensioni logiche condivise con ApocalypseSnow/GameWorld.cs.
+	gameWorldWidth  float32 = 800
+	gameWorldHeight float32 = 480
 )
 
 // GameRoom rappresenta una partita 1v1 lato server.
@@ -63,6 +67,11 @@ func normalize2D(x, y float32) (float32, float32) {
 	}
 	invLen := float32(1.0 / math.Sqrt(float64(lenSq)))
 	return x * invLen, y * invLen
+}
+
+// Stessa tolleranza in tick del client C#: evita +1 tick per rumore float.
+func shotLandingTicks(durationSeconds float32, hz uint32) uint32 {
+	return uint32(math.Ceil(float64(durationSeconds)*float64(hz) - 0.0001))
 }
 
 func shotCollisionTag(shotID uint32) string {
@@ -261,6 +270,15 @@ func (gameRoom *GameRoom) Tick() {
 	gameRoom.collisionManager.SendToCpp()
 	gameRoom.resolveCollisionResults()
 
+	// Lo stato remoto riflette il freeze server anche senza nuovi input.
+	for _, player := range []*Player{&gameRoom.firstPlayer, &gameRoom.secondPlayer} {
+		if gameRoom.isServerFrozen(player) {
+			player.LastMask |= Freezing
+		} else {
+			player.LastMask &^= Freezing
+		}
+	}
+
 	// Broadcast stato
 	gameRoom.sendAuthStateToPlayer(gameRoom.firstPlayerConnection, gameRoom.firstPlayer)
 	gameRoom.sendRemoteStateToPlayer(gameRoom.firstPlayerConnection, gameRoom.secondPlayer)
@@ -383,6 +401,10 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 }
 
 // applyMaturePendingEvents applica tutti gli eventi con seq <= matchTick.
+func (gameRoom *GameRoom) isServerFrozen(player *Player) bool {
+	return gameRoom.matchTick >= player.FreezeStartTick && gameRoom.matchTick < player.FreezeEndTick
+}
+
 func (gameRoom *GameRoom) applyMaturePendingEvents(
 	player *Player,
 	pending *[]PlayerEvent,
@@ -408,7 +430,7 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 			}
 
 			effectiveMask := inputState.Mask &^ Freezing
-			if inputState.SeqN <= player.FreezeEndSeq {
+			if gameRoom.isServerFrozen(player) {
 				effectiveMask |= Freezing
 				effectiveMask &^= ShootLeft | ShootRight
 			}
@@ -468,7 +490,7 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 
 		case EventShot:
 			shotEvent := event.Shot
-			if shotEvent.SeqN <= player.FreezeEndSeq {
+			if gameRoom.isServerFrozen(player) {
 				consumeCount++
 				continue
 			}
@@ -537,9 +559,9 @@ func (gameRoom *GameRoom) updatePlayerColliders() {
 func (gameRoom *GameRoom) computeMaxWorldRange(muzzleBaseX, muzzleBaseY float32) float32 {
 	corners := [][2]float32{
 		{0, 0},
-		{800, 0},
-		{0, 600},
-		{800, 600},
+		{gameWorldWidth, 0},
+		{0, gameWorldHeight},
+		{gameWorldWidth, gameWorldHeight},
 	}
 
 	var maxWorldRangeSq float32 = 0
@@ -624,7 +646,7 @@ func (gameRoom *GameRoom) computeShotScreenAndHeight(shot *Shot) (screenX, scree
 	elapsedTicks := gameRoom.matchTick - shot.SpawnTick
 	t := float32(elapsedTicks) / float32(gameRoom.tickRateHz)
 
-	if t >= shot.FlightDuration {
+	if elapsedTicks >= shotLandingTicks(shot.FlightDuration, gameRoom.tickRateHz) {
 		return 0, 0, 0, 0, 0, true
 	}
 
@@ -713,9 +735,11 @@ func (gameRoom *GameRoom) resolveShot(shot *Shot, outcome ShotOutcome, hitPlayer
 			victim = &gameRoom.secondPlayer
 		}
 		hitAck, hitX, hitY = victim.LastSeqN, victim.X, victim.Y
-		freezeEnd := hitAck + 90
-		if freezeEnd > victim.FreezeEndSeq {
-			victim.FreezeEndSeq = freezeEnd
+		// Il server usa esclusivamente il proprio matchTick: LastSeqN e' solo un ACK.
+		freezeEnd := gameRoom.matchTick + 90
+		if freezeEnd > victim.FreezeEndTick {
+			victim.FreezeStartTick = gameRoom.matchTick
+			victim.FreezeEndTick = freezeEnd
 		}
 		victim.LastMask |= Freezing
 		victim.PendingShot = PendingShot{}
@@ -932,7 +956,7 @@ func (gameRoom *GameRoom) forwardShotEventToOpponent(targetConn *PlayerConnectio
 	binary.LittleEndian.PutUint32(packet[14:18], shot.OwnerPlayerID)
 	binary.LittleEndian.PutUint32(packet[18:22], shot.ClientShotTick)
 
-	targetConn.TryEnqueueOutgoingPacket(packet, false)
+	targetConn.TryEnqueueOutgoingPacket(packet, true)
 }
 
 // createShotFromEvent crea lo shot vero e proprio.
@@ -987,6 +1011,7 @@ func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEven
 		flightDuration := gameRoom.buildServerShotRuntime(player, shotEvent, shotType, authChargeMs)
 
 	log.Printf("[SHOT_TRACE] role=SERVER event=START key=%d:%d tick=%d utc=%s", player.ID, shotEvent.SeqN, gameRoom.matchTick, time.Now().UTC().Format(time.RFC3339Nano))
+	log.Printf("[SHOT_FLIGHT_SERVER] key=%d:%d chargeMs=%d type=%d fullDuration=%.7f expectedLandingTicks=%d", player.ID, shotEvent.SeqN, authChargeMs, shotType, flightDuration, shotLandingTicks(flightDuration, gameRoom.tickRateHz))
 	shot := Shot{
 		ShotID:         gameRoom.nextShotID,
 		ClientShotTick: shotEvent.SeqN,

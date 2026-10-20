@@ -128,8 +128,8 @@ func TestObstacleCollisionResolvesByShotKey(t *testing.T) {
 	checkShotResolution(t, <-room.secondPlayerConnection.OutgoingPacketChannel, 2, 33, ShotOutcomeObstacle, 0, 66)
 }
 
-// Un HIT blocca gli input 41..130, ma il 131 torna a muovere il pinguino.
-func TestAuthoritativeFreezeBlocksNinetyInputSequences(t *testing.T) {
+// Il server usa 90 tick DI SERVER, mai le sequenze locali di B.
+func TestAuthoritativeFreezeBlocksNinetyServerTicks(t *testing.T) {
 	room := syncTestRoom()
 	room.matchTick = 200
 	victim := &room.secondPlayer
@@ -137,8 +137,8 @@ func TestAuthoritativeFreezeBlocksNinetyInputSequences(t *testing.T) {
 	startX, startY := victim.X, victim.Y
 	shot := Shot{ShotID: 23, OwnerPlayerID: 1, ClientShotTick: 11, IsAlive: true}
 	room.resolveShot(&shot, ShotOutcomePenguin, 2)
-	if victim.FreezeEndSeq != 130 {
-		t.Fatalf("freeze end=%d, want 130", victim.FreezeEndSeq)
+	if victim.FreezeStartTick != 200 || victim.FreezeEndTick != 290 {
+		t.Fatalf("freeze interval=[%d,%d) want [200,290)", victim.FreezeStartTick, victim.FreezeEndTick)
 	}
 	packet := <-room.secondPlayerConnection.OutgoingPacketChannel
 	checkShotResolution(t, packet, 1, 11, ShotOutcomePenguin, 2, 200)
@@ -151,6 +151,15 @@ func TestAuthoritativeFreezeBlocksNinetyInputSequences(t *testing.T) {
 	if y := math.Float32frombits(binary.LittleEndian.Uint32(packet[26:30])); y != startY {
 		t.Fatalf("hit Y=%f, want %f", y, startY)
 	}
+
+	// Il freeze dura 90 tick server, indipendentemente da LastSeqN.
+	for tick := uint32(200); tick < 290; tick++ {
+		room.matchTick = tick
+		if !room.isServerFrozen(victim) {
+			t.Fatalf("server unfroze prematurely at tick %d", tick)
+		}
+	}
+	room.matchTick = 289
 	for seq := uint32(41); seq <= 130; seq++ {
 		room.secondPlayerPendingEvents = append(room.secondPlayerPendingEvents, syncInput(seq, Right))
 	}
@@ -158,27 +167,139 @@ func TestAuthoritativeFreezeBlocksNinetyInputSequences(t *testing.T) {
 	if victim.LastSeqN != 130 || victim.X != startX || victim.Y != startY || victim.LastMask&Freezing == 0 {
 		t.Fatalf("frozen player moved: %+v", victim)
 	}
+	room.matchTick = 290
+	if room.isServerFrozen(victim) {
+		t.Fatal("server still frozen at tick 290")
+	}
 	room.secondPlayerPendingEvents = append(room.secondPlayerPendingEvents, syncInput(131, Right|Freezing))
 	room.applyMaturePendingEvents(victim, &room.secondPlayerPendingEvents, room.firstPlayerConnection, MoveDt)
 	if victim.LastSeqN != 131 || victim.LastMask&Freezing != 0 || victim.X <= startX {
-		t.Fatalf("player did not move at 131: %+v", victim)
+		t.Fatalf("player did not move after expiry: %+v", victim)
 	}
 }
 
-// Verifica che un secondo HIT estenda il blocco senza abbreviare il precedente.
+// Due HIT sono intervalli sovrapposti sulla timeline del server.
 func TestRepeatedHitExtendsFreezeDeadline(t *testing.T) {
 	room := syncTestRoom()
+	room.matchTick = 200
 	room.secondPlayer.LastSeqN = 40
 	first := Shot{ShotID: 1, OwnerPlayerID: 1, ClientShotTick: 1, IsAlive: true}
 	room.resolveShot(&first, ShotOutcomePenguin, 2)
-	if room.secondPlayer.FreezeEndSeq != 130 {
+	if room.secondPlayer.FreezeEndTick != 290 {
 		t.Fatal("first freeze deadline mismatch")
 	}
+	room.matchTick = 240
 	room.secondPlayer.LastSeqN = 70
 	second := Shot{ShotID: 2, OwnerPlayerID: 1, ClientShotTick: 2, IsAlive: true}
 	room.resolveShot(&second, ShotOutcomePenguin, 2)
-	if room.secondPlayer.FreezeEndSeq != 160 {
-		t.Fatal("second hit did not extend freeze")
+	if room.secondPlayer.FreezeEndTick != 330 {
+		t.Fatal("second hit did not extend freeze on server timeline")
+	}
+	room.matchTick = 329
+	if !room.isServerFrozen(&room.secondPlayer) {
+		t.Fatal("server ended overlapping freezes too soon")
+	}
+	room.matchTick = 330
+	if room.isServerFrozen(&room.secondPlayer) {
+		t.Fatal("server froze after deadline")
+	}
+}
+
+// Misura la durata calcolata dalla fisica REALE di Go, a parita' di carica
+// e tipologia di tiro rispetto al client A. L'output e' comparato da
+// Tests/compare_shot_flight.ps1 con la misura indipendente in C#.
+func TestShotFlightComparisonFixtures(t *testing.T) {
+	room := syncTestRoom()
+	for _, chargeMs := range []uint32{50, 100, 250, 500, 750, 1000, 1250, 1500} {
+		for _, shotType := range []ShotType{ShotTypeLeft, ShotTypeRight} {
+			name := "left"
+			if shotType == ShotTypeRight {
+				name = "right"
+			}
+			event := ShotEvent{Position: Position{X: 300, Y: 200}}
+			_, _, _, _, speedZ, gravity, duration := room.buildServerShotRuntime(
+				&room.firstPlayer, event, shotType, chargeMs)
+			if duration <= 0 || math.Abs(float64(duration-2*speedZ/gravity)) > 0.00001 {
+				t.Fatalf("bad runtime physics chargeMs=%d shotType=%d duration=%f", chargeMs, shotType, duration)
+			}
+			ticks := shotLandingTicks(duration, room.tickRateHz)
+			t.Logf("FLIGHT_GO|%s-%d|%.9f|%d", name, chargeMs, duration, ticks)
+		}
+	}
+}
+
+// Confronto punto-per-punto della stessa traiettoria fisica C# / Go.
+// Go esegue buildServerShotRuntime + computeShotScreenAndHeight (produzione).
+func TestShotTrajectoryParityFixtures(t *testing.T) {
+	room := syncTestRoom()
+	if gameWorldWidth != 800 || gameWorldHeight != 480 ||
+		shotColliderWidth != 20 || shotColliderHeight != 25 {
+		t.Fatalf("incorrect shared geometry: world %.0fx%.0f ball %dx%d",
+			gameWorldWidth, gameWorldHeight, shotColliderWidth, shotColliderHeight)
+	}
+	origins := []Position{{X: 100, Y: 300}, {X: 550, Y: 25}, {X: 314, Y: 74}}
+	targets := []Position{{X: 700, Y: 120}, {X: 120, Y: 430}, {X: 400, Y: 240}}
+	for i, origin := range origins {
+		room.firstPlayer.Position = origin
+		for _, charge := range []uint32{250, 700, 1500} {
+			for _, kind := range []ShotType{ShotTypeLeft, ShotTypeRight} {
+				name := "left"
+				if kind == ShotTypeRight {
+					name = "right"
+				}
+				event := ShotEvent{Position: targets[i]}
+				sx, sy, gx, gy, vz, g, duration := room.buildServerShotRuntime(
+					&room.firstPlayer, event, kind, charge)
+				shot := Shot{ShotID: 7, OwnerPlayerID: 1, ClientShotTick: 11,
+					StartX: sx, StartY: sy, GroundVelX: gx, GroundVelY: gy,
+					StartVerticalSpeed: vz, Gravity: g, FlightDuration: duration,
+					SpawnTick: 100, IsAlive: true}
+				landing := shotLandingTicks(duration, room.tickRateHz)
+				for _, tick := range []uint32{1, 3, 5, 7, 10, 15, 22} {
+					if tick >= landing {
+						continue
+					}
+					room.matchTick = 100 + tick
+					x, y, shx, shy, z, expired := room.computeShotScreenAndHeight(&shot)
+					if expired {
+						t.Fatalf("unexpected expiry at tick %d", tick)
+					}
+					t.Logf("PATH_GO|p%d-%s-%d-%d|%.6f|%.6f|%.6f|%.6f|%.6f",
+						i, name, charge, tick, x, y, shx, shy, z)
+				}
+			}
+		}
+	}
+}
+
+// Il caso 500ms/destra divergeva di un tick per floating-point:
+// C# 0.50000000s -> 15 tick; Go 0.50000006s -> 16 tick.
+func TestRightShot500msExpiresAtSameFifteenthTickAsClient(t *testing.T) {
+	room := syncTestRoom()
+	_, _, _, _, _, _, duration := room.buildServerShotRuntime(
+		&room.firstPlayer, ShotEvent{Position: Position{X: 300, Y: 200}}, ShotTypeRight, 500)
+	if shotLandingTicks(duration, room.tickRateHz) != 15 {
+		t.Fatalf("landing ticks=%d, want 15", shotLandingTicks(duration, room.tickRateHz))
+	}
+	room.activeShots = append(room.activeShots, Shot{
+		ShotID: 44, OwnerPlayerID: 1, ClientShotTick: 42,
+		SpawnTick: 100, FlightDuration: duration, IsAlive: true,
+	})
+	room.collisionManager.AddObject("s44", 0, 0, shotColliderWidth, shotColliderHeight)
+	room.matchTick = 114
+	room.updateShotColliders()
+	if !room.activeShots[0].IsAlive {
+		t.Fatal("shot expired before 15 ticks")
+	}
+	room.matchTick = 115
+	room.updateShotColliders()
+	if room.activeShots[0].IsAlive {
+		t.Fatal("shot still alive after exactly 15 server ticks")
+	}
+	packet := <-room.firstPlayerConnection.OutgoingPacketChannel
+	checkShotResolution(t, packet, 1, 42, ShotOutcomeExpired, 0, 115)
+	if got := binary.LittleEndian.Uint32(packet[30:34]); got != 15 {
+		t.Fatalf("flight ticks=%d, want 15", got)
 	}
 }
 
