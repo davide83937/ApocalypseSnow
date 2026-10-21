@@ -80,7 +80,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
     {
         _penguinInputHandler._animationManager.Draw(
             spriteBatch,
-            ref _position,
+            _position,
             _penguinShotHandler.Ammo,
             _penguinInputHandler._stateStruct.IsPressed(StateList.Reload),
             _penguinInputHandler._stateStruct.IsPressed(StateList.ShootLeft)|| _penguinInputHandler._stateStruct.IsPressed(StateList.ShootRight),
@@ -207,8 +207,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         _penguinInputHandler._animationManager.Update(
             _deltaTime,
             _penguinInputHandler._stateStruct.IsPressed(StateList.Moving),
-            _penguinInputHandler._stateStruct.IsPressed(StateList.Reload),
-            _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg)
+            _penguinInputHandler._stateStruct.IsPressed(StateList.Reload)
         );
     }
 }

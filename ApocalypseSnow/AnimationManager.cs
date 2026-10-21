@@ -39,7 +39,7 @@ public class AnimationManager
         _textures[index] = Texture2D.FromStream(gd, stream);
     }
 
-    private void ChangeTexture(SpriteBatch spriteBatch, int ammo, bool isReloading, bool isShooting, bool isFreezing,bool isWithEgg, ref Vector2 position)
+    private void ChangeTexture(SpriteBatch spriteBatch, int ammo, bool isReloading, bool isShooting, bool isFreezing,bool isWithEgg, Vector2 position)
     {
         if (isFreezing)
         {
@@ -68,7 +68,7 @@ public class AnimationManager
         spriteBatch.Draw(Texture, position, _sourceRect, Color.White);
     }
 
-    private void walking_animation(ref float gameTime, ref bool isReloading, ref bool isMoving, bool isWithEgg)
+    private void walking_animation(float gameTime, bool isReloading, bool isMoving)
     {
         if (isMoving || isReloading)
         {
@@ -104,16 +104,16 @@ public class AnimationManager
 
    
 
-    public void Update(float gameTime, bool isMoving, bool isReloading, bool isWithEgg)
+    public void Update(float gameTime, bool isMoving, bool isReloading)
     {
-        walking_animation(ref gameTime, ref isReloading, ref isMoving, isWithEgg);
+        walking_animation(gameTime, isReloading, isMoving);
     }
 
 
 
-    public void Draw(SpriteBatch spriteBatch, ref Vector2 position, int ammo, bool isReloading, bool isShooting, bool isFreezing, bool isWithEgg)
+    public void Draw(SpriteBatch spriteBatch, Vector2 position, int ammo, bool isReloading, bool isShooting, bool isFreezing, bool isWithEgg)
     {
-        ChangeTexture(spriteBatch, ammo, isReloading, isShooting, isFreezing, isWithEgg, ref position);
+        ChangeTexture(spriteBatch, ammo, isReloading, isShooting, isFreezing, isWithEgg, position);
     }
 
     public void MoveRect(int posRect)

@@ -143,7 +143,6 @@ public class PenguinShotHandler
     // non il viewport del singolo client. Riportiamo la Y allo spazio del terreno.
     public static float ComputeMaxWorldRange(Vector2 muzzleBase)
     {
-
         Vector2[] corners =
         {
             new Vector2(0f, 0f),
