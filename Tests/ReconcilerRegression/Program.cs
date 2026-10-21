@@ -91,6 +91,7 @@ internal static class Program
             ("Confirmed freeze is half-open and late confirmations never restart it", AuthoritativeFreezeBoundaries),
             ("Expired authoritative HIT does not drop a newly carried egg", ExpiredHitDoesNotDropEgg),
             ("Confirmed HIT drops eggs at the same authoritative impact position", ConfirmedHitEggDropPosition),
+            ("Un HIT confermato in anticipo aspetta il tick di impatto", FutureHitWaitsForImpact),
             ("Predicted freeze cannot drop an egg before HIT confirmation", PredictedFreezeDoesNotDropEgg),
             ("Remote WithEgg loss during freeze waits for HIT confirmation", RemoteEggWaitsForConfirmedHit),
             ("Un HIT remoto ignora vecchi stati WithEgg", RemoteEggRequiresNewPickupAfterHit),
@@ -208,7 +209,10 @@ internal static class Program
             match.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
                 key, ShotOutcome.Penguin, localVictim ? 1u : 2u, 199u, 196u,
                 new Vector2(123, 87), 2u));
-            reconciler.ReconcileShotResults(200);
+            reconciler.ReadAuthShot(200);
+            // Leggere il verdetto non deve ancora applicare la caduta.
+            Equal(dropCount, 0);
+            reconciler.ReconcileShot(200);
 
             Equal(dropCount, 1);
             Equal(eggDuringDrop, "egg7");
@@ -216,6 +220,52 @@ internal static class Program
             Equal(victim._myEgg, (string?)null);
             Equal(victim._penguinColliderHandler.isWithEgg, false);
         }
+    }
+
+    // La conferma puo' arrivare prima dell'impatto: il freeze e' programmato,
+    // ma la perdita dell'uovo avviene soltanto quando il tick viene oltrepassato.
+    private static void FutureHitWaitsForImpact(Reconciler reconciler)
+    {
+        static Penguin DummyPenguin(string tag, Vector2 start)
+        {
+            var penguin = (Penguin)RuntimeHelpers.GetUninitializedObject(typeof(Penguin));
+            typeof(Penguin).GetField("LocalFreeze")!.SetValue(penguin, new FreezeTimeline());
+            penguin._penguinColliderHandler = new PenguinColliderHandler(tag);
+            penguin._position = start;
+            return penguin;
+        }
+
+        var local = DummyPenguin("penguin", new Vector2(300, 200));
+        var remote = DummyPenguin("penguinRed", new Vector2(400, 250));
+        remote._myEgg = "egg6";
+        remote._penguinColliderHandler.isWithEgg = true;
+        int drops = 0;
+        remote._penguinColliderHandler.eggPutEvent += (_, _) => drops++;
+
+        var match = (Events)RuntimeHelpers.GetUninitializedObject(typeof(Events));
+        typeof(Events).GetField("PendingShotResolutions")!
+            .SetValue(match, new Queue<ShotResolutionMessage>());
+        reconciler.AttachMatchContext(1, local, remote, match);
+
+        match.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
+            new ShotKey(1, 200), ShotOutcome.Penguin, 2, 205, 200,
+            new Vector2(123, 87), 5));
+        reconciler.ReadAuthShot(202);
+        Equal(remote.LocalFreeze.IsFrozen(205), true);
+        Equal(drops, 0);
+        At(remote._position, 400, 250);
+
+        reconciler.ReconcileShot(205); // Il tick d'impatto non e' ancora completato.
+        Equal(drops, 0);
+        Equal(remote._myEgg, "egg6");
+
+        reconciler.ReconcileShot(206);
+        Equal(drops, 1);
+        Equal(remote._myEgg, (string?)null);
+        At(remote._position, 123, 87);
+
+        reconciler.ReconcileShot(207);
+        Equal(drops, 1);
     }
 
     private static void PredictedFreezeDoesNotDropEgg(Reconciler reconciler)
@@ -543,7 +593,8 @@ internal static class Program
         events.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
             new ShotKey(1, 10), ShotOutcome.Penguin, 1, 12, 10,
             new Vector2(50, 50), 2));
-        reconciler.ReconcileShotResults(200);
+        reconciler.ReadAuthShot(200);
+        reconciler.ReconcileShot(200);
         Equal(local._myEgg, "egg42");
         Equal(local._penguinColliderHandler.isWithEgg, true);
 
@@ -551,7 +602,9 @@ internal static class Program
         events.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
             new ShotKey(1, 197), ShotOutcome.Penguin, 1, 198, 11,
             new Vector2(50, 50), 2));
-        reconciler.ReconcileShotResults(200);
+        reconciler.ReadAuthShot(200);
+        Equal(local._myEgg, "egg42");
+        reconciler.ReconcileShot(200);
         Equal(local._myEgg, (string?)null);
         Equal(local._penguinColliderHandler.isWithEgg, false);
     }
@@ -570,7 +623,7 @@ internal static class Program
         for (uint tick = 100; tick <= 104; tick++)
         {
             Equal(freeze.IsFrozen(tick), true);
-            r.RecordInputForReplay(tick, StateList.None);
+            r.RecordPendingInput(tick, StateList.None);
         }
         byte[] packet = ResolutionPacket(outcome: ShotOutcome.Expired, hitPlayerId: 0);
         var framer = new NetworkPacketFramer();
@@ -585,7 +638,7 @@ internal static class Program
         r.ReceiveAuthoritativePosition(99, pos);
         Apply(r, ref pos);
         At(pos, 100, 80);
-        r.RecordInputForReplay(105, StateList.Right);
+        r.RecordPendingInput(105, StateList.Right);
         var lastAuthPos = pos;
         pos.X += Step; // il client predice il nuovo input visibile
         r.ReceiveAuthoritativePosition(104, lastAuthPos);
@@ -599,7 +652,7 @@ internal static class Program
         var key = new ShotKey(2, 40);
         f.Predict(key, 100);
         Equal(f.IsFrozen(105), true);
-        r.RecordInputForReplay(105, StateList.None); // client sent neutral movement while predicting HIT
+        r.RecordPendingInput(105, StateList.None); // client sent neutral movement while predicting HIT
         f.RejectPrediction(key);
         Equal(f.IsFrozen(105), false);
         r.ReceiveAuthoritativePosition(104, Vector2.Zero);
@@ -635,7 +688,7 @@ internal static class Program
 
     private static void NoAuthDoesNotCorrect(Reconciler r)
     {
-        r.RecordInputForReplay(1, StateList.Right);
+        r.RecordPendingInput(1, StateList.Right);
         var pos = new Vector2(40, 10);
         Apply(r, ref pos);
         At(pos, 40, 10);
@@ -653,9 +706,9 @@ internal static class Program
     // Verifica che gli input confermati vengano scartati.
     private static void AckAndReplay(Reconciler r)
     {
-        r.RecordInputForReplay(1, StateList.Right);
-        r.RecordInputForReplay(2, StateList.Up);
-        r.RecordInputForReplay(3, StateList.Right);
+        r.RecordPendingInput(1, StateList.Right);
+        r.RecordPendingInput(2, StateList.Up);
+        r.RecordPendingInput(3, StateList.Right);
         r.ReceiveAuthoritativePosition(2, new Vector2(100, 100));
         var pos = Vector2.Zero;
         Apply(r, ref pos);
@@ -667,9 +720,9 @@ internal static class Program
     private static void FrozenPositionSkipsReplay(Reconciler r)
     {
         var position = new Vector2(50, 30); // Posizione dell'HIT gia' applicata.
-        r.RecordInputForReplay(101, StateList.Right);
-        r.RecordInputForReplay(102, StateList.Right);
-        r.RecordInputForReplay(103, StateList.Freezing | StateList.Right);
+        r.RecordPendingInput(101, StateList.Right);
+        r.RecordPendingInput(102, StateList.Right);
+        r.RecordPendingInput(103, StateList.Freezing | StateList.Right);
 
         // Uno snapshot piu' recente non deve spostare il pinguino congelato.
         r.ReceiveAuthoritativePosition(102, new Vector2(300, 300));
@@ -683,14 +736,14 @@ internal static class Program
         Equal(inputs.Count, 1);
 
         // Lo sblocco non deve rieseguire gli input vecchi o congelati.
-        r.RecordInputForReplay(104, StateList.Freezing | StateList.Right);
+        r.RecordPendingInput(104, StateList.Freezing | StateList.Right);
         r.ReceiveAuthoritativePosition(104, new Vector2(50, 30));
         r.ReconcilePosition(ref position, Speed, Dt, isCurrentlyFrozen: true);
         At(position, 50, 30);
         Equal(inputs.Count, 0);
 
         // Il primo movimento successivo allo sblocco torna a essere applicabile.
-        r.RecordInputForReplay(105, StateList.Right);
+        r.RecordPendingInput(105, StateList.Right);
         position.X += Step; // Il movimento viene prima predetto normalmente dal client.
         r.ReceiveAuthoritativePosition(104, new Vector2(50, 30));
         r.ReconcilePosition(ref position, Speed, Dt, isCurrentlyFrozen: false);
@@ -700,9 +753,9 @@ internal static class Program
     // Verifica che una prediction corretta non venga modificata.
     private static void AccuratePrediction(Reconciler r)
     {
-        r.RecordInputForReplay(1, StateList.Right);
-        r.RecordInputForReplay(2, StateList.Right);
-        r.RecordInputForReplay(3, StateList.Right);
+        r.RecordPendingInput(1, StateList.Right);
+        r.RecordPendingInput(2, StateList.Right);
+        r.RecordPendingInput(3, StateList.Right);
         r.ReceiveAuthoritativePosition(1, new Vector2(Step, 0));
         var pos = new Vector2(Step * 3, 0);
         Apply(r, ref pos);
@@ -739,11 +792,11 @@ internal static class Program
     // Verifica gli stati che bloccano il movimento nel replay.
     private static void ActionLocks(Reconciler r)
     {
-        r.RecordInputForReplay(1, StateList.Right | StateList.Reload);
-        r.RecordInputForReplay(2, StateList.Right | StateList.Freezing);
-        r.RecordInputForReplay(3, StateList.Right | StateList.TakingEgg);
-        r.RecordInputForReplay(4, StateList.Right | StateList.PuttingEgg);
-        r.RecordInputForReplay(5, StateList.Right);
+        r.RecordPendingInput(1, StateList.Right | StateList.Reload);
+        r.RecordPendingInput(2, StateList.Right | StateList.Freezing);
+        r.RecordPendingInput(3, StateList.Right | StateList.TakingEgg);
+        r.RecordPendingInput(4, StateList.Right | StateList.PuttingEgg);
+        r.RecordPendingInput(5, StateList.Right);
         r.ReceiveAuthoritativePosition(0, Vector2.Zero);
         var pos = new Vector2(100, 0);
         Apply(r, ref pos);
@@ -754,7 +807,7 @@ internal static class Program
     private static void RecordedFrozenInputs(Reconciler r)
     {
         for (uint seq = 41; seq <= 131; seq++)
-            r.RecordInputForReplay(seq, seq <= 130 ? StateList.Freezing | StateList.Right : StateList.Right);
+            r.RecordPendingInput(seq, seq <= 130 ? StateList.Freezing | StateList.Right : StateList.Right);
         r.ReceiveAuthoritativePosition(40, new Vector2(100, 30));
         var pos = new Vector2(500, 30);
         Apply(r, ref pos);
@@ -777,12 +830,13 @@ internal static class Program
         r.AttachMatchContext(1, local, remote, events);
 
         for (uint seq = 101; seq <= 201; seq++)
-            r.RecordInputForReplay(seq, StateList.Right);
+            r.RecordPendingInput(seq, StateList.Right);
 
         events.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
             new ShotKey(1, 198), ShotOutcome.Penguin, 1, 200, 100,
             Vector2.Zero, 2));
-        r.ReconcileShotResults(201);
+        r.ReadAuthShot(201);
+        r.ReconcileShot(201);
         var position = new Vector2(600, 0);
         Apply(r, ref position);
         At(position, 101 * Step, 0);
@@ -793,7 +847,7 @@ internal static class Program
     private static void LocalFreezeMasksControlFutureReplay(Reconciler r)
     {
         for (uint seq = 130; seq <= 205; seq++)
-            r.RecordInputForReplay(seq, seq < 190 ? StateList.Freezing | StateList.Right : StateList.Right);
+            r.RecordPendingInput(seq, seq < 190 ? StateList.Freezing | StateList.Right : StateList.Right);
         r.ReceiveAuthoritativePosition(100, Vector2.Zero);
         var position = new Vector2(500, 0);
         Apply(r, ref position);
@@ -968,7 +1022,7 @@ internal static class Program
     private static void LocalFreezeReplayBoundary(Reconciler r)
     {
         for (uint seq = 149; seq <= 241; seq++)
-            r.RecordInputForReplay(seq, seq >= 150 && seq <= 239 ? StateList.Freezing | StateList.Right : StateList.Right);
+            r.RecordPendingInput(seq, seq >= 150 && seq <= 239 ? StateList.Freezing | StateList.Right : StateList.Right);
         r.ReceiveAuthoritativePosition(148, new Vector2(100, 30));
         var pos = new Vector2(500, 30);
         Apply(r, ref pos);
@@ -1016,9 +1070,9 @@ internal static class Program
     private static void ObstacleCollision(Reconciler r)
     {
         // Speed 30 => 1 pixel/step; all candidates at X>=2 are blocked.
-        r.RecordInputForReplay(1, StateList.Right);
-        r.RecordInputForReplay(2, StateList.Right);
-        r.RecordInputForReplay(3, StateList.Right);
+        r.RecordPendingInput(1, StateList.Right);
+        r.RecordPendingInput(2, StateList.Right);
+        r.RecordPendingInput(3, StateList.Right);
         r.ReceiveAuthoritativePosition(0, Vector2.Zero);
         var pos = new Vector2(30, 0);
         r.ReconcilePosition(ref pos, 30f, Dt, candidate => candidate.X >= 1.99f);
@@ -1028,7 +1082,7 @@ internal static class Program
     // Verifica la normalizzazione del movimento diagonale.
     private static void DiagonalMovement(Reconciler r)
     {
-        r.RecordInputForReplay(1, StateList.Right | StateList.Up);
+        r.RecordPendingInput(1, StateList.Right | StateList.Up);
         r.ReceiveAuthoritativePosition(0, Vector2.Zero);
         var pos = new Vector2(40, 0);
         Apply(r, ref pos);
@@ -1040,7 +1094,7 @@ internal static class Program
     private static void InputBurst(Reconciler r)
     {
         for (uint seq = 1; seq <= 20; seq++)
-            r.RecordInputForReplay(seq, StateList.Right);
+            r.RecordPendingInput(seq, StateList.Right);
         r.ReceiveAuthoritativePosition(10, new Vector2(10 * Step, 0));
         var pos = Vector2.Zero;
         Apply(r, ref pos);
@@ -1051,7 +1105,7 @@ internal static class Program
     private static void ConsecutiveAcknowledgements(Reconciler r)
     {
         for (uint seq = 1; seq <= 20; seq++)
-            r.RecordInputForReplay(seq, StateList.Right);
+            r.RecordPendingInput(seq, StateList.Right);
 
         r.ReceiveAuthoritativePosition(10, new Vector2(10 * Step, 0));
         var pos = Vector2.Zero;
@@ -1059,7 +1113,7 @@ internal static class Program
         At(pos, 20 * Step, 0);
 
         for (uint seq = 21; seq <= 30; seq++)
-            r.RecordInputForReplay(seq, StateList.Right);
+            r.RecordPendingInput(seq, StateList.Right);
 
         r.ReceiveAuthoritativePosition(20, new Vector2(20 * Step, 0));
         Apply(r, ref pos);
@@ -1069,7 +1123,7 @@ internal static class Program
     // Verifica la pulizia degli input tra due partite.
     private static void ResetClearsPending(Reconciler r)
     {
-        r.RecordInputForReplay(1, StateList.Right);
+        r.RecordPendingInput(1, StateList.Right);
         r.Reset();
         r.ReceiveAuthoritativePosition(0, Vector2.Zero);
         var pos = new Vector2(20, 0);

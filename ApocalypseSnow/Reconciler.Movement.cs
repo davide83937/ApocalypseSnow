@@ -82,7 +82,7 @@ public sealed partial class Reconciler
     }
 
     // Acquisisce l'ultimo snapshot: il replay resta esclusivamente in ReconcilePosition.
-    public void ReadLatestServerPosition()
+    public void ReadAuthPosition()
     {
         if (_matchEvents == null)
             return;
@@ -98,7 +98,7 @@ public sealed partial class Reconciler
         });
     }
 
-    public void RecordInputForReplay(uint inputTick, StateList replayStateMask)
+    public void RecordPendingInput(uint inputTick, StateList replayStateMask)
     {
         _unacknowledgedMovementInputs.Add(new PendingMovementInput { SequenceTick = inputTick, ReplayStateMask = replayStateMask });
     }

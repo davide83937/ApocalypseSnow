@@ -176,9 +176,9 @@ public sealed class GameSession : GameComponent
         NetworkManager.Instance?.Receive();
 
         // Acquisisce ultimo ACK e posizione dal server, senza correggere ancora il movimento.
-        Reconciler.Instance.ReadLatestServerPosition();
+        Reconciler.Instance.ReadAuthPosition();
         // Per ogni tiro ricevuto: conferma/smentisce la prediction e gestisce gli HIT.
-        Reconciler.Instance.ReconcileShotResults(LocalTick);
+        Reconciler.Instance.ReadAuthShot(LocalTick);
 
         // ✅ tick fisso (stesso dt della sim di rete)
         _tickAcc += (float)gameTime.ElapsedGameTime.TotalSeconds;
@@ -204,7 +204,7 @@ public sealed class GameSession : GameComponent
                 StateList.Reload | StateList.Freezing | StateList.TakingEgg | StateList.PuttingEgg);
 
             // 3) record + send usando QUESTO tick
-            Reconciler.Instance.RecordInputForReplay(LocalTick, moveMask);
+            Reconciler.Instance.RecordPendingInput(LocalTick, moveMask);
             NetworkManager.Instance.SendState(st, LocalTick);
             LocalTick++;
         }
@@ -212,7 +212,7 @@ public sealed class GameSession : GameComponent
         //SUPER NOTA: dentro il while siamo a 30 HZ, fuori dal while ma dentro questo Update siamo a 60 FPS
 
         // Dopo l'avanzamento dei tick, applica caduta uovo e correzioni di HIT ora dovuti.
-        Reconciler.Instance.ApplyDueHitConsequences(LocalTick);
+        Reconciler.Instance.ReconcileShot(LocalTick);
 
         // Replay degli input non confermati e correzione della posizione del pinguino locale.
         Reconciler.Instance.ReconcilePosition(

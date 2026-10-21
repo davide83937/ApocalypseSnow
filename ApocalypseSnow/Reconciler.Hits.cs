@@ -7,10 +7,10 @@ namespace ApocalypseSnow;
 // Non simula collisioni: confronta la prediction locale con gli esiti del server.
 public sealed partial class Reconciler
 {
-    // Solo conferme ricevute PRIMA del tick d'impatto. Non sono HIT predetti.
+    // HIT confermati dal server in attesa di applicare le conseguenze sul client.
     private readonly List<(uint Tick, bool LocalVictim, uint Ack, Vector2 Position)> _pendingHits = new();
 
-    public void ReconcileShotResults(uint nextLocalTick)
+    public void ReadAuthShot(uint nextLocalTick)
     {
         if (_matchEvents == null)
             return;
@@ -50,18 +50,14 @@ public sealed partial class Reconciler
             Penguin victim = hitLocal ? _localPenguin : _opponentPenguin;
             victim.LocalFreeze.ConfirmLocal(result.Key, impactTick);
 
-            // Se il risultato e' anticipato, il freeze e' gia' pianificato
-            // nella FreezeTimeline. Rimandiamo solo le conseguenze di gameplay
-            // e l'eventuale correzione della posizione fino all'impatto.
-            if (impactTick >= nextLocalTick)
-                _pendingHits.Add((impactTick, hitLocal, result.HitAck, result.HitPosition));
-            else
-                ApplyConfirmedHit(hitLocal, impactTick, result.HitAck, result.HitPosition, nextLocalTick);
+            // La lettura del verdetto registra l'HIT: solo ReconcileShot applica
+            // le conseguenze, anche quando l'impatto e' gia' avvenuto.
+            _pendingHits.Add((impactTick, hitLocal, result.HitAck, result.HitPosition));
         }
     }
 
     // Chiamato dopo il ciclo dei tick: esegue solo le conferme diventate dovute.
-    public void ApplyDueHitConsequences(uint nextLocalTick)
+    public void ReconcileShot(uint nextLocalTick)
     {
         if (_matchEvents == null)
             return;
