@@ -110,6 +110,8 @@ public class PenguinShotHandler
         float chargeSeconds = MathHelper.Clamp(chargeMs / 1000f, 0f, MaxChargeSeconds);
         float theta = MathHelper.ToRadians(type == ShotType.Left ? ThetaLeftDeg : ThetaRightDeg);
         float thetaLow = MathHelper.ToRadians(ThetaLeftDeg);
+        
+        //FORMULA TEMPO DI VOLO RICAVATA DAL MOTO DEL PROIETTILE(portare in c++)
         return DesiredFullChargeFlightTimeLowShot * MathF.Sqrt(chargeSeconds / MaxChargeSeconds) *
                MathF.Sin(theta) / MathF.Sin(thetaLow);
     }
@@ -117,13 +119,24 @@ public class PenguinShotHandler
     public static float ComputeGravityForLowShot(float maxWorldRange)
     {
         float thetaLowRad = MathHelper.ToRadians(ThetaLeftDeg);
-
+        //calcola il valore esatto della costante di accelerazione di
+        //gravità g affinché un proiettile a piena carica copra l'intera
+        //distanza della mappa
         return (2f * maxWorldRange * MathF.Tan(thetaLowRad)) /
                (DesiredFullChargeFlightTimeLowShot * DesiredFullChargeFlightTimeLowShot);
     }
 
     private static float ComputeMaxV0(float gravity)
     {
+        /*
+        Questa formula calcola il modulo della velocità iniziale
+        massima (v(0,max)) con cui deve partire la palla a piena 
+        carica per rispettare il tempo di volo prefissato di 
+        0.5 secondi con l'alzo basso di 30°.   
+        La derivazione algebrica discende direttamente dalla 
+        cinematica del moto verticale uniformemente accelerato.
+        */
+        
         float thetaLowRad = MathHelper.ToRadians(ThetaLeftDeg);
 
         return (gravity * DesiredFullChargeFlightTimeLowShot) /
@@ -132,6 +145,12 @@ public class PenguinShotHandler
 
     public static float ComputeVerticalSpeed(float chargeSeconds, ShotType type, float gravity)
     {
+        /*
+         Questa funzione calcola la componente verticale 
+         iniziale della velocità (v_0z o v_z), ossia la 
+         spinta verso l'alto lungo l'asse virtuale della 
+         quota Z nel mondo 2.5D
+         */
         float charge01 = MathHelper.Clamp(chargeSeconds / MaxChargeSeconds, 0f, 1f);
         float power01 = MathF.Sqrt(charge01);
         float v0 = power01 * ComputeMaxV0(gravity);
@@ -155,14 +174,37 @@ public class PenguinShotHandler
 
         foreach (var corner in corners)
         {
+            /*
+             Per ciascun angolo, calcola la distanza 
+             orizzontale e verticale rispetto alla canna 
+             del pinguino
+             */
+            //Sull'asse orizzontale $X$, lo spazio è in scala 1:1,
+            //quindi si fa una semplice differenza
             float dx = corner.X - muzzleBase.X;
+            //Sull'asse verticale $Y$, la visuale del gioco è
+            //inclinata/isometrica (2.5D)
+            //Dividendo per 0.70, il codice "stira" virtualmente
+            //la coordinata verticale, ripristinando la distanza
+            //metrica reale non deformata sul piano del terreno
             float dyWorld = (corner.Y - muzzleBase.Y) / PlanePerspectiveY;
-
+            //Per calcolare la distanza in linea d'aria
+            //(ipotenusa del triangolo rettangolo) si applica
+            //il Teorema di Pitagora:distanza^2 = dx^2 + dy_{world}^2
             float distSq = dx * dx + dyWorld * dyWorld;
+            //Siccome la radice quadrata è pesante per la CPU
+            //confrontiamo direttamente i quadrati
             if (distSq > maxWorldRangeSq)
                 maxWorldRangeSq = distSq;
         }
-        return MathF.Sqrt(maxWorldRangeSq);
+        //Una volta individuato qual è l'angolo con il
+        //quadrato della distanza maggiore (maxWorldRangeSq),
+        //esegue una singola radice quadrata finale
+        return MathF.Sqrt(maxWorldRangeSq); 
+        //Il valore restituito è la gittata massima reale
+        //R_{max}, che viene poi passata a
+        //ComputeGravityForLowShot per calibrare
+        //l'accelerazione di gravità su misura per la mappa.   
     }
 
     public readonly record struct ShotLaunch(Vector2 Start, Vector2 GroundVelocity, float VerticalSpeed, float Gravity);
