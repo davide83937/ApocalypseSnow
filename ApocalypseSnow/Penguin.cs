@@ -85,7 +85,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             _penguinInputHandler._stateStruct.IsPressed(StateList.Reload),
             _penguinInputHandler._stateStruct.IsPressed(StateList.ShootLeft)|| _penguinInputHandler._stateStruct.IsPressed(StateList.ShootRight),
             _penguinInputHandler._stateStruct.IsPressed(StateList.Freezing),
-            _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg)
+            // Il remoto usa il possesso realmente ricostruito, non un WithEgg di rete obsoleto.
+            _tag.EndsWith("Red")
+                ? _penguinColliderHandler.isWithEgg
+                : _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg)
         );
     }
 

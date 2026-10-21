@@ -134,7 +134,8 @@ public sealed partial class Reconciler
     ref Vector2 predictedPosition,
     float movementSpeed,
     float fixedDeltaTime,
-    Func<Vector2, bool>? isBlockedAtPosition = null)
+    Func<Vector2, bool>? isBlockedAtPosition = null,
+    bool isCurrentlyFrozen = false)
     {
         if (!_hasUnappliedAuthoritativePosition)
             return;
@@ -143,6 +144,11 @@ public sealed partial class Reconciler
 
         // Scarta gli input vecchi che il server ha già processato e confermato
         _unacknowledgedMovementInputs.RemoveAll(pendingInput => pendingInput.SequenceTick <= _authoritativeInputAck);
+
+        // Durante il freeze la posizione dell'HIT resta fissa: aggiorniamo gli ACK,
+        // ma non applichiamo movimenti pendenti né correggiamo la posizione.
+        if (isCurrentlyFrozen)
+            return;
 
         // 1) Calcola il "vero presente": parti dal passato sicuro (_authoritativePosition)
         // e ri-simula tutti i movimenti che il server non ha ancora visto.

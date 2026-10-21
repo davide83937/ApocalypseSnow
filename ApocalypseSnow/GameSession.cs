@@ -226,7 +226,8 @@ public sealed class GameSession : GameComponent
                 96,
                 64,
                 "obstacle"
-            )
+            ),
+            isCurrentlyFrozen: _myPenguin.LocalFreeze.IsFrozen(LastSentInputTick)
         );
 
 

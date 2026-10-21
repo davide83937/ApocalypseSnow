@@ -74,6 +74,7 @@ internal static class Program
             ("Wire MISS rejects predicted freeze without ghost movement", WireMissRejectsPredictedFreeze),
             ("Rejected HIT preserves another active freeze", FalseHitDoesNotClearOtherFreeze),
             ("ACK removes acknowledged moves, replay keeps the rest", AckAndReplay),
+            ("Durante il freeze gli ACK avanzano senza spostare il pinguino", FrozenPositionSkipsReplay),
             ("Replay matches prediction: no correction", AccuratePrediction),
             ("Dead zone ignores sub-2px mismatch", DeadZone),
             ("Soft correction interpolates medium mismatch", SoftCorrection),
@@ -92,6 +93,7 @@ internal static class Program
             ("Confirmed HIT drops eggs at the same authoritative impact position", ConfirmedHitEggDropPosition),
             ("Predicted freeze cannot drop an egg before HIT confirmation", PredictedFreezeDoesNotDropEgg),
             ("Remote WithEgg loss during freeze waits for HIT confirmation", RemoteEggWaitsForConfirmedHit),
+            ("Un HIT remoto ignora vecchi stati WithEgg", RemoteEggRequiresNewPickupAfterHit),
             ("Local egg drop on E fires once, retains carried tag until event", LocalEggDropOnE),
             ("Frozen penguins cannot pick up eggs", FrozenPenguinsCannotPickUpEggs),
             ("Multiple eggs: pick the smallest numeric ID exactly once", MultipleEggsPickLowestIdOnce),
@@ -259,6 +261,44 @@ internal static class Program
         Equal(drops, 1);
         Equal(egg, (string?)null);
         collider.SyncStateWithNetwork(state, ref egg);
+        Equal(drops, 1);
+    }
+
+    // I vecchi snapshot WithEgg non possono far sparire nuovamente l'uovo dopo un HIT.
+    private static void RemoteEggRequiresNewPickupAfterHit(Reconciler reconciler)
+    {
+        var collider = new PenguinColliderHandler("penguinRed") { isWithEgg = true };
+        string egg = "egg4";
+        int drops = 0;
+        int pickups = 0;
+        collider.eggPutEvent += (_, _) => drops++;
+        collider.eggTakenEvent += (_, _) => pickups++;
+        var eggOnGround = new List<string> { "egg4" };
+
+        collider.HandleHitByBall(ref egg);
+        Equal(drops, 1);
+        Equal(egg, (string?)null);
+        collider.isFrozen = false;
+
+        // Vecchio WithEgg dopo la conferma: non e' una nuova raccolta.
+        var stale = new StateStruct { Current = StateList.WithEgg };
+        collider.HandleEggPickup(eggOnGround, stale, Dt, ref egg);
+        Equal(pickups, 0);
+        Equal(egg, (string?)null);
+        Equal(drops, 1);
+
+        // Il server comunica la perdita dell'uovo anche se il pinguino e' congelato.
+        collider.isFrozen = true;
+        var released = new StateStruct { Current = StateList.Freezing };
+        collider.HandleEggPickup(eggOnGround, released, Dt, ref egg);
+        Equal(pickups, 0);
+        collider.isFrozen = false;
+
+        // Solo un nuovo WithEgg dopo il rilascio autorizza un pickup.
+        collider.HandleEggPickup(eggOnGround, stale, Dt, ref egg);
+        Equal(pickups, 1);
+        Equal(egg, "egg4");
+        Equal(collider.isWithEgg, true);
         Equal(drops, 1);
     }
 
@@ -620,6 +660,41 @@ internal static class Program
         var pos = Vector2.Zero;
         Apply(r, ref pos);
         At(pos, 100 + Step, 100);
+    }
+
+    // Durante il freeze il client conserva la posizione dell'impatto, ma elimina
+    // comunque gli input confermati. Dopo lo sblocco riprende il normale replay.
+    private static void FrozenPositionSkipsReplay(Reconciler r)
+    {
+        var position = new Vector2(50, 30); // Posizione dell'HIT gia' applicata.
+        r.RecordInputForReplay(101, StateList.Right);
+        r.RecordInputForReplay(102, StateList.Right);
+        r.RecordInputForReplay(103, StateList.Freezing | StateList.Right);
+
+        // Uno snapshot piu' recente non deve spostare il pinguino congelato.
+        r.ReceiveAuthoritativePosition(102, new Vector2(300, 300));
+        r.ReconcilePosition(ref position, Speed, Dt, isCurrentlyFrozen: true);
+        At(position, 50, 30);
+
+        // Gli ACK sono stati consumati anche se il replay e' sospeso.
+        var inputs = (System.Collections.IList)typeof(Reconciler)
+            .GetField("_unacknowledgedMovementInputs", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(r)!;
+        Equal(inputs.Count, 1);
+
+        // Lo sblocco non deve rieseguire gli input vecchi o congelati.
+        r.RecordInputForReplay(104, StateList.Freezing | StateList.Right);
+        r.ReceiveAuthoritativePosition(104, new Vector2(50, 30));
+        r.ReconcilePosition(ref position, Speed, Dt, isCurrentlyFrozen: true);
+        At(position, 50, 30);
+        Equal(inputs.Count, 0);
+
+        // Il primo movimento successivo allo sblocco torna a essere applicabile.
+        r.RecordInputForReplay(105, StateList.Right);
+        position.X += Step; // Il movimento viene prima predetto normalmente dal client.
+        r.ReceiveAuthoritativePosition(104, new Vector2(50, 30));
+        r.ReconcilePosition(ref position, Speed, Dt, isCurrentlyFrozen: false);
+        At(position, 50 + Step, 30);
     }
 
     // Verifica che una prediction corretta non venga modificata.

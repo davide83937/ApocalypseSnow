@@ -12,6 +12,8 @@ public class PenguinColliderHandler
     public event EventHandler eggPutEvent;
     public bool isFrozen = false;
     public bool isWithEgg = false;
+    // Dopo un HIT il remoto ignora i vecchi WithEgg finche' la rete non comunica il rilascio.
+    private bool _remotePickupWaitsForEggRelease;
     private float timeTakingEgg = 0;
     private float timePuttingEgg = 0;
     private bool deleteEggBool = false;
@@ -57,6 +59,11 @@ public class PenguinColliderHandler
     // MODIFICATO: ora riceve la lista delle uova in collisione
     public void HandleEggPickup(List<string> collidingEggs, StateStruct stateStruct, float deltaTime, ref string myEgg)
     {
+        // Il rilascio puo' arrivare mentre il remoto e' ancora congelato.
+        // Va riconosciuto anche se il freeze impedisce la raccolta.
+        if (_tag.EndsWith("Red") && !stateStruct.IsPressed(StateList.WithEgg))
+            _remotePickupWaitsForEggRelease = false;
+
         if (isFrozen || stateStruct.IsPressed(StateList.Freezing))
         {
             _lockedEggTag = null;
@@ -66,6 +73,10 @@ public class PenguinColliderHandler
         // Il remoto raccoglie soltanto se WithEgg arriva dalla rete
         if (_tag.EndsWith("Red"))
         {
+            // Un WithEgg ancora valido prima dell'HIT non e' una nuova raccolta.
+            if (_remotePickupWaitsForEggRelease)
+                return;
+
             if (stateStruct.IsPressed(StateList.WithEgg) && myEgg == null && collidingEggs.Count > 0)
             {
                 // Anche in remoto prende quello con ID minore
@@ -122,6 +133,11 @@ public class PenguinColliderHandler
 
     public void HandleHitByBall(ref string myEgg)
     {
+        // La conferma dell'HIT invalida il precedente possesso del remoto.
+        // Per un nuovo pickup serve prima uno stato di rete senza WithEgg.
+        if (_tag.EndsWith("Red"))
+            _remotePickupWaitsForEggRelease = true;
+
         if (isWithEgg)
         {
             eggPutEvent?.Invoke(this, EventArgs.Empty);
