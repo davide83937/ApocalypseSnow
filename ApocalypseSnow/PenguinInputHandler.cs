@@ -58,6 +58,20 @@ public class PenguinInputHandler
     
 
     
+    // Il remoto aggiorna la direzione dello sprite ma non integra movimento:
+    // la sua posizione viene esclusivamente dagli snapshot autoritativi.
+    public void UpdateRemoteFacing()
+    {
+        if (_stateStruct.IsPressed(StateList.Freezing))
+            return;
+
+        float dx = _stateStruct.IsPressed(StateList.Right) ? 1f : 0f;
+        if (_stateStruct.IsPressed(StateList.Left)) dx -= 1f;
+        float dy = _stateStruct.IsPressed(StateList.Down) ? 1f : 0f;
+        if (_stateStruct.IsPressed(StateList.Up)) dy -= 1f;
+        UpdateAnimationState(dx, dy);
+    }
+
     private void UpdateAnimationState(float vx, float vy)
     {
         // Se il pinguino si muove principalmente in verticale

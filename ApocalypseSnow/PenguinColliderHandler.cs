@@ -184,11 +184,12 @@ public class PenguinColliderHandler
         }
     }
     
-    public void SyncStateWithNetwork(StateStruct stateStruct, ref string myEgg)
+    public void SyncStateWithNetwork(StateStruct stateStruct, ref string myEgg, bool serverFrozen = false)
     {
         // Se siamo il pinguino remoto e il server dice che NON abbiamo più l'uovo,
         // ma localmente risultiamo ancora "WithEgg", forziamo il reset immediato.
-        if (_tag.EndsWith("Red") && !stateStruct.IsPressed(StateList.WithEgg) && isWithEgg)
+        if (_tag.EndsWith("Red") && !stateStruct.IsPressed(StateList.WithEgg) && isWithEgg
+            && !stateStruct.IsPressed(StateList.Freezing) && !serverFrozen)
         {
             // Notificare PRIMA di cancellare il tag: EggsEvent.addEgg
             // usa ancora il riferimento all'uovo trasportato.
@@ -220,8 +221,11 @@ public class PenguinColliderHandler
     
     public void putEgg(StateStruct stateStruct, ref string tagEgg)
     {
-        if ((stateStruct.IsPressed(StateList.WithEgg) && stateStruct.JustPressed(StateList.TakingEgg))
-            || (stateStruct.JustReleased(StateList.WithEgg) && stateStruct.JustPressed(StateList.Freezing)))
+        // Solo il rilascio volontario con E passa da qui.
+        // La pallata provoca il drop esclusivamente tramite HandleConfirmedHit.
+        if (stateStruct.IsPressed(StateList.WithEgg)
+            && stateStruct.JustPressed(StateList.TakingEgg)
+            && !stateStruct.IsPressed(StateList.Freezing))
         {
             eggPutEvent?.Invoke(this, EventArgs.Empty);
             isWithEgg = false;

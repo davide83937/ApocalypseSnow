@@ -61,10 +61,14 @@ public class Events:GameComponent
         LatestRemotePosition = new Vector2(x, y);
         HasRemotePosition = true;
 
-        // Evita di anticipare il freeze remoto usando snapshot del server:
-        // il suo impatto viene ricostruito sulla timeline di questo client.
+        // Il freeze predetto puo' scadere prima di quello sul server.
+        // Non riprodurre le vecchie posizioni di rete mentre una delle due
+        // timeline indica ancora il congelamento. Il remoto NON simula
+        // movimento: appena entrambi i freeze sono finiti riprende
+        // direttamente dall'ultimo snapshot, senza replay dei precedenti.
         bool localFreeze = _redPenguin.LocalFreeze.IsFrozen(GameSession.LocalTick);
-        if (!localFreeze)
+        bool serverFreeze = ((StateList)mask & StateList.Freezing) != StateList.None;
+        if (!localFreeze && !serverFreeze)
             _redPenguin._position = LatestRemotePosition;
     }
     
@@ -79,8 +83,8 @@ public class Events:GameComponent
     private void HandleRemoteShot(RemoteShotMessage shot)
     {
         Vector2 target = new Vector2(shot.TargetX, shot.TargetY);
-        _remoteShotStartTicks[shot.Key] = GameSession.LocalTick;
         _redPenguin.HandleRemoteShot(target, shot.Charge, shot.Type, shot.Key);
-        _redPenguin._myEgg = null;
+        // La palla e' stata creata: associamo il tick locale alla sua ShotKey.
+        _remoteShotStartTicks[shot.Key] = GameSession.LocalTick;
     }
 }

@@ -89,6 +89,13 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
         );
     }
 
+    // Il server ha confermato il colpo: il pinguino gestisce l'eventuale uovo.
+    // La collisione grafica e la prediction restano nel normale gameplay locale.
+    public void HandleConfirmedHit()
+    {
+        _penguinColliderHandler.HandleHitByBall(ref _myEgg);
+    }
+
     public void HandleRemoteShot(Vector2 target, int charge, ShotType shotType, ShotKey shotKey)
     {
         _penguinShotHandler.pressedTime = charge/1000f; 
@@ -121,9 +128,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 {
                     uint hitTick = GameSession.LocalTick;
                     ShotTrace.Log($"[SHOT_TRACE] role={(_tag.EndsWith("Red") ? "REMOTE_TARGET" : "LOCAL_TARGET")} event=PRED_HIT key={ball.ShotKey} tick={hitTick} startTick={ball.ObservedStartTick} flightTicks={hitTick - ball.ObservedStartTick} utc={DateTime.UtcNow:O}");
-                    LocalFreeze.Predict(ball.ShotKey, hitTick);
+                    bool predictedFreeze = LocalFreeze.Predict(ball.ShotKey, hitTick);
                     ball.PredictPenguinImpact();
-                    _penguinColliderHandler.isFrozen = true;
+                    if (predictedFreeze)
+                        _penguinColliderHandler.isFrozen = true;
                 }
                 break;
             case "blueP" or "redP":
@@ -152,7 +160,12 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 _physicsDeltaTime,
                 _position);
 
-            _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
+            // Il remoto usa esclusivamente gli snapshot di posizione del server:
+            // non simulare di nuovo gli input gia' applicati dal server.
+            if (_tag.EndsWith("Red"))
+                _penguinInputHandler.UpdateRemoteFacing();
+            else
+                _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
 
 
             // --- ESEGUIAMO LA TUA LOGICA CON LA LISTA COMPLETA ---
@@ -171,13 +184,18 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
             _penguinShotHandler.Reload(_penguinInputHandler._stateStruct, _physicsDeltaTime);
 
-            if (!_tag.EndsWith("Red") && _gameContext.IsActive)
+            // ChargeShot azzera la carica anche quando la finestra perde il focus.
+            if (!_tag.EndsWith("Red"))
             {
                 _penguinShotHandler.ChargeShot(_penguinInputHandler._stateStruct, _physicsDeltaTime);
             }
 
             if (_tag.EndsWith("Red"))
-                _penguinColliderHandler.SyncStateWithNetwork(_penguinInputHandler._stateStruct, ref _myEgg);
+            {
+                bool serverFrozen = _movementsManager is MovementsManagerRed remote && remote.IsServerFrozen;
+                _penguinColliderHandler.SyncStateWithNetwork(
+                    _penguinInputHandler._stateStruct, ref _myEgg, serverFrozen);
+            }
             
             if (!_tag.EndsWith("Red") && _gameContext.IsActive)
             {

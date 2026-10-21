@@ -351,6 +351,13 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 		return
 	}
 
+	// Un rilascio annullato dal client (freeze predetto, perdita del focus, ecc.)
+	// puo' non produrre MsgShot: una nuova pressione avvia una nuova carica.
+	if ps.Active && ps.WaitingShotPacket && (leftJustPressed || rightJustPressed) {
+		log.Printf("[SHOT ABANDONED] owner=%d releaseTick=%d newPressTick=%d", player.ID, ps.ReleaseTick, seqN)
+		*ps = PendingShot{}
+	}
+
 	if !ps.Active {
 		if leftJustPressed {
 			ps.Active = true
@@ -491,6 +498,7 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 		case EventShot:
 			shotEvent := event.Shot
 			if gameRoom.isServerFrozen(player) {
+				log.Printf("[SHOT REJECT FROZEN] owner=%d shotClientTick=%d serverMatchTick=%d freeze=[%d,%d)", player.ID, shotEvent.SeqN, gameRoom.matchTick, player.FreezeStartTick, player.FreezeEndTick)
 				consumeCount++
 				continue
 			}
@@ -735,7 +743,7 @@ func (gameRoom *GameRoom) resolveShot(shot *Shot, outcome ShotOutcome, hitPlayer
 			victim = &gameRoom.secondPlayer
 		}
 		hitAck, hitX, hitY = victim.LastSeqN, victim.X, victim.Y
-		// Il server usa esclusivamente il proprio matchTick: LastSeqN e' solo un ACK.
+		// Il freeze dura 90 tick del server, senza finestre sugli input client.
 		freezeEnd := gameRoom.matchTick + 90
 		if freezeEnd > victim.FreezeEndTick {
 			victim.FreezeStartTick = gameRoom.matchTick

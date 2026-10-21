@@ -7,23 +7,19 @@ public sealed class FreezeTimeline
 {
     private readonly Dictionary<ShotKey, (uint Start, uint EndExclusive)> _predictedIntervals = new();
     private readonly List<(uint Start, uint EndExclusive)> _confirmedIntervals = new();
+    private readonly HashSet<ShotKey> _resolvedShots = new();
 
     // La durata del volo e' relativa: ogni client usa il proprio tick di comparsa.
     public static uint ComputeImpactTick(uint observedStartTick, uint serverFlightTicks)
         => checked(observedStartTick + serverFlightTicks);
 
-    // Se manca il tick di partenza, un HIT confermato dal server va comunque applicato.
-    // Usiamo il tick locale corrente invece di perdere il congelamento.
-    public static uint ComputeConfirmedImpactTick(bool hasObservedStartTick, uint observedStartTick,
-        uint serverFlightTicks, uint currentLocalTick)
-        => hasObservedStartTick
-            ? ComputeImpactTick(observedStartTick, serverFlightTicks)
-            : currentLocalTick;
-
     // Anticipa il freeze usando il tick locale della collisione prevista.
-    public void Predict(ShotKey key, uint localHitTick)
+    public bool Predict(ShotKey key, uint localHitTick)
     {
-        _predictedIntervals.TryAdd(key, (localHitTick, checked(localHitTick + 90)));
+        // Se il server ha gia' risolto questa palla, una prediction tardiva non prevale.
+        if (_resolvedShots.Contains(key))
+            return false;
+        return _predictedIntervals.TryAdd(key, (localHitTick, checked(localHitTick + 90)));
     }
 
     public bool TryGetPredictedHitTick(ShotKey key, out uint localHitTick)
@@ -37,15 +33,17 @@ public sealed class FreezeTimeline
         return false;
     }
 
-    // Una prediction smentita viene soltanto annullata.
+    // Il server ha risolto il tiro: annulla la prediction e impedisce di ricrearla.
     // Gli ACK del server non sono tick della timeline locale.
     public void RejectPrediction(ShotKey key)
     {
+        _resolvedShots.Add(key);
         _predictedIntervals.Remove(key);
     }
 
     public void ConfirmLocal(ShotKey key, uint localHitTick, uint durationTicks = 90)
     {
+        _resolvedShots.Add(key);
         _predictedIntervals.Remove(key);
         _confirmedIntervals.Add((localHitTick, checked(localHitTick + durationTicks)));
     }

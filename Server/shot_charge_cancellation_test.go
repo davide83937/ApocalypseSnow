@@ -42,6 +42,49 @@ func requireShotFromNewCharge(t *testing.T, room *GameRoom) {
 	}
 }
 
+// Una carica interrotta (senza MsgShot) non deve bloccare i tiri successivi.
+func TestAbandonedShotAllowsNextCharge(t *testing.T) {
+	room := processShotInputSequence(t,
+		syncInput(1, ShootLeft),
+		syncInput(2, ShootLeft),
+		syncInput(3, 0), // Rilascio senza MsgShot, per esempio freeze predetto.
+		syncInput(4, 0),
+		syncInput(5, ShootLeft),
+		syncInput(6, ShootLeft),
+		shotAt(7, 67),
+		syncInput(7, 0),
+	)
+	if len(room.activeShots) != 1 {
+		t.Fatalf("expected next shot to be accepted, got %d, pending=%+v",
+			len(room.activeShots), room.firstPlayer.PendingShot)
+	}
+	shot := room.activeShots[0]
+	if shot.ClientShotTick != 7 || shot.PressedTick != 5 || shot.ReleasedTick != 7 {
+		t.Fatalf("stale charge reused: %+v", shot)
+	}
+}
+
+// Un MsgShot vecchio non deve prendere il posto di un nuovo rilascio valido.
+func TestAbandonedShotRejectsOldPacketButAcceptsNewShot(t *testing.T) {
+	room := processShotInputSequence(t,
+		syncInput(1, ShootLeft),
+		syncInput(2, 0), // Pacchetto 2 assente al rilascio.
+		syncInput(3, ShootRight),
+		shotAt(2, 33), // Un eventuale pacchetto tardivo della vecchia carica.
+		syncInput(4, ShootRight),
+		shotAt(5, 67),
+		syncInput(5, 0),
+	)
+	if len(room.activeShots) != 1 {
+		t.Fatalf("expected valid new shot, got %d, pending=%+v",
+			len(room.activeShots), room.firstPlayer.PendingShot)
+	}
+	shot := room.activeShots[0]
+	if shot.ClientShotTick != 5 || shot.ReleasedTick != 5 || shot.PressedTick != 3 || shot.Type != ShotTypeRight {
+		t.Fatalf("wrong new shot after old packet: %+v", shot)
+	}
+}
+
 // Ricaricare mentre si carica il tiro deve annullare il vecchio PendingShot.
 func TestReloadCancelsChargingShotAndNextShotStartsFresh(t *testing.T) {
 	room := processShotInputSequence(t,

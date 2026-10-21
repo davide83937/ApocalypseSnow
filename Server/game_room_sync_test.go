@@ -151,3 +151,57 @@ func TestOriginalMaturePendingPreservesShotBeforeReleaseState(t *testing.T) {
 		t.Fatalf("ACK did not reach release: %d", room.firstPlayer.LastSeqN)
 	}
 }
+
+// Il server consuma e conferma gli input durante il freeze, senza muovere il pinguino.
+// Allo scadere dei 90 tick server riprende normalmente, anche con input accumulati.
+func TestServerFreezeAcknowledgesInputsWithoutMoving(t *testing.T) {
+	room := syncTestRoom()
+	victim := &room.secondPlayer
+	victim.LastSeqN = 100
+	room.matchTick = 150
+	shot := Shot{ShotID: 99, OwnerPlayerID: 1, ClientShotTick: 71, IsAlive: true}
+	room.resolveShot(&shot, ShotOutcomePenguin, 2)
+
+	initialX := victim.X
+	room.matchTick = 200 // Freeze server: [150, 240).
+	for seq := uint32(101); seq <= 105; seq++ {
+		room.secondPlayerPendingEvents = append(room.secondPlayerPendingEvents, syncInput(seq, Right))
+	}
+	processed, remaining := room.applyMaturePendingEvents(victim, &room.secondPlayerPendingEvents, room.firstPlayerConnection, MoveDt)
+	if processed != 5 || remaining != 0 || victim.LastSeqN != 105 {
+		t.Fatalf("frozen inputs: processed=%d pending=%d ACK=%d", processed, remaining, victim.LastSeqN)
+	}
+	syncClose(t, victim.X, initialX)
+
+	room.matchTick = 240 // Fine freeze, primo tick libero.
+	for seq := uint32(106); seq <= 110; seq++ {
+		room.secondPlayerPendingEvents = append(room.secondPlayerPendingEvents, syncInput(seq, Right))
+	}
+	processed, remaining = room.applyMaturePendingEvents(victim, &room.secondPlayerPendingEvents, room.firstPlayerConnection, MoveDt)
+	if processed != 5 || remaining != 0 || victim.LastSeqN != 110 {
+		t.Fatalf("unfrozen inputs: processed=%d pending=%d ACK=%d", processed, remaining, victim.LastSeqN)
+	}
+	syncClose(t, victim.X, initialX+5*MoveSpeed*MoveDt)
+}
+
+// Conta il tick del server, non l'intervallo HitAck+90: dopo il freeze
+// i nuovi comandi sul nastro vengono elaborati indipendentemente dal numero di sequenza.
+func TestDelayedInputAfterServerFreezeIsAllowed(t *testing.T) {
+	room := syncTestRoom()
+	victim := &room.firstPlayer
+	victim.LastSeqN = 100
+	room.matchTick = 150
+	shot := Shot{ShotID: 99, OwnerPlayerID: 2, ClientShotTick: 71, IsAlive: true}
+	room.resolveShot(&shot, ShotOutcomePenguin, 1)
+
+	room.matchTick = 250
+	initialX := victim.X
+	for seq := uint32(101); seq <= 105; seq++ {
+		room.firstPlayerPendingEvents = append(room.firstPlayerPendingEvents, syncInput(seq, Right))
+	}
+	processed, remaining := room.applyMaturePendingEvents(victim, &room.firstPlayerPendingEvents, room.secondPlayerConnection, MoveDt)
+	if processed != 5 || remaining != 0 || victim.LastSeqN != 105 {
+		t.Fatalf("post-freeze inputs: processed=%d pending=%d ACK=%d", processed, remaining, victim.LastSeqN)
+	}
+	syncClose(t, victim.X, initialX+5*MoveSpeed*MoveDt)
+}

@@ -205,6 +205,35 @@ func TestRepeatedHitExtendsFreezeDeadline(t *testing.T) {
 	}
 }
 
+// Dieci HIT ravvicinati non si sommano: scadenza = ultimo impatto + 90 tick.
+func TestTenHitsUseLastServerDeadline(t *testing.T) {
+	room := syncTestRoom()
+	victim := &room.secondPlayer
+	for i := uint32(0); i < 10; i++ {
+		room.matchTick = 200 + 10*i
+		victim.LastSeqN = 40 + 10*i
+		shot := Shot{ShotID: 100 + i, OwnerPlayerID: 1,
+			ClientShotTick: 500 + i, IsAlive: true}
+		room.resolveShot(&shot, ShotOutcomePenguin, 2)
+		if victim.FreezeEndTick != room.matchTick+90 {
+			t.Fatalf("hit %d: freeze ends at %d, want %d",
+				i, victim.FreezeEndTick, room.matchTick+90)
+		}
+	}
+	room.matchTick = 379
+	if !room.isServerFrozen(victim) {
+		t.Fatal("unfroze before last hit deadline")
+	}
+	room.matchTick = 380
+	if room.isServerFrozen(victim) {
+		t.Fatal("freeze stacked past final deadline")
+	}
+	if len(room.firstPlayerConnection.OutgoingPacketChannel) != 10 ||
+		len(room.secondPlayerConnection.OutgoingPacketChannel) != 10 {
+		t.Fatal("each confirmed hit must be delivered once to both players")
+	}
+}
+
 // Misura la durata calcolata dalla fisica REALE di Go, a parita' di carica
 // e tipologia di tiro rispetto al client A. L'output e' comparato da
 // Tests/compare_shot_flight.ps1 con la misura indipendente in C#.

@@ -11,7 +11,11 @@ public class MovementsManagerRed:IMovements
     private bool isFreezing = false;
     private bool isWithEgg = false;
     private StateList _remoteState = StateList.None;
- 
+
+    // Il bit del server serve a non anticipare il drop dell'uovo durante un HIT.
+    // L'animazione del freeze continua a usare la timeline locale.
+    public bool IsServerFrozen => (_remoteState & StateList.Freezing) != 0;
+
     
     public MovementsManagerRed()
     {
@@ -43,7 +47,9 @@ public class MovementsManagerRed:IMovements
         if (isFreezing)
             inputList.Current |= StateList.Freezing;
 
-        if (inputList.IsPressed(StateList.Freezing))
+        // Il bit del server non allunga l'animazione del freeze locale, ma
+        // impedisce di mostrare movimenti quando lo stato autoritativo e' fermo.
+        if (inputList.IsPressed(StateList.Freezing) || IsServerFrozen)
             inputList.Current &= ~(StateList.Moving | StateList.Up | StateList.Down |
                                    StateList.Left | StateList.Right | StateList.ShootLeft |
                                    StateList.ShootRight);
