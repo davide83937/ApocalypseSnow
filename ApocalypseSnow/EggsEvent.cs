@@ -55,6 +55,12 @@ public class EggsEvent:GameComponent
         // 2. Eseguiamo la rimozione fuori dal ciclo foreach
         if (eggToRemove != null)
         {
+            // Solo il proprietario comunica al server l'ID della consegna;
+            // il remoto non deve inviare un secondo punto per lo stesso uovo.
+            if (sender == _myPenguin._penguinColliderHandler &&
+                int.TryParse(eggToRemove._tag.Substring(3), out int eggId))
+                NetworkManager.Instance.SendEggDelivered(eggId);
+
             // Rimuoviamo dalla logica delle collisioni
             CollisionManager.Instance.removeObject(eggToRemove._tag);
         
@@ -64,15 +70,8 @@ public class EggsEvent:GameComponent
             // Rimuoviamo dalla nostra lista privata (ORA è SICURO)
             _eggs.Remove(eggToRemove);
 
-            // 3. Aggiorniamo il punteggio
-            Penguin penguin = null;
-            if (sender == _myPenguin._penguinColliderHandler) penguin = _myPenguin;
-            else if (sender == _redPenguin._penguinColliderHandler) penguin = _redPenguin;
-
-            if (penguin is { _tag: "penguin" }) 
-            { _myPenguinScore++; }
-            else
-            {_redPenguinScore++;}
+            // Il punteggio viene aggiornato solo dal MsgMatchStatus del server.
+            // Questo evento locale rimuove esclusivamente lo sprite dell'uovo.
         }
     }
 
@@ -86,15 +85,49 @@ public class EggsEvent:GameComponent
 
         if (penguin != null)
         {
+            ShotTrace.Log($"[EGG_DROP] penguin={penguin._tag} egg={penguin._myEgg ?? "none"} at=({penguin._position.X:F1},{penguin._position.Y:F1})");
             foreach (Egg egg in _eggs)
             {
                 if (egg._tag == penguin._myEgg)
                 {
+                    ShotTrace.Log($"[EGG_DROP] found={egg._tag}");
                     if (!Game.Components.Contains(egg)) Game.Components.Add(egg); // Evita duplicati
-                    egg._position.X = penguin._position.X + 48;
-                    egg._position.Y = penguin._position.Y + 100;
-                
-                    CollisionManager.Instance.addObject(egg._tag, egg._position.X, egg._position.Y, 
+
+                    // Offset riferiti ai centri visivi degli sprite, non agli angoli.
+                    Vector2 penguinCenter = penguin._position + new Vector2(
+                        penguin._penguinInputHandler._animationManager.SourceRect.Width / 2f,
+                        penguin._penguinInputHandler._animationManager.SourceRect.Height / 2f);
+                    Vector2 eggHalfSize = new(egg._texture.Width / 2f, egg._texture.Height / 2f);
+                    Vector2[] dropOffsets =
+                    [
+                        new(40, 60),   // Basso a destra
+                        new(-40, 60),  // Basso a sinistra
+                        new(-40, -60), // Alto a sinistra
+                        new(40, -60)   // Alto a destra
+                    ];
+
+                    // Il collider del muro e' piu' stretto della sua immagine.
+                    // Per scegliere il punto di posa usiamo il centro dell'uovo e
+                    // un margine visivo; la sua hitbox di raccolta resta invariata.
+                    const int wallVisualMarginX = 24;
+                    const int wallVisualMarginY = 16;
+
+                    foreach (Vector2 offset in dropOffsets)
+                    {
+                        Vector2 candidate = penguinCenter + offset - eggHalfSize;
+                        Vector2 eggCenter = candidate + eggHalfSize;
+                        if (!CollisionManager.Instance.wouldCollide(
+                                egg._tag, eggCenter.X, eggCenter.Y,
+                                egg._texture.Width + 2 * wallVisualMarginX,
+                                egg._texture.Height + 2 * wallVisualMarginY, "obstacle"))
+                        {
+                            egg._position = candidate;
+                            ShotTrace.Log($"[EGG_DROP] placed={egg._tag} at=({candidate.X:F1},{candidate.Y:F1})");
+                            break;
+                        }
+                    }
+
+                    CollisionManager.Instance.addObject(egg._tag, egg._position.X, egg._position.Y,
                         egg._texture.Width, egg._texture.Height);
                     break; 
                 }

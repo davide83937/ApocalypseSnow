@@ -46,6 +46,13 @@ type GameRoom struct {
 	activeShots []Shot
 	nextShotID  uint32
 
+	// Il server conta le consegne per ID, una sola volta per uovo.
+	basePositions  [2]Position
+	totalEggs      int
+	deliveredEggs  map[int32]bool
+	scores         [2]uint32
+	matchFinished  bool
+
 	tickRateHz uint32
 	matchTick  uint32
 }
@@ -125,6 +132,7 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 
 		activeShots:      make([]Shot, 0, 64),
 		nextShotID:       1,
+		deliveredEggs:   make(map[int32]bool),
 		collisionManager: NewCollisionManager(),
 
 		Obstacles: []Position{
@@ -151,6 +159,8 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 			LastRx:   time.Time{},
 		},
 	}
+
+	gameRoom.basePositions = [2]Position{gameRoom.firstPlayer.Position, gameRoom.secondPlayer.Position}
 
 	// Collider persistenti dei player
 	gameRoom.collisionManager.AddObject(
@@ -230,6 +240,9 @@ func (gameRoom *GameRoom) Run() {
 
 // Tick esegue un singolo passo logico del gioco.
 func (gameRoom *GameRoom) Tick() {
+	if gameRoom.matchFinished {
+		return
+	}
 	gameRoom.matchTick++
 	deltaTime := float32(1.0 / float32(gameRoom.tickRateHz))
 	now := time.Now()
@@ -494,6 +507,10 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 				}
 				ps.ShotPacket = nil
 			}
+
+		case EventEggDelivered:
+			gameRoom.recordEggDelivery(player, event.EggID)
+			applied++
 
 		case EventShot:
 			shotEvent := event.Shot
@@ -894,6 +911,7 @@ func (gameRoom *GameRoom) SendJoinAcknowledgements() {
 
 // CreateInitialEggs genera un certo numero di uova iniziali.
 func (gameRoom *GameRoom) CreateInitialEggs(eggCount int) {
+	gameRoom.totalEggs = eggCount
 	for eggID := 0; eggID < eggCount; eggID++ {
 		eggX := float32(250 + rand.Intn(250))
 		eggY := float32(rand.Intn(400))

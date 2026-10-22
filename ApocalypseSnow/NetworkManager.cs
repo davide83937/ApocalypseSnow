@@ -23,6 +23,7 @@ public class NetworkManager : GameComponent
     public event Action<ShotResolutionMessage> OnShotResolvedReceived;
 
     public event Action<int, float, float> OnEggReceived;
+    public event Action<uint, uint, uint, uint> OnMatchStatusReceived; // p1, p2, remaining, winner
     public event Action<float, float> OnObstacleReceived;
 
     public uint StartTick { get; private set; }
@@ -154,6 +155,14 @@ public class NetworkManager : GameComponent
                     OnShotResolvedReceived?.Invoke(ShotResolutionMessage.Parse(payload));
                     break;
 
+                case 13: // MsgMatchStatus: punteggio e risultato dal server
+                    OnMatchStatusReceived?.Invoke(
+                        BitConverter.ToUInt32(payload, 0),
+                        BitConverter.ToUInt32(payload, 4),
+                        BitConverter.ToUInt32(payload, 8),
+                        BitConverter.ToUInt32(payload, 12));
+                    break;
+
                 case 9: // MsgTickAlign (reserved; no server sender yet)
                     StartTick = BitConverter.ToUInt32(payload, 0);
                     ServerTickHz = BitConverter.ToUInt32(payload, 4);
@@ -167,6 +176,23 @@ public class NetworkManager : GameComponent
                         break;
                     }
             }
+        }
+    }
+
+    // Invia solo la consegna completata localmente; il server decide se vale un punto.
+    public void SendEggDelivered(int eggId)
+    {
+        if (_stream == null || !_tcpClient.Connected) return;
+        byte[] packet = new byte[5];
+        packet[0] = (byte)MessageType.EggDelivered;
+        Buffer.BlockCopy(BitConverter.GetBytes(eggId), 0, packet, 1, 4);
+        try
+        {
+            _stream.Write(packet, 0, packet.Length);
+        }
+        catch (IOException)
+        {
+            Connect();
         }
     }
 

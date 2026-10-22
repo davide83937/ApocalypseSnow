@@ -22,6 +22,9 @@ public sealed class GameSession : GameComponent
     public EggsEvent _eggsEvent;
     public Events _events;
     public string state = null;
+    private uint _localPlayerId;
+    public string MatchResult { get; private set; }
+    public bool IsMatchOver => MatchResult != null;
 
     //copia del tick locale, che incrementiamo ad ogni update, e del tick accumulato, che invece incrementiamo con il delta time
     //e usiamo per capire quando è ora di fare un nuovo tick di gioco (e quindi inviare un nuovo input al server)
@@ -84,6 +87,9 @@ public sealed class GameSession : GameComponent
         LocalTick = 1; // Il server inizializza LastSeqN=0: la prima sequenza valida è 1.
         TickRateHz = ack.Heartz;
         _tickAcc = 0f;
+        _localPlayerId = ack.PlayerId;
+        MatchResult = null;
+        networkManager.OnMatchStatusReceived += HandleMatchStatus;
         Reconciler.Instance.Reset();
         //Reconciler.Instance.SetNextSeq(1);
 
@@ -108,6 +114,19 @@ public sealed class GameSession : GameComponent
         Game.Components.Add(_events);
     }
     
+    // I punteggi arrivano dal server e non dal conteggio locale degli sprite.
+    private void HandleMatchStatus(uint player1Score, uint player2Score, uint remaining, uint winnerId)
+    {
+        _eggsEvent._myPenguinScore = (int)(_localPlayerId == 1 ? player1Score : player2Score);
+        _eggsEvent._redPenguinScore = (int)(_localPlayerId == 1 ? player2Score : player1Score);
+        if (winnerId != 0)
+        {
+            string outcome = winnerId == 3 ? "PAREGGIO!" :
+                winnerId == _localPlayerId ? "HAI VINTO!" : "HAI PERSO!";
+            MatchResult = $"{outcome}  {_eggsEvent._myPenguinScore} - {_eggsEvent._redPenguinScore}";
+        }
+    }
+
     public void EndSession()
     {
         // 1. Rimuovi tutti i componenti che la sessione ha aggiunto al gioco
@@ -139,7 +158,11 @@ public sealed class GameSession : GameComponent
         // 3. Chiudi la connessione di rete (fondamentale!)
         // Se il tuo NetworkManager ha un metodo Close o Dispose, chiamalo qui
         // Altrimenti, assicurati che il socket venga rilasciato.
-        networkManager?.Disconnect();
+        if (networkManager != null)
+        {
+            networkManager.OnMatchStatusReceived -= HandleMatchStatus;
+            networkManager.Disconnect();
+        }
 
         Console.WriteLine("Partita terminata e risorse pulite.");
     }
@@ -174,42 +197,44 @@ public sealed class GameSession : GameComponent
             return;
         
         NetworkManager.Instance?.Receive();
+        if (IsMatchOver)
+            return;
 
         // Acquisisce ultimo ACK e posizione dal server, senza correggere ancora il movimento.
         Reconciler.Instance.ReadAuthPosition();
         // Per ogni tiro ricevuto: conferma/smentisce la prediction e gestisce gli HIT.
         Reconciler.Instance.ReadAuthShot(LocalTick);
 
-        // ✅ tick fisso (stesso dt della sim di rete)
+        // Invia un input ogni NetDt secondi (30 Hz), recuperando eventuali tick arretrati.
         _tickAcc += (float)gameTime.ElapsedGameTime.TotalSeconds;
         while (_tickAcc >= NetDt)
         {
             _tickAcc -= NetDt;
             Debug.WriteLine($"LocalTick++: {LocalTick}");
 
-            var st = _myPenguin._penguinInputHandler._stateStruct;
+            // StateStruct e' una struct: modifichiamo la copia da inviare, non lo stato del pinguino.
+            StateStruct stateToSend = _myPenguin._penguinInputHandler._stateStruct;
+
             if (_myPenguin.LocalFreeze.IsFrozen(LocalTick))
             {
-                st.Current |= StateList.Freezing;
-                st.Current &= ~(StateList.Up | StateList.Down | StateList.Left | StateList.Right |
-                                StateList.Moving | StateList.ShootLeft | StateList.ShootRight |
-                                StateList.Reload | StateList.TakingEgg | StateList.PuttingEgg);
+                stateToSend.Current |= StateList.Freezing;
+                stateToSend.Current &= ~StateMasks.InputsBlockedByFreeze;
             }
             else
-                st.Current &= ~StateList.Freezing;
+            {
+                stateToSend.Current &= ~StateList.Freezing;
+            }
 
-            // 2) Conserva anche gli stati che bloccano il movimento per il replay.
-            StateList moveMask = st.Current & (
-                StateList.Up | StateList.Down | StateList.Left | StateList.Right |
-                StateList.Reload | StateList.Freezing | StateList.TakingEgg | StateList.PuttingEgg);
+            // Registra solo i bit necessari alla riconciliazione della posizione.
+            StateList pendingInput = stateToSend.Current & StateMasks.PositionReconciliationInputs;
+            Reconciler.Instance.RecordPendingInput(LocalTick, pendingInput);
 
-            // 3) record + send usando QUESTO tick
-            Reconciler.Instance.RecordPendingInput(LocalTick, moveMask);
-            NetworkManager.Instance.SendState(st, LocalTick);
+            // Invia lo stato completo usando lo stesso tick registrato localmente.
+            NetworkManager.Instance.SendState(stateToSend, LocalTick);
             LocalTick++;
         }
 
-        //SUPER NOTA: dentro il while siamo a 30 HZ, fuori dal while ma dentro questo Update siamo a 60 FPS
+        // Fuori dal ciclo a tick fisso: la riconciliazione viene eseguita una volta per Update().
 
         // Dopo l'avanzamento dei tick, applica caduta uovo e correzioni di HIT ora dovuti.
         Reconciler.Instance.ReconcileShot(LocalTick);
@@ -232,17 +257,7 @@ public sealed class GameSession : GameComponent
 
 
         
-        if (_eggsEvent._eggs.Count == 0)
-        {
-            if (_eggsEvent._myPenguinScore > _eggsEvent._redPenguinScore)
-            {
-                Console.WriteLine("Pinguino BLU ha vinto!!!!!!!!!!");
-            }
-            else
-            {
-                Console.WriteLine("Pinguino ROSSO ha vinto!!!!!!!!!");
-            }
-        }
+        // La fine della partita viene decisa esclusivamente dal server.
         base.Update(gameTime);
     }
 

@@ -66,12 +66,14 @@ type PlayerEventType int
 const (
 	EventInput PlayerEventType = iota
 	EventShot
+	EventEggDelivered
 )
 
 type PlayerEvent struct {
 	Type  PlayerEventType
 	Input InputState
 	Shot  ShotEvent
+	EggID int32
 }
 
 func (event PlayerEvent) SeqN() uint32 {

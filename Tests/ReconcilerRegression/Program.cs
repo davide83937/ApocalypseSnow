@@ -86,6 +86,7 @@ internal static class Program
             ("Predicted freeze, confirmed freeze and false HIT use tick deadlines", FreezeTimelines),
             ("Server flight duration maps to independent local timelines", FlightTimelineAcrossClients),
             ("Quantized flight duration does not gain a ghost tick", FlightTickQuantization),
+            ("Freeze ice fades across the 90 active ticks only", FreezeVisualFade),
             ("Ball fragments expire and terminal outcomes do not remove early", BallVisualLifecycleBoundaries),
             ("Remote shot before hit even when TCP messages arrive together", RemoteShotAndHitSameTcpBatch),
             ("Confirmed freeze is half-open and late confirmations never restart it", AuthoritativeFreezeBoundaries),
@@ -119,6 +120,7 @@ internal static class Program
             ("Every ball collider tag is unique and fits native 16-byte buffer", BallCollisionTags),
             ("RemoteShot wire payload preserves identity and trajectory fields", RemoteShotPayload),
             ("RemoteShot decoder rejects malformed length", RejectMalformedRemoteShot),
+            ("Server match status packet survives fragmented TCP", MatchStatusTcpFraming),
             ("Three terminal shot results decode with complete identity", ShotResolutionPayload),
             ("Terminal results reject corrupted payload", ShotResolutionRejectsInvalid),
             ("TCP framing survives byte-by-byte fragmented resolution", FragmentedShotResolution),
@@ -559,6 +561,53 @@ internal static class Program
         Equal(scores, 1);
         Equal(egg == null, true);
         Equal(collider.isWithEgg, false);
+    }
+
+    // Il verdetto finale deve essere letto solo quando tutto il payload TCP e' arrivato.
+    private static void MatchStatusTcpFraming(Reconciler reconciler)
+    {
+        byte[] packet = new byte[17];
+        packet[0] = (byte)MessageType.MatchStatus;
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(1, 4), 3);
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(5, 4), 2);
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(9, 4), 0);
+        BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(13, 4), 1);
+        var framer = new NetworkPacketFramer();
+        framer.Append(packet.AsSpan(0, 5));
+        Equal(framer.TryRead(out _, out _), false);
+        framer.Append(packet.AsSpan(5));
+        Equal(framer.TryRead(out byte type, out byte[] payload), true);
+        Equal(type, (byte)MessageType.MatchStatus);
+        Equal(payload.Length, 16);
+        Equal(BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4)), 3u);
+        Equal(BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(4, 4)), 2u);
+        Equal(BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(8, 4)), 0u);
+        Equal(BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(12, 4)), 1u);
+        Equal(framer.TryRead(out _, out _), false);
+    }
+
+    private static void FreezeVisualFade(Reconciler reconciler)
+    {
+        var timeline = new FreezeTimeline();
+        var first = new ShotKey(1, 10);
+        timeline.Predict(first, 100);
+        Equal(timeline.GetVisualOpacity(99), 0f);
+        Equal(timeline.GetVisualOpacity(100), 1f);
+        Equal(MathF.Abs(timeline.GetVisualOpacity(145) - 0.5f) < 0.0001f, true);
+        Equal(MathF.Abs(timeline.GetVisualOpacity(189) - 1f / 90f) < 0.0001f, true);
+        Equal(timeline.GetVisualOpacity(190), 0f);
+
+        // Un altro HIT ricrea il ghiaccio; un MISS lo elimina senza code grafiche.
+        var second = new ShotKey(2, 20);
+        timeline.Predict(second, 160);
+        Equal(timeline.GetVisualOpacity(160), 1f);
+        timeline.RejectPrediction(second);
+        Equal(MathF.Abs(timeline.GetVisualOpacity(160) - 30f / 90f) < 0.0001f, true);
+        timeline.RejectPrediction(first);
+        Equal(timeline.GetVisualOpacity(160), 0f);
+        timeline.ConfirmLocal(new ShotKey(1, 30), 200);
+        Equal(timeline.GetVisualOpacity(200), 1f);
+        Equal(timeline.GetVisualOpacity(290), 0f);
     }
 
     // Controlla che due valori siano uguali.

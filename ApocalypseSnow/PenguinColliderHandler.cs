@@ -15,6 +15,9 @@ public class PenguinColliderHandler
     // Dopo un HIT il remoto ignora i vecchi WithEgg finche' la rete non comunica il rilascio.
     private bool _remotePickupWaitsForEggRelease;
     private float timeTakingEgg = 0;
+    // Durate originali del deposito sulla piattaforma: 1 s di pressione + 0,2 s di completamento.
+    private const float EggDeliverySeconds = 1f;
+    private const float EggDeliveryCleanupSeconds = 0.2f;
     private float timePuttingEgg = 0;
     private bool deleteEggBool = false;
 
@@ -177,14 +180,14 @@ public class PenguinColliderHandler
             timePuttingEgg += deltaTime;
         
             // 1. A 1.0 secondi diamo il punto in locale e chiudiamo il lucchetto
-            if (timePuttingEgg > 1f && !deleteEggBool)
+            if (timePuttingEgg > EggDeliverySeconds && !deleteEggBool)
             {
                 deleteEgg(myEgg);
                 deleteEggBool = true;
             }
 
             // 2. A 1.2 secondi abbiamo finito di inviare il "falso" tasto premuto: resettiamo tutto
-            if (timePuttingEgg > 1.2f)
+            if (timePuttingEgg > EggDeliverySeconds + EggDeliveryCleanupSeconds)
             {
                 timePuttingEgg = 0;
                 isWithEgg = false;

@@ -48,6 +48,29 @@ public sealed class FreezeTimeline
         _confirmedIntervals.Add((localHitTick, checked(localHitTick + durationTicks)));
     }
 
+    // Dissolvenza SOLO visiva: dal 100% al 0% lungo i 90 tick del freeze.
+    // Con piu' HIT sovrapposti prevale il piu' recente (ghiaccio di nuovo pieno).
+    public float GetVisualOpacity(uint localTick)
+    {
+        float opacity = 0f;
+        foreach (var interval in _confirmedIntervals)
+        {
+            if (localTick >= interval.Start && localTick < interval.EndExclusive)
+                opacity = System.MathF.Max(opacity,
+                    (interval.EndExclusive - localTick) /
+                    (float)(interval.EndExclusive - interval.Start));
+        }
+
+        foreach (var interval in _predictedIntervals.Values)
+        {
+            if (localTick >= interval.Start && localTick < interval.EndExclusive)
+                opacity = System.MathF.Max(opacity,
+                    (interval.EndExclusive - localTick) /
+                    (float)(interval.EndExclusive - interval.Start));
+        }
+        return opacity;
+    }
+
     // Indica se un input locale appartiene ancora al freeze.
     public bool IsFrozen(uint localTick)
     {

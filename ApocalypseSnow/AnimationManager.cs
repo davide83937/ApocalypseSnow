@@ -12,6 +12,7 @@ public class AnimationManager
     private float _tempTime;
     private int _currentFrame;
     private Rectangle _sourceRect;
+    // L'opacita' del ghiaccio segue i 90 tick del freeze (FreezeTimeline).
     public Rectangle SourceRect{ get => _sourceRect;}
     public Texture2D this[int index] => _textures[index];
     private string partialPath;
@@ -39,13 +40,9 @@ public class AnimationManager
         _textures[index] = Texture2D.FromStream(gd, stream);
     }
 
-    private void ChangeTexture(SpriteBatch spriteBatch, int ammo, bool isReloading, bool isShooting, bool isFreezing,bool isWithEgg, Vector2 position)
+    private void ChangeTexture(SpriteBatch spriteBatch, int ammo, bool isReloading, bool isShooting, bool isFreezing, bool isWithEgg, float iceOpacity, Vector2 position)
     {
-        if (isFreezing)
-        {
-            Texture = _textures[4];
-        }
-        else if (ammo == 0 &&  !isReloading && !isShooting)
+        if (ammo == 0 && !isReloading && !isShooting)
         {
             Texture = _textures[0];
         }
@@ -65,7 +62,11 @@ public class AnimationManager
         {
             Texture = _textures[1];
         }
+        // Il pinguino resta visibile sotto il ghiaccio mentre questo svanisce
+        // durante i 3 secondi di freeze: nessuna dissolvenza aggiuntiva dopo.
         spriteBatch.Draw(Texture, position, _sourceRect, Color.White);
+        if (isFreezing && iceOpacity > 0f)
+            spriteBatch.Draw(_textures[4], position, _sourceRect, Color.White * iceOpacity);
     }
 
     private void walking_animation(float gameTime, bool isReloading, bool isMoving)
@@ -111,9 +112,9 @@ public class AnimationManager
 
 
 
-    public void Draw(SpriteBatch spriteBatch, Vector2 position, int ammo, bool isReloading, bool isShooting, bool isFreezing, bool isWithEgg)
+    public void Draw(SpriteBatch spriteBatch, Vector2 position, int ammo, bool isReloading, bool isShooting, bool isFreezing, bool isWithEgg, float iceOpacity)
     {
-        ChangeTexture(spriteBatch, ammo, isReloading, isShooting, isFreezing, isWithEgg, position);
+        ChangeTexture(spriteBatch, ammo, isReloading, isShooting, isFreezing, isWithEgg, iceOpacity, position);
     }
 
     public void MoveRect(int posRect)

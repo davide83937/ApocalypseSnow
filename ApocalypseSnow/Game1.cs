@@ -118,6 +118,10 @@ public class Game1: Game {
                 DrawComponentsOfType<Penguin>(Components.OfType<Penguin>());
                 DrawComponentsOfType<Ball>(Components.OfType<Ball>());
                 DrawUI();
+                if (gameSession.IsMatchOver)
+                    DrawFancyText(gameSession.MatchResult,
+                        new Vector2(_width / 2f, _height / 2f),
+                        Color.Gold, gameTime, true, 1.3f);
             }
         }
         else
@@ -191,8 +195,9 @@ public class Game1: Game {
         }
         else
         {
-            // Aggiorna i componenti registrati in MonoGame.
-            base.Update(gameTime);
+            // Dopo l'esito del server la scena rimane visibile ma non evolve.
+            if (!gameSession.IsMatchOver)
+                base.Update(gameTime);
         }
     }
 }

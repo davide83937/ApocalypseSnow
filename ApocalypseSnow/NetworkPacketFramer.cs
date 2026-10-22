@@ -30,6 +30,7 @@ public sealed class NetworkPacketFramer
             4 or 6 or 8 or 9 or 10 => 12,
             7 => RemoteShotMessage.PayloadLength,
             11 => ShotResolutionMessage.PayloadLength,
+            13 => 16, // due punteggi, uova rimanenti, vincitore
             _ => throw new InvalidDataException($"Unknown server message type: {type}")
         };
         int packetSize = payloadSize + 1;

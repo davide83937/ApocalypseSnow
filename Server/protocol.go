@@ -12,6 +12,8 @@ const (
 	MsgSpawnEgg      byte = 8 // 13B [type][id:int32][x:float32][y:float32]
 	MsgSpawnObstacle byte = 10
 	MsgShotResolved  byte = 11 // 34B [type][ownerId:uint32][shotTick:uint32][outcome:uint8][hitPlayerId:uint32][serverTick:uint32][hitAck:uint32][hitX:float32][hitY:float32][flightTicks:uint32]
+	MsgEggDelivered  byte = 12 // 5B  [type][eggId:int32] client -> server
+	MsgMatchStatus   byte = 13 // 17B [type][player1Score:uint32][player2Score:uint32][remaining:uint32][winnerId:uint32] server -> both
 )
 
 // Input mask bit

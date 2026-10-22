@@ -10,5 +10,7 @@ public enum MessageType
     RemoteState = 6, //Posizione del player remoto, usato per aggiornare la posizione dell'avversario
     RemoteShot = 7,  //Shot del player remoto, usato per spawnare la palla dell'avversario 
     AuthShot = 8,    // Legacy reserved (server currently uses MsgSpawnEgg=8).
-    ShotResolved = 11 // Server terminal outcome of a spawned shot (both players)
+    ShotResolved = 11, // Server terminal outcome of a spawned shot (both players)
+    EggDelivered = 12, // Consegna di un uovo alla base: client -> server
+    MatchStatus = 13   // Punteggi e vincitore determinati dal server
 }

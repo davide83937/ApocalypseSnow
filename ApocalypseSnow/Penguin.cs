@@ -88,7 +88,8 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             // Il remoto usa il possesso realmente ricostruito, non un WithEgg di rete obsoleto.
             _tag.EndsWith("Red")
                 ? _penguinColliderHandler.isWithEgg
-                : _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg)
+                : _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg),
+            LocalFreeze.GetVisualOpacity(GameSession.LastSentInputTick)
         );
     }
 
@@ -96,7 +97,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
     // La collisione grafica e la prediction restano nel normale gameplay locale.
     public void HandleConfirmedHit()
     {
+        // Diagnostica: distingue un HIT confermato dal semplice freeze predetto.
+        ShotTrace.Log($"[EGG_HIT] penguin={_tag} tick={GameSession.LocalTick} beforeEgg={_myEgg ?? "none"} beforeWithEgg={_penguinColliderHandler.isWithEgg}");
         _penguinColliderHandler.HandleHitByBall(ref _myEgg);
+        ShotTrace.Log($"[EGG_HIT] penguin={_tag} tick={GameSession.LocalTick} afterEgg={_myEgg ?? "none"} afterWithEgg={_penguinColliderHandler.isWithEgg}");
     }
 
     public void HandleRemoteShot(Vector2 target, int charge, ShotType shotType, ShotKey shotKey)
@@ -142,7 +146,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                     ref _penguinInputHandler._stateStruct, _deltaTime, ref _myEgg);
                 break;
             case "obstacle":
-                _penguinColliderHandler.HandleObstacleCollision(collisionRecordOut._type, ref _position);
+                // Il locale blocca gia' il movimento prima della collisione.
+                // Conserva la gestione precedente soltanto per il remoto.
+                if (_tag.EndsWith("Red"))
+                    _penguinColliderHandler.HandleObstacleCollision(collisionRecordOut._type, ref _position);
                 break;
         }
     }
@@ -168,7 +175,24 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             if (_tag.EndsWith("Red"))
                 _penguinInputHandler.UpdateRemoteFacing();
             else
-                _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
+            {
+                // Come sul server: calcola il passo e applicalo solo se non urta un ostacolo.
+                // UpdateMovement aggiorna anche la direzione dello sprite.
+                Vector2 candidatePosition = _position;
+                _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref candidatePosition);
+
+                if (candidatePosition == _position ||
+                    !CollisionManager.Instance.wouldCollide(
+                        _tag,
+                        candidatePosition.X + _halfTextureFractionWidth,
+                        candidatePosition.Y + _halfTextureFractionHeight,
+                        _textureFractionWidth,
+                        _halfTextureFractionHeight,
+                        "obstacle"))
+                {
+                    _position = candidatePosition;
+                }
+            }
 
 
             // --- ESEGUIAMO LA TUA LOGICA CON LA LISTA COMPLETA ---

@@ -77,6 +77,7 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 	joinPayloadBuffer := make([]byte, 8)
 	statePayloadBuffer := make([]byte, 8)
 	shotPayloadBuffer := make([]byte, 16)
+	eggPayloadBuffer := make([]byte, 4)
 
 	for {
 		select {
@@ -144,6 +145,17 @@ func (playerConnection *PlayerConnection) StartReadPump() {
 				Shot: shotEvent,
 			}
 
+			select {
+			case playerConnection.EventChannel <- event:
+			case <-playerConnection.DisconnectChannel:
+				return
+			}
+
+		case MsgEggDelivered:
+			if _, err := io.ReadFull(playerConnection.bufferReader, eggPayloadBuffer); err != nil {
+				return
+			}
+			event := PlayerEvent{Type: EventEggDelivered, EggID: int32(binary.LittleEndian.Uint32(eggPayloadBuffer))}
 			select {
 			case playerConnection.EventChannel <- event:
 			case <-playerConnection.DisconnectChannel:
