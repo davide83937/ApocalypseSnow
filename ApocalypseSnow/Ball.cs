@@ -32,6 +32,7 @@ public class Ball : CollisionExtensions
     public ShotKey ShotKey { get; }
     public uint ObservedStartTick { get; private set; }
     private bool _hasObservedStart;
+    
     public void MarkObservedStart(uint tick, string role)
     {
         ObservedStartTick = tick;

@@ -212,44 +212,54 @@ public class PenguinShotHandler
     // Ricostruisce la stessa traiettoria per il tiro locale e quello remoto.
     // I parametri sono verificati anche dai test di confronto con il server Go.
     public static ShotLaunch ComputeLaunch(Vector2 penguinPosition, Vector2 target, float chargeSeconds, ShotType type)
-    {
-        Vector2 muzzleBase = new(penguinPosition.X + 48f, penguinPosition.Y + MuzzleOffsetY);
-        // Lo schermo comprime il piano di gioco lungo Y (fattore 0,70).
-        // Compensiamo prima di normalizzare, cosi' la direzione sul terreno
-        // non dipende dalla distorsione prospettica.
-        float differenceX = target.X - muzzleBase.X;
-        float differenceY = (target.Y - muzzleBase.Y) / PlanePerspectiveY;
-        PhysicsAPI.normalizeVelocity(ref differenceX, ref differenceY);
+{
+    Vector2 muzzleBase = new(penguinPosition.X + 48f, penguinPosition.Y + MuzzleOffsetY);
+    
+    // 1. Salviamo subito il vettore direzione puro a schermo (pixel del monitor)
+    Vector2 screenDelta = target - muzzleBase;
 
-        // Taratura della parabola: la distanza massima del mondo definisce
-        // la gravita' e la velocita' massima del tiro basso a piena carica.
-        float gravity = ComputeGravityForLowShot(ComputeMaxWorldRange(muzzleBase));
-        float maxV0 = ComputeMaxV0(gravity);
-        // Carica normalizzata tra 0 e 1. La radice quadrata fa crescere
-        // la potenza rapidamente all'inizio (25% di carica -> 50% di velocita')
-        // senza superare la velocita' massima.
-        float charge01 = MathHelper.Clamp(chargeSeconds / MaxChargeSeconds, 0f, 1f);
-        float v0 = MathF.Sqrt(charge01) * maxV0;
-        float thetaDeg = type == ShotType.Left ? ThetaLeftDeg : ThetaRightDeg;
-        float thetaRad = MathHelper.ToRadians(thetaDeg);
-        // Il coseno proietta v0 sul terreno (direzione del mouse).
-        // Il seno, in ComputeVerticalSpeed, ricava la velocita' verticale Z:
-        // il tiro alto sacrifica velocita' orizzontale per aumentare l'altezza.
-        Vector2 velocity = new(differenceX, differenceY);
-        velocity *= v0 * MathF.Cos(thetaRad);
-        float vz = ComputeVerticalSpeed(chargeSeconds, type, gravity);
+    // Lo schermo comprime il piano di gioco lungo Y (fattore 0,70).
+    // Compensiamo prima di normalizzare, cosi' la direzione sul terreno
+    // non dipende dalla distorsione prospettica.
+    float differenceX = screenDelta.X;
+    float differenceY = screenDelta.Y / PlanePerspectiveY;
+    PhysicsAPI.normalizeVelocity(ref differenceX, ref differenceY);
 
-        // Il punto di spawn e' spostato di MuzzleDistance verso il mouse
-        // nello spazio dello schermo, per non far partire la palla dal centro
-        // del pinguino. Con mirino coincidente usiamo la direzione destra.
-        Vector2 aimScreenDirection = target - muzzleBase;
-        if (aimScreenDirection.LengthSquared() > 0.0001f)
-            aimScreenDirection.Normalize();
-        else
-            aimScreenDirection = new Vector2(1f, 0f);
-        Vector2 start = muzzleBase + aimScreenDirection * MuzzleDistance;
-        return new ShotLaunch(start, velocity, vz, gravity);
-    }
+    // Taratura della parabola: la distanza massima del mondo definisce
+    // la gravita' e la velocita' massima del tiro basso a piena carica.
+    float gravity = ComputeGravityForLowShot(ComputeMaxWorldRange(muzzleBase));
+    float maxV0 = ComputeMaxV0(gravity);
+    
+    // Carica normalizzata tra 0 e 1. La radice quadrata fa crescere
+    // la potenza rapidamente all'inizio (25% di carica -> 50% di velocita')
+    // senza superare la velocita' massima.
+    float charge01 = MathHelper.Clamp(chargeSeconds / MaxChargeSeconds, 0f, 1f);
+    float v0 = MathF.Sqrt(charge01) * maxV0;
+    float thetaDeg = type == ShotType.Left ? ThetaLeftDeg : ThetaRightDeg;
+    float thetaRad = MathHelper.ToRadians(thetaDeg);
+    
+    // Il coseno proietta v0 sul terreno (direzione del mouse).
+    // Il seno, in ComputeVerticalSpeed, ricava la velocita' verticale Z:
+    // il tiro alto sacrifica velocita' orizzontale per aumentare l'altezza.
+    Vector2 velocity = new(differenceX, differenceY);
+    velocity *= v0 * MathF.Cos(thetaRad);
+    float vz = ComputeVerticalSpeed(chargeSeconds, type, gravity);
+
+    // Il punto di spawn e' spostato di MuzzleDistance verso il mouse
+    // nello spazio dello schermo, per non far partire la palla dal centro del pinguino. 
+    // Riutilizziamo screenDelta senza dover ricalcolare la sottrazione.
+    //La soglia 0.0001f e il fallback (1f, 0f) servono unicamente a prevenire un errore
+    //di divisione per zero se il cursore del mouse si trova esattamente sopra le coordinate della canna
+    Vector2 aimScreenDirection = screenDelta;
+    if (aimScreenDirection.LengthSquared() > 0.0001f)
+        aimScreenDirection.Normalize();
+    else
+        aimScreenDirection = new Vector2(1f, 0f);
+        
+    Vector2 start = muzzleBase + aimScreenDirection * MuzzleDistance;
+    
+    return new ShotLaunch(start, velocity, vz, gravity);
+}
 
     // Per il locale, crea il tiro al rilascio del tasto armato e invia MsgShot.
     // Per il remoto, ricrea soltanto la palla usando i metadati ricevuti dal server.
@@ -328,6 +338,7 @@ public class PenguinShotHandler
         Ball b = new Ball(_gameContext, _tag, launch.Start, launch.GroundVelocity, launch.VerticalSpeed,
             shotKey.CollisionTag(tagBall), launch.Gravity, shotKey);
         _gameContext.Components.Add(b);
+        
         b.MarkObservedStart(GameSession.LocalTick, isRemoteShot ? "REMOTE" : "OWNER");
         if (!isRemoteShot)
         {
