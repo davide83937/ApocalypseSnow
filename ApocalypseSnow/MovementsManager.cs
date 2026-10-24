@@ -105,7 +105,8 @@ public class MovementsManager : IMovements
             _newKeyboardState.IsKeyDown(Keys.A) ||
             _newKeyboardState.IsKeyDown(Keys.D);
 
-        if (movementKeyPressed && !isFreezing)
+        // E e Spazio non bloccano il passo: il completamento dipende dall'hitbox.
+        if (movementKeyPressed && !StateMasks.BlocksMovement(stateStruct.Current))
             stateStruct.Current |= StateList.Moving;
     }
 

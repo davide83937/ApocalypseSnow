@@ -27,6 +27,7 @@ extern "C" {
         char myTag[16];
         char otherTag[16];
         int type;
+        float penetration;
     };
 
     struct CollisionOrder {

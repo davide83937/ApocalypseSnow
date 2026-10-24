@@ -38,7 +38,7 @@ public class PenguinColliderHandler
     
     public void resetPuttingTimer()
     {
-        timePuttingEgg = 0;
+        if (!deleteEggBool) timePuttingEgg = 0;
     }  
 
     // Metodo helper per trovare l'uovo con ID minore nella lista
@@ -69,7 +69,7 @@ public class PenguinColliderHandler
 
         if (isFrozen || stateStruct.IsPressed(StateList.Freezing))
         {
-            _lockedEggTag = null;
+            resetTakingTimer();
             return;
         }
 
@@ -120,17 +120,20 @@ public class PenguinColliderHandler
                 }
                 else
                 {
-                    // Se esce dalla collisione con l'uovo bersaglio, resetta
-                    timeTakingEgg = 0;
-                    _lockedEggTag = null;
+                    // Se esce dalla collisione con l'uovo bersaglio, resetta.
+                    resetTakingTimer();
                 }
+            }
+            else
+            {
+                // Nessuna hitbox sovrapposta: serve un secondo consecutivo sull'uovo.
+                resetTakingTimer();
             }
         }
         else
         {
-            // Se rilascio il tasto prima, si resetta tutto
-            timeTakingEgg = 0;
-            _lockedEggTag = null;
+            // Se rilascio il tasto prima, si resetta tutto.
+            resetTakingTimer();
         }
     }
 
@@ -175,7 +178,7 @@ public class PenguinColliderHandler
             stateStruct.Current |= StateList.PuttingEgg;
         }
 
-        if (isCorrectPlatform && stateStruct.IsPressed(StateList.WithEgg) && stateStruct.IsPressed(StateList.PuttingEgg))
+        if ((isCorrectPlatform || deleteEggBool) && stateStruct.IsPressed(StateList.WithEgg) && stateStruct.IsPressed(StateList.PuttingEgg))
         {
             timePuttingEgg += deltaTime;
         
@@ -197,7 +200,7 @@ public class PenguinColliderHandler
         }
         else
         {
-            // Se rilascia il tasto PRIMA di fare 1.0 secondi, si resetta tutto normalmente
+            // Spazio rilasciato o collisione persa prima del secondo: riparti da zero.
             timePuttingEgg = 0;
             deleteEggBool = false;
         }
@@ -218,18 +221,6 @@ public class PenguinColliderHandler
             myEgg = null;
             timePuttingEgg = 0;
             timeTakingEgg = 0;
-        }
-    }
-    
-    public void HandleObstacleCollision(int collisionType, ref Vector2 position)
-    {
-        const float bounceDistance = 1f;
-        switch (collisionType)
-        {
-            case 1: position.Y -= bounceDistance; break; // TOP
-            case 2: position.Y += bounceDistance; break; // BOTTOM
-            case 3: position.X += bounceDistance; break; // LEFT
-            case 4: position.X -= bounceDistance; break; // RIGHT
         }
     }
     

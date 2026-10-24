@@ -30,6 +30,7 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
     // --- NUOVA LISTA PER GESTIRE LE COLLISIONI MULTIPLE DELLE UOVA ---
     private List<string> _collidingEggs = new List<string>();
+    private string _collidingPlatformTag;
 
 
     public Penguin(Game game, string tag, Vector2 startPosition, Vector2 startSpeed,
@@ -120,6 +121,8 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
     protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
     {
+        // La penetrazione con gli ostacoli viene risolta nello stesso tick del movimento,
+        // non nell'evento di collisione, che puo' arrivare dopo.
         switch (otherTag)
         {
             case string t when t.StartsWith("egg"):
@@ -142,16 +145,21 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 }
                 break;
             case "blueP" or "redP":
-                _penguinColliderHandler.HandleEggDelivery(otherTag,
-                    ref _penguinInputHandler._stateStruct, _deltaTime, ref _myEgg);
-                break;
-            case "obstacle":
-                // Il locale blocca gia' il movimento prima della collisione.
-                // Conserva la gestione precedente soltanto per il remoto.
-                if (_tag.EndsWith("Red"))
-                    _penguinColliderHandler.HandleObstacleCollision(collisionRecordOut._type, ref _position);
+                if ((_tag == "penguin" && otherTag == "blueP") ||
+                    (_tag == "penguinRed" && otherTag == "redP"))
+                    _collidingPlatformTag = otherTag;
                 break;
         }
+    }
+
+    // La geometria della hitbox appartiene al pinguino: prediction e replay
+    // usano così le stesse dimensioni, senza duplicare numeri in GameSession.
+    public Vector2 ResolveObstacleOverlaps(Vector2 position)
+    {
+        Vector2 half = new(_halfTextureFractionWidth, _halfTextureFractionHeight);
+        Vector2 center = CollisionManager.Instance.ResolveObstacleOverlaps(
+            position + half, _textureFractionWidth, _halfTextureFractionHeight);
+        return center - half;
     }
 
     public override void Update(GameTime gameTime)
@@ -176,22 +184,9 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                 _penguinInputHandler.UpdateRemoteFacing();
             else
             {
-                // Come sul server: calcola il passo e applicalo solo se non urta un ostacolo.
-                // UpdateMovement aggiorna anche la direzione dello sprite.
-                Vector2 candidatePosition = _position;
-                _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref candidatePosition);
-
-                if (candidatePosition == _position ||
-                    !CollisionManager.Instance.wouldCollide(
-                        _tag,
-                        candidatePosition.X + _halfTextureFractionWidth,
-                        candidatePosition.Y + _halfTextureFractionHeight,
-                        _textureFractionWidth,
-                        _halfTextureFractionHeight,
-                        "obstacle"))
-                {
-                    _position = candidatePosition;
-                }
+                // Movimento e risoluzione della penetrazione avvengono nello stesso tick.
+                _penguinInputHandler.UpdateMovement(_physicsDeltaTime, ref _position);
+                _position = ResolveObstacleOverlaps(_position);
             }
 
 
@@ -202,6 +197,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
             _collidingEggs.Clear();
             // -----------------------------------------------------
 
+            // Deposito: un solo avanzamento per tick, anche quando si esce dalla piattaforma.
+            _penguinColliderHandler.HandleEggDelivery(_collidingPlatformTag,
+                ref _penguinInputHandler._stateStruct, _physicsDeltaTime, ref _myEgg);
+            _collidingPlatformTag = null;
 
             resetTakingTimer();
             resetPuttingTimer();
@@ -241,10 +240,10 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
                     _position, _penguinInputHandler._animationManager._ballTag);
             }
 
-            int posCollX = (int)_position.X + _halfTextureFractionWidth;
-            int posCollY = (int)_position.Y + _halfTextureFractionHeight;
-            CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _textureFractionWidth,
-                _halfTextureFractionHeight);
+            CollisionManager.Instance.modifyObject(_tag,
+                _position.X + _halfTextureFractionWidth,
+                _position.Y + _halfTextureFractionHeight,
+                _textureFractionWidth, _halfTextureFractionHeight);
 
             _accumulator -= _physicsDeltaTime;
         }

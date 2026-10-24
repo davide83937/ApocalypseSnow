@@ -79,7 +79,10 @@ internal static class Program
             ("Dead zone ignores sub-2px mismatch", DeadZone),
             ("Soft correction interpolates medium mismatch", SoftCorrection),
             ("Large mismatch snaps to replayed position", HardCorrection),
-            ("Reload, freezing, egg actions skip movement in replay", ActionLocks),
+            ("Only reload and freezing stop movement in replay", ActionLocks),
+            ("Local movement continues during pickup, deposit and drop", MovementLocksMatchEggActions),
+            ("Egg actions do not stop movement in position replay", EggReleaseMatchesReplay),
+            ("Egg pickup requires continuous hitbox overlap", PickupRequiresContinuousOverlap),
             ("Locally frozen input masks skip movement in replay", RecordedFrozenInputs),
             ("HIT confirmation does not assume HitAck+90 input freeze", HitConfirmationDoesNotFreezeByAck),
             ("New input replay respects each locally recorded freeze mask", LocalFreezeMasksControlFutureReplay),
@@ -105,11 +108,13 @@ internal static class Program
             ("Remote egg pickup uses only WithEgg received from network", RemotePickupNeedsNetworkConfirmation),
             ("Remote egg drop notifies before clearing its tag", RemoteEggDropPreservesTag),
             ("Egg delivery emits only one score event", EggDeliveryScoresOnlyOnce),
+            ("Egg delivery needs uninterrupted platform overlap", EggDeliveryRequiresContinuousOverlap),
             ("Authoritative tick replaces an incorrect predicted impact", ConfirmedFreezeReplacesPrediction),
             ("Movement replay skips exactly the locally recorded frozen ticks", LocalFreezeReplayBoundary),
             ("Remote penguin obeys predicted freeze and clears it on rejection", RemotePredictedFreeze),
             ("Remote snapshots respect authoritative freeze", RemoteSnapshotBlockedByServerFreeze),
-            ("Blocked collision rejects candidate without stepping backward", ObstacleCollision),
+            ("Penetration resolution is replayed every tick", ObstacleCollision),
+            ("Native penetration resolution does not alter collider state", CollisionQueryIsReadOnly),
             ("Diagonal movement uses normalized native physics", DiagonalMovement),
             ("Twenty buffered inputs replay despite partial ACK", InputBurst),
             ("Subsequent ACK replays only new pending inputs", ConsecutiveAcknowledgements),
@@ -563,6 +568,26 @@ internal static class Program
         Equal(collider.isWithEgg, false);
     }
 
+    // Se esci dalla piattaforma mentre tieni Spazio, il secondo riparte da zero.
+    private static void EggDeliveryRequiresContinuousOverlap(Reconciler reconciler)
+    {
+        var collider = new PenguinColliderHandler("penguin") { isWithEgg = true };
+        string egg = "egg8";
+        int deliveries = 0;
+        collider.eggDeleteEvent += (_, _) => deliveries++;
+        var state = new StateStruct { Current = StateList.WithEgg | StateList.PuttingEgg };
+        collider.HandleEggDelivery("blueP", ref state, 0.6f, ref egg);
+        collider.HandleEggDelivery(null, ref state, 0.2f, ref egg);
+        collider.HandleEggDelivery("blueP", ref state, 0.5f, ref egg);
+        Equal(deliveries, 0);
+        collider.HandleEggDelivery("blueP", ref state, 0.51f, ref egg);
+        Equal(deliveries, 1);
+        // Dopo il punto, il cleanup di 0.2 s termina anche uscendo dalla base.
+        collider.HandleEggDelivery(null, ref state, 0.21f, ref egg);
+        Equal(egg == null, true);
+        Equal(collider.isWithEgg, false);
+    }
+
     // Il verdetto finale deve essere letto solo quando tutto il payload TCP e' arrivato.
     private static void MatchStatusTcpFraming(Reconciler reconciler)
     {
@@ -659,8 +684,8 @@ internal static class Program
     }
 
     // Applica il Reconciler con i parametri di movimento del gioco.
-    private static void Apply(Reconciler r, ref Vector2 position, Func<Vector2, bool>? isBlocked = null)
-        => r.ReconcilePosition(ref position, Speed, Dt, isBlocked);
+    private static void Apply(Reconciler r, ref Vector2 position, Func<Vector2, Vector2>? resolveOverlap = null)
+        => r.ReconcilePosition(ref position, Speed, Dt, resolveOverlap);
 
     // Verifica che senza auth la posizione non cambi.
     private static void WireMissRejectsPredictedFreeze(Reconciler r)
@@ -800,6 +825,44 @@ internal static class Program
     }
 
     // Verifica che una prediction corretta non venga modificata.
+    // Verifica anche il caso di contatto appena tangente (non collisione).
+    private static void CollisionQueryIsReadOnly(Reconciler r)
+    {
+        var manager = (CollisionManager)RuntimeHelpers.GetUninitializedObject(typeof(CollisionManager));
+        var colliders = new List<CollisionRecordIn>
+        {
+            new("obstacle", 150, 150, 100, 100),
+            new("penguin", 100, 100, 96, 64)
+        };
+        typeof(CollisionManager).GetField("_collisionRecordIns", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(manager, colliders);
+
+        // Risoluzione minima lungo l'asse X, nessun mutamento dei collider.
+        At(manager.ResolveObstacleOverlaps(new Vector2(80, 150), 96, 64), 52, 150);
+        At(manager.ResolveObstacleOverlaps(new Vector2(220, 150), 96, 64), 248, 150);
+        // Appena tangente: nessuna correzione e nessun tremolio.
+        At(manager.ResolveObstacleOverlaps(new Vector2(248, 150), 96, 64), 248, 150);
+        At(manager.ResolveObstacleOverlaps(new Vector2(300, 300), 96, 64), 300, 300);
+        // Risoluzione verticale e collisione non dipendente dall'ordine nella lista.
+        At(manager.ResolveObstacleOverlaps(new Vector2(150, 95), 96, 64), 150, 68);
+        At(manager.ResolveObstacleOverlaps(new Vector2(150, 205), 96, 64), 150, 232);
+
+        // 120 tick contro il muro: sempre a filo, senza oscillare.
+        var contact = new Vector2(52, 150);
+        for (int tick = 0; tick < 120; tick++)
+        {
+            contact.X += Step;
+            contact = manager.ResolveObstacleOverlaps(contact, 96, 64);
+            At(contact, 52, 150);
+        }
+
+        Equal(colliders.Count, 2);
+        Equal(colliders[0]._x, 150f);
+        Equal(colliders[0]._y, 150f);
+        Equal(colliders[1]._x, 100f);
+        Equal(colliders[1]._y, 100f);
+    }
+
     private static void AccuratePrediction(Reconciler r)
     {
         r.RecordPendingInput(1, StateList.Right);
@@ -849,7 +912,58 @@ internal static class Program
         r.ReceiveAuthoritativePosition(0, Vector2.Zero);
         var pos = new Vector2(100, 0);
         Apply(r, ref pos);
-        At(pos, Step, 0);
+        At(pos, Step * 3, 0);
+    }
+
+    // Prediction locale: E raccoglie solo senza uovo, E con uovo lo rilascia subito.
+    // Spazio ed E non bloccano il movimento; reload e freeze si'.
+    private static void MovementLocksMatchEggActions(Reconciler r)
+    {
+        var input = new PenguinInputHandler("penguin");
+        foreach (var (mask, expectedX) in new (StateList Mask, float X)[]
+        {
+            (StateList.Right, Step),
+            (StateList.Right | StateList.TakingEgg, Step),
+            (StateList.Right | StateList.TakingEgg | StateList.WithEgg, Step),
+            (StateList.Right | StateList.PuttingEgg | StateList.WithEgg, Step),
+            (StateList.Right | StateList.Reload, 0f),
+            (StateList.Right | StateList.Freezing, 0f)
+        })
+        {
+            input._stateStruct.Current = mask;
+            var position = Vector2.Zero;
+            input.UpdateMovement(Dt, ref position);
+            At(position, expectedX, 0f);
+        }
+    }
+
+    // Il replay deve muoversi durante E/Spazio indipendentemente da WithEgg.
+    private static void EggReleaseMatchesReplay(Reconciler r)
+    {
+        r.RecordPendingInput(1, StateList.Right | StateList.TakingEgg | StateList.WithEgg);
+        r.RecordPendingInput(2, StateList.Right | StateList.TakingEgg);
+        r.RecordPendingInput(3, StateList.Right | StateList.PuttingEgg | StateList.WithEgg);
+        r.ReceiveAuthoritativePosition(0, Vector2.Zero);
+        var position = new Vector2(100f, 0f);
+        Apply(r, ref position);
+        At(position, Step * 3, 0f);
+    }
+
+    // Allontanarsi da TUTTE le uova interrompe la raccolta, anche tenendo premuto E.
+    private static void PickupRequiresContinuousOverlap(Reconciler r)
+    {
+        var handler = new PenguinColliderHandler("penguin");
+        var state = new StateStruct { Current = StateList.TakingEgg };
+        string egg = null!;
+        var overlaps = new List<string> { "egg5" };
+        handler.HandleEggPickup(overlaps, state, 0.6f, ref egg);
+        handler.HandleEggPickup(new List<string>(), state, 0.2f, ref egg);
+        handler.HandleEggPickup(overlaps, state, 0.5f, ref egg);
+        if (handler.isWithEgg || egg != null)
+            throw new Exception("Pickup progress survived loss of all hitbox overlap");
+        handler.HandleEggPickup(overlaps, state, 0.51f, ref egg);
+        if (!handler.isWithEgg || egg != "egg5")
+            throw new Exception("Continuous overlap did not complete pickup");
     }
 
     // Il replay salta soltanto gli input gia' registrati come congelati dal client.
@@ -1118,13 +1232,14 @@ internal static class Program
     // Verifica che il replay non attraversi gli ostacoli.
     private static void ObstacleCollision(Reconciler r)
     {
-        // Speed 30 => 1 pixel/step; all candidates at X>=2 are blocked.
+        // Speed 30 => 1 pixel/step; il muro limita la posizione al bordo X=1.
         r.RecordPendingInput(1, StateList.Right);
         r.RecordPendingInput(2, StateList.Right);
         r.RecordPendingInput(3, StateList.Right);
         r.ReceiveAuthoritativePosition(0, Vector2.Zero);
         var pos = new Vector2(30, 0);
-        r.ReconcilePosition(ref pos, 30f, Dt, candidate => candidate.X >= 1.99f);
+        r.ReconcilePosition(ref pos, 30f, Dt,
+            candidate => new Vector2(MathF.Min(candidate.X, 1f), candidate.Y));
         At(pos, 1, 0);
     }
 

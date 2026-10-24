@@ -14,7 +14,11 @@ internal static class StateMasks
         Directions | ReloadAndEggActions |
         StateList.Moving | StateList.ShootLeft | StateList.ShootRight;
 
-    // Direzioni e stati che il Reconciler deve conoscere.
+    // Raccolta e deposito dipendono dalla collisione, non bloccano WASD.
+    public static bool BlocksMovement(StateList state) =>
+        (state & (StateList.Reload | StateList.Freezing)) != StateList.None;
+
+    // Il replay riguarda soltanto gli stati che incidono sul movimento.
     public const StateList PositionReconciliationInputs =
-        Directions | ReloadAndEggActions | StateList.Freezing;
+        Directions | StateList.Reload | StateList.Freezing;
 }

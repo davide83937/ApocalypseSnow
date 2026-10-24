@@ -102,13 +102,13 @@ func (cm *CollisionManager) SendToCpp() {
 
 	cm.collisionRecordOuts = cm.collisionRecordOuts[:0]
 	for i := 0; i < resCount; i++ {
-		cm.collisionRecordOuts = append(cm.collisionRecordOuts,
-			NewCollisionRecordOut(
-				C.GoString((*C.char)(unsafe.Pointer(&dataOut[i].myTag[0]))),
-				C.GoString((*C.char)(unsafe.Pointer(&dataOut[i].otherTag[0]))),
-				int32(dataOut[i]._type),
-			),
+		record := NewCollisionRecordOut(
+			C.GoString((*C.char)(unsafe.Pointer(&dataOut[i].myTag[0]))),
+			C.GoString((*C.char)(unsafe.Pointer(&dataOut[i].otherTag[0]))),
+			int32(dataOut[i]._type),
 		)
+		record.Penetration = float32(dataOut[i].penetration)
+		cm.collisionRecordOuts = append(cm.collisionRecordOuts, record)
 	}
 }
 
@@ -123,79 +123,62 @@ func playerCollisionTag(playerID uint32) string {
 	return collisionTagPenguin1
 }
 
-// Replica della logica del client CollisionManager.wouldCollide():
-// modifica temporaneamente il collider del player, esegue il test,
-// poi ripristina lo stato originale del manager.
-func (cm *CollisionManager) CheckPlayerCollisionAt(playerTag string, x, y float32, obstacles []Position) bool {
-	index := -1
-	var original CollisionRecordIn
+// Risolve l'intersezione della posizione appena calcolata con gli ostacoli fissi.
+// Stessa funzione C++ e stessa regola del client, senza alterare la scena registrata.
+func (cm *CollisionManager) ResolvePlayerObstacleOverlaps(playerTag string, x, y float32) (float32, float32) {
+	cx := x + penguinHalfTextureFractionWidth
+	cy := y + penguinHalfTextureFractionHeight
 
-	for i := range cm.collisionRecordIns {
-		if cm.collisionRecordIns[i].Tag == playerTag {
-			index = i
-			original = cm.collisionRecordIns[i]
+	for pass := 0; pass < 8; pass++ {
+		moved := false
+
+		for _, obstacle := range cm.collisionRecordIns {
+			if obstacle.Tag != collisionTagObstacle && !isObstacleTag(obstacle.Tag) {
+				continue
+			}
+
+			var input [2]C.struct_CollisionDataIn
+			var result [1]C.struct_CollisionDataOut
+
+			writeCollisionTag((*C.char)(unsafe.Pointer(&input[0].tag[0])), playerTag)
+			input[0].x, input[0].y = C.float(cx), C.float(cy)
+			input[0].width = C.int(penguinTextureFractionWidth)
+			input[0].height = C.int(penguinHalfTextureFractionHeight)
+
+			writeCollisionTag((*C.char)(unsafe.Pointer(&input[1].tag[0])), obstacle.Tag)
+			input[1].x, input[1].y = C.float(obstacle.X), C.float(obstacle.Y)
+			input[1].width, input[1].height = C.int(obstacle.Width), C.int(obstacle.Height)
+
+			C.check_collisions(&input[0], &result[0], 2)
+
+			if result[0]._type == 0 || result[0].penetration <= 0 {
+				continue
+			}
+
+			correction := float32(result[0].penetration)
+			if C.GoString((*C.char)(unsafe.Pointer(&result[0].myTag[0]))) != playerTag {
+				correction = -correction
+			}
+
+			switch result[0]._type {
+			case 1:
+				cy += correction
+			case 2:
+				cy -= correction
+			case 3:
+				cx -= correction
+			case 4:
+				cx += correction
+			}
+			moved = true
+		}
+
+		if !moved {
 			break
 		}
 	}
 
-	posCollX := x + penguinHalfTextureFractionWidth
-	posCollY := y + penguinHalfTextureFractionHeight
-
-	if index != -1 {
-		cm.ModifyObject(
-			playerTag,
-			posCollX,
-			posCollY,
-			penguinTextureFractionWidth,
-			penguinHalfTextureFractionHeight,
-		)
-	} else {
-		cm.AddObject(
-			playerTag,
-			posCollX,
-			posCollY,
-			penguinTextureFractionWidth,
-			penguinHalfTextureFractionHeight,
-		)
-	}
-
-	cm.SendToCpp()
-
-	collided := false
-
-	for _, result := range cm.collisionRecordOuts {
-		if result.Type <= 0 {
-			continue
-		}
-
-		if result.MyTag != playerTag && result.OtherTag != playerTag {
-			continue
-		}
-
-		otherTag := result.OtherTag
-		if result.OtherTag == playerTag {
-			otherTag = result.MyTag
-		}
-
-		if otherTag == collisionTagObstacle || isObstacleTag(otherTag) {
-			collided = true
-			break
-		}
-	}
-
-	if index != -1 {
-		cm.ModifyObject(
-			playerTag,
-			original.X,
-			original.Y,
-			original.Width,
-			original.Height,
-		)
-	} else {
-		cm.RemoveObject(playerTag)
-	}
-
-	return collided
+	return cx - penguinHalfTextureFractionWidth, cy - penguinHalfTextureFractionHeight
 }
 
 func writeCollisionTag(dst *C.char, tag string) {

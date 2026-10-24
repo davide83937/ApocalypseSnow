@@ -19,9 +19,10 @@ func NewCollisionRecordIn(tag string, x, y float32, width, height int32) Collisi
 }
 
 type CollisionRecordOut struct {
-	MyTag    string
-	OtherTag string
-	Type     int32
+	MyTag       string
+	OtherTag    string
+	Type        int32
+	Penetration float32
 }
 
 func NewCollisionRecordOut(myTag, otherTag string, collisionType int32) CollisionRecordOut {

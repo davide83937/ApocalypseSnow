@@ -55,6 +55,7 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
                     strcpy(dataOut[found].otherTag, data[j].tag);
 
                     // La direzione della collisione è l'asse con la sovrapposizione minore
+                    dataOut[found].penetration = std::min(overlapX, overlapY);
                     if (overlapX < overlapY) {
                         // Collisione Orizzontale (Left o Right)
                         if (dx > 0) {

@@ -29,6 +29,7 @@ public struct CollisionRecordOut
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 16)]
         public string _otherTag;
         public int _type;
+        public float _penetration;
     
 
     public CollisionRecordOut(string myTag, string otherTag, int type)

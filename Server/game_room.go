@@ -47,11 +47,11 @@ type GameRoom struct {
 	nextShotID  uint32
 
 	// Il server conta le consegne per ID, una sola volta per uovo.
-	basePositions  [2]Position
-	totalEggs      int
-	deliveredEggs  map[int32]bool
-	scores         [2]uint32
-	matchFinished  bool
+	basePositions [2]Position
+	totalEggs     int
+	deliveredEggs map[int32]bool
+	scores        [2]uint32
+	matchFinished bool
 
 	tickRateHz uint32
 	matchTick  uint32
@@ -132,7 +132,7 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 
 		activeShots:      make([]Shot, 0, 64),
 		nextShotID:       1,
-		deliveredEggs:   make(map[int32]bool),
+		deliveredEggs:    make(map[int32]bool),
 		collisionManager: NewCollisionManager(),
 
 		Obstacles: []Position{
@@ -456,29 +456,10 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 			}
 			gameRoom.updatePendingShot(player, effectiveMask, inputState.SeqN)
 
-			oldX, oldY := player.X, player.Y
 			newX, newY := StepFromState(player.X, player.Y, effectiveMask, deltaTime)
-
-			if gameRoom.collisionManager.CheckPlayerCollisionAt(
-				playerCollisionTag(player.ID),
-				newX,
-				newY,
-				gameRoom.Obstacles,
-			) {
-				log.Printf(
-					"[COLLISION] player=%d tag=%s old=(%.1f, %.1f) attempted=(%.1f, %.1f)",
-					player.ID,
-					playerCollisionTag(player.ID),
-					oldX,
-					oldY,
-					newX,
-					newY,
-				)
-
-				player.X, player.Y = oldX, oldY
-			} else {
-				player.X, player.Y = newX, newY
-			}
+			player.X, player.Y = gameRoom.collisionManager.ResolvePlayerObstacleOverlaps(
+				playerCollisionTag(player.ID), newX, newY,
+			)
 
 			player.LastMask = effectiveMask
 			player.LastSeqN = inputState.SeqN

@@ -15,7 +15,7 @@ func NormalizeVelocity(velocityX, velocityY *float32) {
 }
 
 func StepFromState(x, y float32, mask int32, dt float32) (float32, float32) {
-	if (mask&Reload) != 0 || (mask&Freezing) != 0 || (mask&TakingEgg) != 0 || (mask&PuttingEgg) != 0 {
+	if (mask&Reload) != 0 || (mask&Freezing) != 0 {
 		return x, y
 	}
 

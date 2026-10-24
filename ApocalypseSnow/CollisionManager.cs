@@ -113,60 +113,52 @@ namespace ApocalypseSnow
             Console.WriteLine("CollisionManager: Liste pulite per la nuova partita.");
         }
 
-        //serve al reconciliator per verificare se il movimento applicato causerebbe una collisione
-        public bool wouldCollide(string tag, float x, float y, int w, int h, string otherTagFilter = "obstacle")
+        // Se una hitbox mobile penetra in un ostacolo fermo, la porta appena fuori.
+        // Lavora su coordinate del CENTRO, non modifica i collider registrati.
+        // Ogni passo di movimento (prediction, server e replay) applica questa regola.
+        public Vector2 ResolveObstacleOverlaps(Vector2 center, int width, int height)
         {
-            int index = _collisionRecordIns.FindIndex(r => r._tag == tag);
+            const string candidateTag = "candidate";
 
-            bool hadOriginal = index != -1;
-            CollisionRecordIn original = default;
-
-            if (hadOriginal)
+            // Una correzione contro un muro puo' intersecare un secondo muro.
+            // Ripetiamo fino alla separazione o a un limite finito (incastri impossibili).
+            for (int pass = 0; pass < 8; pass++)
             {
-                original = _collisionRecordIns[index];
-                modifyObject(tag, x, y, w, h);
-            }
-            else
-            {
-                addObject(tag, x, y, w, h);
-            }
-
-            SendToCpp();
-
-            bool collided = false;
-
-            if (resultsBuffer != null)
-            {
-                foreach (var elemento in resultsBuffer)
+                bool moved = false;
+                foreach (var obstacle in _collisionRecordIns)
                 {
-                    if (elemento._type <= 0)
+                    if (obstacle._tag != "obstacle")
                         continue;
 
-                    bool involvesTag = elemento._myTag == tag || elemento._otherTag == tag;
-                    if (!involvesTag)
-                        continue;
-
-                    string otherTag = elemento._myTag == tag ? elemento._otherTag : elemento._myTag;
-
-                    if (otherTag == otherTagFilter)
+                    var input = new[]
                     {
-                        collided = true;
-                        break;
+                        new CollisionRecordIn(candidateTag, center.X, center.Y, width, height),
+                        obstacle
+                    };
+                    var output = new CollisionRecordOut[1];
+                    check_collisions(input, output, 2);
+
+                    if (output[0]._type == 0 || output[0]._penetration <= 0f)
+                        continue;
+
+                    float correction = output[0]._penetration *
+                        (output[0]._myTag == candidateTag ? 1f : -1f);
+
+                    switch (output[0]._type)
+                    {
+                        case 1: center.Y += correction; break; // primo sotto il secondo
+                        case 2: center.Y -= correction; break; // primo sopra il secondo
+                        case 3: center.X -= correction; break; // primo a sinistra
+                        case 4: center.X += correction; break; // primo a destra
                     }
+                    moved = true;
                 }
+
+                if (!moved)
+                    break;
             }
 
-            // Ripristina il collider originale
-            if (hadOriginal)
-            {
-                modifyObject(tag, original._x, original._y, original._width, original._height);
-            }
-            else
-            {
-                removeObject(tag);
-            }
-
-            return collided;
+            return center;
         }
     }
 }

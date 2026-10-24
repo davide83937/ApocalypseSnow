@@ -51,7 +51,7 @@ public class PenguinInputHandler
     
     public void UpdateMovement(float deltaTime, ref Vector2 position)
     {
-        if (_stateStruct.IsPressed(StateList.Reload) || _stateStruct.IsPressed(StateList.Freezing)) { return; }
+        if (StateMasks.BlocksMovement(_stateStruct.Current)) return;
         PhysicsWrapper.StepFromStateRef(ref position, _stateStruct.Current, 200f, deltaTime, out float dx, out float dy);
         UpdateAnimationState(dx, dy);
     }

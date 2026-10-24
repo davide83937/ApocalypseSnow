@@ -29,7 +29,8 @@ public class Egg:CollisionExtensions
     protected override void LoadContent()
     {
         load_texture("Content/images/egg.png");
-        CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height );
+        CollisionManager.Instance.addObject(_tag, _position.X + _texture.Width / 2f,
+            _position.Y + _texture.Height / 2f, _texture.Width, _texture.Height);
         base.LoadContent();
         base.LoadContent();
     }
@@ -45,34 +46,23 @@ public class Egg:CollisionExtensions
     
   
     
-    protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
+    // L'uovo usa la stessa risoluzione geometrica dei pinguini.
+    // Le collisioni con il muro non vanno corrette nell'evento (frame successivo).
+    protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut) { }
+
+    public void ResolveObstacleOverlaps()
     {
-        //if (!collisionRecordOut.Involves(_tag)) return;
-        //string otherTag = collisionRecordOut.GetOtherTag(_tag);
-        switch (otherTag)
-        {
-            case "obstacle":
-                HandleObstacleCollision(collisionRecordOut._type);
-                CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height);
-                break;
-        }
-    }
-    
-    private void HandleObstacleCollision(int collisionType)
-    {
-        const int bounceDistance = 5;
-        switch (collisionType)
-        {
-            case 1: _position.Y += bounceDistance; break; // TOP
-            case 2: _position.Y -= bounceDistance; break; // BOTTOM
-            case 3: _position.X += bounceDistance; break; // LEFT
-            case 4: _position.X -= bounceDistance; break; // RIGHT
-        }
+        Vector2 half = new(_texture.Width / 2f, _texture.Height / 2f);
+        Vector2 center = CollisionManager.Instance.ResolveObstacleOverlaps(
+            _position + half, _texture.Width, _texture.Height);
+        _position = center - half;
+        CollisionManager.Instance.modifyObject(_tag, center.X, center.Y,
+            _texture.Width, _texture.Height);
     }
 
     public override void Update(GameTime gameTime)
     {
-        CollisionManager.Instance.modifyObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height);
+        ResolveObstacleOverlaps();
         base.Update(gameTime);
     }
 }

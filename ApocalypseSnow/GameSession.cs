@@ -244,14 +244,7 @@ public sealed class GameSession : GameComponent
             ref _myPenguin._position,
             200f,
             NetDt,
-            candidatePos => CollisionManager.Instance.wouldCollide(
-                "penguin",
-                candidatePos.X + 48f,
-                candidatePos.Y + 64f,
-                96,
-                64,
-                "obstacle"
-            ),
+            _myPenguin.ResolveObstacleOverlaps,
             isCurrentlyFrozen: _myPenguin.LocalFreeze.IsFrozen(LastSentInputTick)
         );
 

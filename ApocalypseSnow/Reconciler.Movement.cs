@@ -134,7 +134,7 @@ public sealed partial class Reconciler
     ref Vector2 predictedPosition,
     float movementSpeed,
     float fixedDeltaTime,
-    Func<Vector2, bool>? isBlockedAtPosition = null,
+    Func<Vector2, Vector2>? resolveOverlap = null,
     bool isCurrentlyFrozen = false)
     {
         if (!_hasUnappliedAuthoritativePosition)
@@ -156,21 +156,16 @@ public sealed partial class Reconciler
 
         foreach (var pendingInput in _unacknowledgedMovementInputs)
         {
-            // Come sul server, durante questi stati non si applica movimento.
-            if ((pendingInput.ReplayStateMask & (StateList.Reload | StateList.Freezing |
-                               StateList.TakingEgg | StateList.PuttingEgg)) != StateList.None)
+            // Come nella prediction e nel server: solo Reload e Freezing fermano il passo.
+            if (StateMasks.BlocksMovement(pendingInput.ReplayStateMask))
                 continue;
 
-            // Calcola prima una posizione candidata
-            Vector2 candidatePosition = replayedPosition;
-            PhysicsWrapper.StepFromState(ref candidatePosition, pendingInput.ReplayStateMask, movementSpeed, fixedDeltaTime);
+            PhysicsWrapper.StepFromState(ref replayedPosition,
+                pendingInput.ReplayStateMask, movementSpeed, fixedDeltaTime);
 
-            // Se la posizione candidata collide, non committare lo step
-            if (isBlockedAtPosition != null && isBlockedAtPosition(candidatePosition))
-                continue;
-
-            // Solo se non collide aggiorni davvero replayedPosition
-            replayedPosition = candidatePosition;
+            // Stessa risoluzione delle collisioni della prediction e del server.
+            if (resolveOverlap != null)
+                replayedPosition = resolveOverlap(replayedPosition);
         }
 
         // 2) Confronta la posizione attuale con il "vero presente"

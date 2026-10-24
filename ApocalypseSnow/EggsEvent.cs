@@ -93,41 +93,19 @@ public class EggsEvent:GameComponent
                     ShotTrace.Log($"[EGG_DROP] found={egg._tag}");
                     if (!Game.Components.Contains(egg)) Game.Components.Add(egg); // Evita duplicati
 
-                    // Offset riferiti ai centri visivi degli sprite, non agli angoli.
+                    // Il punto iniziale di rilascio e' vicino al pinguino.
+                    // Se compenetra un ostacolo, il risolutore fisico sposta l'uovo
+                    // esattamente quanto serve: nessuna lista di posizioni speciali.
                     Vector2 penguinCenter = penguin._position + new Vector2(
                         penguin._penguinInputHandler._animationManager.SourceRect.Width / 2f,
                         penguin._penguinInputHandler._animationManager.SourceRect.Height / 2f);
                     Vector2 eggHalfSize = new(egg._texture.Width / 2f, egg._texture.Height / 2f);
-                    Vector2[] dropOffsets =
-                    [
-                        new(40, 60),   // Basso a destra
-                        new(-40, 60),  // Basso a sinistra
-                        new(-40, -60), // Alto a sinistra
-                        new(40, -60)   // Alto a destra
-                    ];
+                    egg._position = penguinCenter + new Vector2(40, 60) - eggHalfSize;
+                    egg.ResolveObstacleOverlaps();
 
-                    // Il collider del muro e' piu' stretto della sua immagine.
-                    // Per scegliere il punto di posa usiamo il centro dell'uovo e
-                    // un margine visivo; la sua hitbox di raccolta resta invariata.
-                    const int wallVisualMarginX = 24;
-                    const int wallVisualMarginY = 16;
-
-                    foreach (Vector2 offset in dropOffsets)
-                    {
-                        Vector2 candidate = penguinCenter + offset - eggHalfSize;
-                        Vector2 eggCenter = candidate + eggHalfSize;
-                        if (!CollisionManager.Instance.wouldCollide(
-                                egg._tag, eggCenter.X, eggCenter.Y,
-                                egg._texture.Width + 2 * wallVisualMarginX,
-                                egg._texture.Height + 2 * wallVisualMarginY, "obstacle"))
-                        {
-                            egg._position = candidate;
-                            ShotTrace.Log($"[EGG_DROP] placed={egg._tag} at=({candidate.X:F1},{candidate.Y:F1})");
-                            break;
-                        }
-                    }
-
-                    CollisionManager.Instance.addObject(egg._tag, egg._position.X, egg._position.Y,
+                    ShotTrace.Log($"[EGG_DROP] placed={egg._tag} at=({egg._position.X:F1},{egg._position.Y:F1})");
+                    CollisionManager.Instance.addObject(egg._tag,
+                        egg._position.X + eggHalfSize.X, egg._position.Y + eggHalfSize.Y,
                         egg._texture.Width, egg._texture.Height);
                     break; 
                 }

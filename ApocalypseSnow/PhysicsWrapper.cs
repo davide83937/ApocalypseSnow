@@ -16,33 +16,8 @@ public static class PhysicsWrapper
 
     public static void StepFromState(ref Vector2 pos, StateList state, float speed, float dt)
     {
-        float dx = 0;
-        float dy = 0;
-
-        // 1. Rilevazione direzioni (input grezzo: -1, 0, 1)
-        if ((state & StateList.Up) != 0) dy -= 1f;
-        if ((state & StateList.Down) != 0) dy += 1f;
-        if ((state & StateList.Left) != 0) dx -= 1f;
-        if ((state & StateList.Right) != 0) dx += 1f;
-
-        // --- IL CONTROLLO FONDAMENTALE ---
-        // Verifichiamo se c'è almeno un input direzionale attivo.
-        // Se dx e dy sono entrambi 0, non dobbiamo normalizzare né muoverci.
-        if (dx == 0 && dy == 0) { return; }
-
-        // 3. Normalizzazione
-        // Se dx=1 e dy=1 (diagonale), dopo questa chiamata dx e dy diventeranno circa 0.707
-        PhysicsAPI.normalizeVelocity(ref dx, ref dy);
-
-        // 4. Calcolo velocità finale e applicazione del moto
-        //float speed = 200f;
-        float finalVx = dx * speed;
-        float finalVy = dy * speed;
-        //Console.WriteLine("CHIAMATO "+i);
-        UniformMotion(ref pos.X, finalVx, dt);
-        UniformMotion(ref pos.Y, finalVy, dt);
-        
-        //i++;
+        // Un solo algoritmo di movimento, con o senza informazioni per l'animazione.
+        StepFromStateRef(ref pos, state, speed, dt, out _, out _);
     }
 
     public static void StepFromStateRef(ref Vector2 pos, StateList state, float speed, float dt, out float dx, out float dy)
