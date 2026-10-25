@@ -46,18 +46,25 @@ func (matchmaker *Matchmaker) Run() {
 // Ritorna nil se JoinChannel viene chiuso.
 func (matchmaker *Matchmaker) waitForNextAliveConnection() *PlayerConnection {
 	for {
+		// 1. Resta in attesa (bloccante) finché main.go non manda un giocatore
 		playerConnection, ok := <-matchmaker.JoinChannel
 		if !ok {
+			// Se JoinChannel è stato chiuso dal server in fase di shutdown, esce ritornando nil
 			return nil
 		}
 		if playerConnection == nil {
 			continue
 		}
+		// 2. Controllo istantaneo sullo stato di salute del client
 		select {
 		case <-playerConnection.DisconnectChannel:
-			// già chiusa => scarto e continuo
+			// Se la ReadPump del client ha già segnalato la disconnessione,
+			// scartiamo questo giocatore "fantasma" e torniamo all'inizio del loop
+			// ad aspettarne un altro.
 			continue
 		default:
+			// Se DisconnectChannel è vuoto, significa che il socket è ancora attivo.
+			// Trovato un giocatore valido: lo restituiamo al matchmaker.
 			return playerConnection
 		}
 	}

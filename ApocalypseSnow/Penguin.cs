@@ -229,7 +229,8 @@ public class Penguin : CollisionExtensions //, DrawableGameComponent
 
                 if (_newState.IsKeyDown(Keys.P))
                 {
-                    _penguinInputHandler.getMotion(ref _position.X, 200f, _physicsDeltaTime);
+                    PhysicsWrapper.UniformMotion(ref _position.X, 200f, _physicsDeltaTime);
+                    //_penguinInputHandler.getMotion(ref _position.X, 200f, _physicsDeltaTime);
                 }
                 
                 Vector2 mousePosition = _movementsManager.GetMousePosition();

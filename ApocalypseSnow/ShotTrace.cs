@@ -6,6 +6,7 @@ namespace ApocalypseSnow;
 public static class ShotTrace
 {
     private static readonly object Gate = new();
+    
     public static readonly string LogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "ApocalypseSnow", "shot-traces", $"client-{Environment.ProcessId}.log");

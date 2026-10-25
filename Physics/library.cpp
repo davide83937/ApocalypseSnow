@@ -23,10 +23,10 @@ void normalizeVelocity(float* velX, float* velY) {
     }
 }
 
-void parabolic_motion(float gravity,float start_positionX, float start_positionY, float* positionX, float* positionY,  float start_velocityX, float start_velocityY, float gameTime) {
+/*void parabolic_motion(float gravity,float start_positionX, float start_positionY, float* positionX, float* positionY,  float start_velocityX, float start_velocityY, float gameTime) {
     *positionX = start_positionX + (start_velocityX * gameTime);
     *positionY = 0.5f * gravity * pow(gameTime, 2)+ start_velocityY*gameTime + start_positionY;
-}
+}*/
 
 
 void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int count) {
@@ -79,7 +79,7 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
 }
 
 
-float calculate_ball_scale_only(float startX, float startY, float finalX, float finalY, float posX, float startSpeedX, float L, float K, float currentScale) {
+/*float calculate_ball_scale_only(float startX, float startY, float finalX, float finalY, float posX, float startSpeedX, float L, float K, float currentScale) {
     float differenceY = std::abs(startY - finalY);
     float x = L * (1.0f - std::exp(-K * differenceY));
     float midpoint = (finalX + startX + 48.0f) / 2.0f;
@@ -89,7 +89,7 @@ float calculate_ball_scale_only(float startX, float startY, float finalX, float 
     } else { // Sinistra
         return (posX > midpoint) ? (currentScale + x) : (currentScale - x);
     }
-}
+}*/
 
 
 float Distance(Vector2 a, Vector2 b) {

@@ -9,9 +9,9 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano()) //timestamp attuale in nanosecondi
 
-	listenAddr := os.Getenv("APOCALYPSE_SERVER_LISTEN_ADDR")
+	listenAddr := os.Getenv("APOCALYPSE_SERVER_LISTEN_ADDR") //lasciare o no?
 	if listenAddr == "" {
 		listenAddr = ListenAddr
 	}

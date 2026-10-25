@@ -48,7 +48,7 @@ public static class PhysicsWrapper
         UniformMotion(ref pos.Y, finalVy, dt);
     }
     
-    public static Vector2 ParabolicMotion(
+    /*public static Vector2 ParabolicMotion(
         float gravity,
         Vector2 startPosition,
         Vector2 startVelocity,
@@ -67,7 +67,7 @@ public static class PhysicsWrapper
             time
         );
         return new Vector2(x, y);
-    }
+    }*/
     
     
 }

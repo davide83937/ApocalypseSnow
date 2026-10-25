@@ -89,6 +89,7 @@ public class Ball : CollisionExtensions
     // Tempo totale di volo e altezza massima
     private readonly float _flightDuration;
     public float FlightDurationSeconds => _flightDuration;
+    
     public static float ComputeFlightDurationSeconds(float startVerticalSpeed, float gravity)
         => (2f * startVerticalSpeed) / gravity;
 

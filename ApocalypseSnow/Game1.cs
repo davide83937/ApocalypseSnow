@@ -8,7 +8,7 @@ using Microsoft.Xna.Framework.Input;
 namespace ApocalypseSnow;
 
 public class Game1: Game {
-    private GraphicsDeviceManager _graphics;
+    
     private SpriteBatch _spriteBatch;
 
     private GameSession gameSession;
@@ -18,7 +18,7 @@ public class Game1: Game {
     private Texture2D _backgroundTextureGaming;
     private Texture2D _backgroundTextureMenu;
     private Reconciler _reconciler;
-
+    private GraphicsDeviceManager _graphics;
     private string state = "PREMI INVIO PER INIZIARE...";
     private const string GameBackgroundPath = "Content/images/background.png";
     private const string StartBackgroundPath = "Content/images/start.png";
@@ -76,7 +76,6 @@ public class Game1: Game {
         {
             string esc = "Premi Esc per uscire (ma perdi)";
             _spriteBatch.DrawString(_uiFont, esc, new Vector2(_width / 15f, _height * 0.95f), Color.Chocolate);
-            
             
             // Testo Munizioni (in basso a sinistra come lo avevi)
             string ammoText = $"Munizioni: {gameSession._myPenguin._penguinShotHandler.Ammo}";

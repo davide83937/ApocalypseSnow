@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using ApocalypseSnow;
 using Microsoft.Xna.Framework;
 
 internal static class PhysicsAPI
@@ -18,7 +19,7 @@ internal static class PhysicsAPI
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void normalizeVelocity(ref float velocityX, ref float velocityY);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    /*[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void parabolic_motion(
         float gravity,
         float start_positionX,
@@ -28,13 +29,13 @@ internal static class PhysicsAPI
         float start_velocityX,
         float start_velocityY,
         float gameTime
-    );
+    );*/
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    /*[DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern float calculate_ball_scale_only(
         float startX, float startY, float finalX, float finalY, float posX,
         float startSpeedX, float L, float K, float currentScale);
-
+*/
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern float Distance(Vector2 a, Vector2 b);
 
@@ -57,4 +58,7 @@ internal static class PhysicsAPI
         float startVerticalVelocity, float gravity,
         out float worldDeltaX, out float worldDeltaY, out float z
     );
+    
+    [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, [Out] CollisionRecordOut[] collisionRecordOut, int count);
 }
