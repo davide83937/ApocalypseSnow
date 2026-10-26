@@ -60,5 +60,5 @@ internal static class PhysicsAPI
     );
     
     [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, [Out] CollisionRecordOut[] collisionRecordOut, int count);
+    public static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, [Out] CollisionRecordOut[] collisionRecordOut, int count);
 }

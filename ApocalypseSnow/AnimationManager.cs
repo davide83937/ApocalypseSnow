@@ -1,9 +1,10 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace ApocalypseSnow;
 
-public class AnimationManager
+public class AnimationManager : IDisposable
 {
     public string _ballTag  { get; set; }
     public Texture2D Texture { get; set; }
@@ -12,8 +13,8 @@ public class AnimationManager
     private float _tempTime;
     private int _currentFrame;
     private Rectangle _sourceRect;
-    // L'opacita' del ghiaccio segue i 90 tick del freeze (FreezeTimeline).
-    public Rectangle SourceRect{ get => _sourceRect;}
+    
+    public Rectangle SourceRect => _sourceRect;
     public Texture2D this[int index] => _textures[index];
     private string partialPath;
 
@@ -36,7 +37,6 @@ public class AnimationManager
     private void load_texture(GraphicsDevice gd, int index, string path)
     {
         using var stream = System.IO.File.OpenRead(path);
-        // 1. Carichiamo l'immagine (deve essere nel Content Pipeline)
         _textures[index] = Texture2D.FromStream(gd, stream);
     }
 
@@ -62,8 +62,6 @@ public class AnimationManager
         {
             Texture = _textures[1];
         }
-        // Il pinguino resta visibile sotto il ghiaccio mentre questo svanisce
-        // durante i 3 secondi di freeze: nessuna dissolvenza aggiuntiva dopo.
         spriteBatch.Draw(Texture, position, _sourceRect, Color.White);
         if (isFreezing && iceOpacity > 0f)
             spriteBatch.Draw(_textures[4], position, _sourceRect, Color.White * iceOpacity);
@@ -84,12 +82,11 @@ public class AnimationManager
         }
         else
         {
-            _currentFrame = 1; // Frame di riposo (solitamente quello centrale)
+            _currentFrame = 1; 
         }
-        // Applichiamo il calcolo della X nel rettangolo di ritaglio
+        
         _sourceRect.X = _currentFrame * (Texture.Width / 3);
     }
-
 
     public void Load_Content(GraphicsDevice graphicsDevice)
     {
@@ -100,17 +97,13 @@ public class AnimationManager
         load_texture(graphicsDevice, 4, $"Content/images/penguin_{partialPath}_freezed.png");
         load_texture(graphicsDevice, 5, $"Content/images/penguin_{partialPath}_walking_egg.png");
         Texture = _textures[1];
-        _sourceRect = new Rectangle(0, 0, Texture.Width / 3, Texture.Height/4);
+        _sourceRect = new Rectangle(0, 0, Texture.Width / 3, Texture.Height / 4);
     }
-
-   
 
     public void Update(float gameTime, bool isMoving, bool isReloading)
     {
         walking_animation(gameTime, isReloading, isMoving);
     }
-
-
 
     public void Draw(SpriteBatch spriteBatch, Vector2 position, int ammo, bool isReloading, bool isShooting, bool isFreezing, bool isWithEgg, float iceOpacity)
     {
@@ -120,5 +113,14 @@ public class AnimationManager
     public void MoveRect(int posRect)
     {
         _sourceRect.Y = posRect;
+    }
+
+    // Implementazione di IDisposable per rilasciare la VRAM in modo deterministico
+    public void Dispose()
+    {
+        foreach (var texture in _textures)
+        {
+            texture?.Dispose();
+        }
     }
 }

@@ -34,8 +34,8 @@ namespace ApocalypseSnow
         }
 
         
-        [DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, [Out] CollisionRecordOut[] collisionRecordOut, int count);
+        //[DllImport("libPhysicsDll.dll", CallingConvention = CallingConvention.Cdecl)]
+        //private static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, [Out] CollisionRecordOut[] collisionRecordOut, int count);
         
 
         public void addObject(string tag, float x, float y, int w, int h)
@@ -73,7 +73,7 @@ namespace ApocalypseSnow
             int inputCount = inputData.Length*(inputData.Length-1)/2;
             resultsBuffer = new CollisionRecordOut[inputCount];
             
-                check_collisions(inputData, resultsBuffer, inputData.Length);
+                PhysicsAPI.check_collisions(inputData, resultsBuffer, inputData.Length);
         }
 
         public override void Update(GameTime gameTime)
@@ -136,7 +136,7 @@ namespace ApocalypseSnow
                         obstacle
                     };
                     var output = new CollisionRecordOut[1];
-                    check_collisions(input, output, 2);
+                    PhysicsAPI.check_collisions(input, output, 2);
 
                     if (output[0]._type == 0 || output[0]._penetration <= 0f)
                         continue;

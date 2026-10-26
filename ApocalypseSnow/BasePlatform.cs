@@ -32,13 +32,5 @@ public class BasePlatform:DrawableGameComponent
         base.LoadContent();
     }
     
-    public void Draw(SpriteBatch spriteBatch)
-    {
-        spriteBatch.Draw(_texture, _position,null, Color.White*0.7f, 0f, 
-            Vector2.Zero, 
-            1f, 
-            SpriteEffects.None, 
-            0f);
-        //Console.WriteLine($"{_texture.Width}, {_texture.Height}");
-    }
+
 }
