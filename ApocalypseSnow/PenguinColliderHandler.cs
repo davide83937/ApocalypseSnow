@@ -7,7 +7,7 @@ namespace ApocalypseSnow;
 public class PenguinColliderHandler
 {
     private string _tag;
-    public event EventHandler<string> eggTakenEvent;
+    public event Action<string> eggTakenEvent;
     public event EventHandler<string> eggDeleteEvent;
     public event EventHandler eggPutEvent;
     public bool isFrozen = false;
@@ -226,7 +226,7 @@ public class PenguinColliderHandler
     
     public virtual void eggTakenEventFunction(string tagEgg)
     {
-        eggTakenEvent?.Invoke(this, tagEgg);
+        eggTakenEvent?.Invoke(tagEgg);
     }
     
     public void putEgg(StateStruct stateStruct, ref string tagEgg)

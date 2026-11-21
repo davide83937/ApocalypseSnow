@@ -10,7 +10,6 @@ namespace ApocalypseSnow;
 public class Game1: Game {
     
     private SpriteBatch _spriteBatch;
-
     private GameSession gameSession;
     private SpriteFont _uiFont;
     private int _width;
@@ -128,7 +127,6 @@ public class Game1: Game {
             _spriteBatch.Draw(_backgroundTextureMenu, new Rectangle(0, 0, _width, _height), Color.White);
             DrawFancyText(state, new Vector2(_width / 1.5f, _height / 1.2f), Color.YellowGreen, gameTime, true, 1.6f);
         }
-
         _spriteBatch.End();
         base.Draw(gameTime);
     }
@@ -146,7 +144,7 @@ public class Game1: Game {
         // 2. Effetto pulsante (opzionale)
         if (pulse)
         {
-            float pulseDelta = (float)Math.Sin(gameTime.TotalGameTime.TotalSeconds * 4f) * 0.05f;
+            float pulseDelta = (float)Math.Sin(gameTime.TotalGameTime.TotalSeconds *4f) * 0.05f;
             finalScale += pulseDelta;
         }
 

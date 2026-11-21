@@ -6,16 +6,16 @@ namespace ApocalypseSnow;
 
 public class AnimationManager : IDisposable
 {
-    public string _ballTag  { get; set; }
-    public Texture2D Texture { get; set; }
+    public string _ballTag;
+    public Texture2D Texture;
     private readonly Texture2D[] _textures = new Texture2D[6];
     private static readonly float FrameSpeed;
     private float _tempTime;
     private int _currentFrame;
     private Rectangle _sourceRect;
     
-    public Rectangle SourceRect => _sourceRect;
-    public Texture2D this[int index] => _textures[index];
+    public Rectangle SourceRect => _sourceRect; //Aperto in sola lettura: leggibile ovunque
+    //public Texture2D this[int index] => _textures[index];
     private string partialPath;
 
     static AnimationManager()

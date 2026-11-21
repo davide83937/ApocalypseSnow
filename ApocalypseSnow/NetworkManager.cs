@@ -15,6 +15,7 @@ public class NetworkManager : GameComponent
     private readonly NetworkPacketFramer _packetFramer = new();
     private readonly byte[] _incomingBuffer = new byte[4096];
 
+ 
     public event Action<uint, float, float> OnAuthStateReceived; //posizione autoritativa del player locale
     public event Action<uint, float, int, ShotType> OnAuthShotReceived; //shot autoritativo del player locale (seqN, mouseY, charge, shotType) rivedere la firma
 

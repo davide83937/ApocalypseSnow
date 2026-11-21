@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+
 using Microsoft.Xna.Framework;
 
 namespace ApocalypseSnow;
@@ -26,7 +27,7 @@ public class EggsEvent:GameComponent
         NetworkManager.Instance.OnEggReceived += HandleEggSpawn;
     }
     
-    private void removeEgg(object sender, string tagEgg)
+    private void removeEgg(string tagEgg)
     {
         Console.WriteLine("Removing egg " + tagEgg);
         foreach (Egg egg in _eggs)
@@ -78,6 +79,7 @@ public class EggsEvent:GameComponent
     
     private void addEgg(object sender, EventArgs e)
     {
+        
         // Determiniamo quale pinguino ha lanciato l'evento tramite il suo handler
         Penguin penguin = null;
         if (sender == _myPenguin._penguinColliderHandler) penguin = _myPenguin;
