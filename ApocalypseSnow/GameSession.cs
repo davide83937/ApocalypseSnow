@@ -48,7 +48,7 @@ public sealed class GameSession : GameComponent
         string host = Environment.GetEnvironmentVariable("APOCALYPSE_SERVER_HOST") ?? "127.0.0.1";
         int port = int.TryParse(Environment.GetEnvironmentVariable("APOCALYPSE_SERVER_PORT"), out int configuredPort)
                    && configuredPort is > 0 and <= 65535 ? configuredPort : 8080;
-        networkManager = new NetworkManager(Game, host, port);
+        networkManager = new NetworkManager(host, port);
         Console.WriteLine($"[NETWORK_TEST] connecting to {host}:{port}");
         state = "IN ATTESA DI UN AVVERSARIO...";
  

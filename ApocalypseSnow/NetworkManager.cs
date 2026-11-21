@@ -6,7 +6,7 @@ using Microsoft.Xna.Framework;
 
 namespace ApocalypseSnow;
 
-public class NetworkManager : GameComponent
+public class NetworkManager 
 {
     private TcpClient _tcpClient;
     private NetworkStream _stream;
@@ -38,7 +38,7 @@ public class NetworkManager : GameComponent
         private set => _instance = value;
     }
 
-    public NetworkManager(Game game, string ip, int port) : base(game)
+    public NetworkManager(string ip, int port) 
     {
         if (_instance != null)
             throw new Exception("Puoi creare solo una istanza di NetworkManager!");
@@ -271,14 +271,5 @@ public class NetworkManager : GameComponent
         }
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _stream?.Close();
-            _tcpClient?.Close();
-            _instance = null;
-        }
-        base.Dispose(disposing);
-    }
+
 }
