@@ -7,7 +7,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace ApocalypseSnow;
 
-public class Penguin : CollisionExtensions //, DrawableGameComponent
+public class Penguin : CollisionExtensions //,GameComponent
 {
     private readonly Game _gameContext;
     private readonly IMovements _movementsManager;

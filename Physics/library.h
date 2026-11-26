@@ -1,19 +1,13 @@
-#ifndef PHYSICS_LIBRARY_H
-#define PHYSICS_LIBRARY_H
+#pragma once
 
-#ifdef _WIN32
-    #ifdef PHYSICS_BUILD_DLL
-        #define PHYSICS_API __declspec(dllexport)
-    #else
-        #define PHYSICS_API __declspec(dllimport)
-    #endif
+#ifdef PHYSICS_BUILD_DLL
+    #define PHYSICS_API __declspec(dllexport)
 #else
-    #define PHYSICS_API
+    #define PHYSICS_API __declspec(dllimport)
 #endif
 
-#ifdef __cplusplus
 extern "C" {
-#endif
+
 
     struct CollisionDataIn {
         char tag[16];
@@ -93,6 +87,6 @@ typedef struct {
 
 #ifdef __cplusplus
 }
-#endif
+
 
 #endif // PHYSICS_LIBRARY_H

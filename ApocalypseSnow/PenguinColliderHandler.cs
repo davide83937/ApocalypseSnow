@@ -64,8 +64,8 @@ public class PenguinColliderHandler
     {
         // Il rilascio puo' arrivare mentre il remoto e' ancora congelato.
         // Va riconosciuto anche se il freeze impedisce la raccolta.
-        if (_tag.EndsWith("Red") && !stateStruct.IsPressed(StateList.WithEgg))
-            _remotePickupWaitsForEggRelease = false;
+        //if (_tag.EndsWith("Red") && !stateStruct.IsPressed(StateList.WithEgg))
+            //_remotePickupWaitsForEggRelease = false;
 
         if (isFrozen || stateStruct.IsPressed(StateList.Freezing))
         {
@@ -77,8 +77,8 @@ public class PenguinColliderHandler
         if (_tag.EndsWith("Red"))
         {
             // Un WithEgg ancora valido prima dell'HIT non e' una nuova raccolta.
-            if (_remotePickupWaitsForEggRelease)
-                return;
+            //if (_remotePickupWaitsForEggRelease)
+            //    return;
 
             if (stateStruct.IsPressed(StateList.WithEgg) && myEgg == null && collidingEggs.Count > 0)
             {
@@ -141,8 +141,8 @@ public class PenguinColliderHandler
     {
         // La conferma dell'HIT invalida il precedente possesso del remoto.
         // Per un nuovo pickup serve prima uno stato di rete senza WithEgg.
-        if (_tag.EndsWith("Red"))
-            _remotePickupWaitsForEggRelease = true;
+        //if (_tag.EndsWith("Red"))
+            //_remotePickupWaitsForEggRelease = true;
 
         if (isWithEgg)
         {

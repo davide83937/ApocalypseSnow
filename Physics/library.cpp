@@ -79,19 +79,6 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
 }
 
 
-/*float calculate_ball_scale_only(float startX, float startY, float finalX, float finalY, float posX, float startSpeedX, float L, float K, float currentScale) {
-    float differenceY = std::abs(startY - finalY);
-    float x = L * (1.0f - std::exp(-K * differenceY));
-    float midpoint = (finalX + startX + 48.0f) / 2.0f;
-
-    if (startSpeedX > 0) { // Destra
-        return (posX < midpoint) ? (currentScale + x) : (currentScale - x);
-    } else { // Sinistra
-        return (posX > midpoint) ? (currentScale + x) : (currentScale - x);
-    }
-}*/
-
-
 float Distance(Vector2 a, Vector2 b) {
     float dx = a.x - b.x;
     float dy = a.y - b.y;

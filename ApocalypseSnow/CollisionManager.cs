@@ -1,10 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 
-namespace ApocalypseSnow
-{
+
+namespace ApocalypseSnow;
+
     public class CollisionManager : GameComponent
     {
         private static CollisionManager _instance;
@@ -161,4 +161,3 @@ namespace ApocalypseSnow
             return center;
         }
     }
-}

@@ -161,7 +161,7 @@ public sealed class GameSession : GameComponent
         if (networkManager != null)
         {
             networkManager.OnMatchStatusReceived -= HandleMatchStatus;
-            networkManager.Disconnect();
+            networkManager?.Dispose();
         }
 
         Console.WriteLine("Partita terminata e risorse pulite.");

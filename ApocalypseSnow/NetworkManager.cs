@@ -6,7 +6,7 @@ using Microsoft.Xna.Framework;
 
 namespace ApocalypseSnow;
 
-public class NetworkManager 
+public class NetworkManager: IDisposable
 {
     private TcpClient _tcpClient;
     private NetworkStream _stream;
@@ -35,7 +35,6 @@ public class NetworkManager
     public static NetworkManager Instance
     {
         get { return _instance; }
-        private set => _instance = value;
     }
 
     public NetworkManager(string ip, int port) 
@@ -116,7 +115,7 @@ public class NetworkManager
                 throw new IOException("Connessione chiusa durante la ricezione.");
             _packetFramer.Append(_incomingBuffer.AsSpan(0, read));
         }
-
+        //Separiamo intestazione da payload
         while (_packetFramer.TryRead(out byte type, out byte[] payload))
         {
             switch (type)
@@ -199,6 +198,10 @@ public class NetworkManager
 
     public void SendShot(ShotStruct shot)
     {
+        //Aggiornamento passivo: Quando chiami Connect(), diventa true.
+        //Rimane true in memoria finché una successiva operazione Read()
+        //o Write() non fallisce (ad esempio perché il server Go è andato
+        //in crash, hai staccato il cavo di rete o il server ha chiuso la connessione).
         if (_stream == null || !_tcpClient.Connected) return;
 
         byte[] packet = new byte[17];
@@ -227,10 +230,9 @@ public class NetworkManager
             Thread.Sleep(100);
             tentativi++;
         }
-
         if (_stream == null || !_tcpClient.Connected)
             throw new Exception("Non connesso al server");
-
+        
         byte[] buffer = new byte[25];
         int totalRead = 0;
 
@@ -258,12 +260,19 @@ public class NetworkManager
 
     public void Disconnect()
     {
+        Dispose();
+    }
+
+    public void Dispose()
+    {
         try
         {
-            _stream?.Close();
-            _tcpClient?.Close();
-            Console.WriteLine("Connessione TCP chiusa correttamente.");
+            _stream?.Dispose();
+            _tcpClient?.Dispose();
+            _stream = null;
+            _tcpClient = null;
             _instance = null;
+            Console.WriteLine("Connessione TCP chiusa correttamente.");
         }
         catch (Exception ex)
         {
