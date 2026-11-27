@@ -141,7 +141,7 @@ public class Penguin : CollisionExtensions //,GameComponent
                 {
                     uint hitTick = GameSession.LocalTick;
                     bool predictedFreeze = LocalFreeze.Predict(ball.ShotKey, hitTick);
-                    ball.PredictPenguinImpact();
+                    //ball.PredictPenguinImpact();
                     if (predictedFreeze)
                         _penguinColliderHandler.isFrozen = true;
                 }

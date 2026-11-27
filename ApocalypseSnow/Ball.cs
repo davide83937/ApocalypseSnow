@@ -110,6 +110,63 @@ public class Ball : CollisionExtensions
             z);
     }
 
+    private Texture2D load_texture(string path)
+    {
+        using var stream = System.IO.File.OpenRead(path);
+        return Texture2D.FromStream(GraphicsDevice, stream);
+    }
+    
+    protected override void UnloadContent()
+    {
+        _texture?.Dispose();
+        _brokenTexture?.Dispose();
+        base.UnloadContent();
+    }
+    
+    protected override void LoadContent()
+    {
+        _texture = load_texture("Content/images/palla1.png");
+        _brokenTexture = load_texture("Content/images/palla_rotta.png");
+
+        CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height);
+        base.LoadContent();
+
+        _halfTextureFractionWidth = _texture.Width / 2;
+        _halfTextureFractionHeight = _texture.Height / 2;
+    }
+    
+    public void Draw(SpriteBatch spriteBatch)
+    {
+        if (!_hitObstacle)
+        {
+            spriteBatch.Draw(
+                _texture,
+                _shadowPosition,
+                null,
+                Color.Black * _shadowOpacity,
+                0f,
+                Vector2.Zero,
+                _shadowScale,
+                SpriteEffects.None,
+                0f
+            );
+        }
+
+        Texture2D texToDraw = _hitObstacle ? _brokenTexture : _texture;
+
+        spriteBatch.Draw(
+            texToDraw,
+            _position,
+            null,
+            Color.White,
+            0f,
+            Vector2.Zero,
+            _scale,
+            SpriteEffects.None,
+            0f
+        );
+    }
+    
     public override void Update(GameTime gameTime)
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
@@ -295,23 +352,7 @@ public class Ball : CollisionExtensions
     public static bool ShouldDrawLandingFragment(bool locallyLanded, bool predictedHit, float elapsed)
         => locallyLanded && !predictedHit && LandingFragmentOpacity(elapsed) > 0f;
 
-    public void Draw(SpriteBatch spriteBatch)
-    {
-        // HIT previsto: niente palla o frammento, anche se il server lo smentisce.
-        if (_predictedHitVisual)
-            return;
 
-        if (_locallyLanded)
-        {
-            if (ShouldDrawLandingFragment(_locallyLanded, _predictedHitVisual, _landingVisualElapsed))
-                spriteBatch.Draw(_brokenTexture, _position, Color.White * LandingFragmentOpacity(_landingVisualElapsed));
-            return;
-        }
-
-        DrawShadow(spriteBatch);
-        spriteBatch.Draw(_texture, _position, null, Color.White, 0f,
-            Vector2.Zero, _scale, SpriteEffects.None, 0f);
-    }
 
     private void DrawShadow(SpriteBatch spriteBatch)
     {
@@ -330,29 +371,5 @@ public class Ball : CollisionExtensions
 
     // ===== RISORSE MONOGAME =====
 
-    private Texture2D LoadTexture(string path)
-    {
-        using var stream = System.IO.File.OpenRead(path);
-        return Texture2D.FromStream(GraphicsDevice, stream);
-    }
-
-    protected override void LoadContent()
-    {
-        _texture = LoadTexture("Content/images/palla1.png");
-        _brokenTexture = LoadTexture("Content/images/palla_rotta.png");
-
-        CollisionManager.Instance.addObject(_tag, _position.X, _position.Y,
-            _texture.Width, _texture.Height, minZ: 0f, maxZ: 0f);
-        base.LoadContent();
-
-        _halfTextureFractionWidth = _texture.Width / 2;
-        _halfTextureFractionHeight = _texture.Height / 2;
-    }
-
-    protected override void UnloadContent()
-    {
-        _texture?.Dispose();
-        _brokenTexture?.Dispose();
-        base.UnloadContent();
-    }
+  
 }
