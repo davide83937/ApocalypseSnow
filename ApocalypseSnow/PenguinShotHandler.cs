@@ -1,5 +1,4 @@
-﻿using System;
-using System.Runtime.InteropServices;
+﻿﻿using System;
 using Microsoft.Xna.Framework;
 
 namespace ApocalypseSnow;
@@ -19,22 +18,12 @@ public class PenguinShotHandler
     public float pressedTime;
     public float _reloadTime;
 
-    // ===== Parametri tiro =====
-    private const float ThetaLeftDeg = 30f;
-    private const float ThetaRightDeg = 60f;
-    private const float MaxChargeSeconds = 1.5f;
-    private const float DesiredFullChargeFlightTimeLowShot = 0.5f;
-    private const float PlanePerspectiveY = 0.70f;
-    private const float MuzzleOffsetY = 18f;
-    private const float MuzzleDistance = 22f;
+    // La durata massima della carica e' una regola di gioco (ShotGameplay).
 
-    private float _currentThetaDeg = ThetaLeftDeg;
-    private float _currentVerticalSpeed;
 
     // Tipo di carica “armato” dall’input unificato.
     // Non legge più il mouse direttamente.
     private ShotType? _armedShotType = null;
-    public readonly record struct ShotLaunch(Vector2 Start, Vector2 GroundVelocity, float VerticalSpeed, float Gravity);
 
     public PenguinShotHandler(Game gameContext, string tag, uint ownerPlayerId)
     {
@@ -85,18 +74,16 @@ public class PenguinShotHandler
         if (isChargingLeft)
         {
             _armedShotType = ShotType.Left;
-            _currentThetaDeg = ThetaLeftDeg;
             pressedTime += deltaTime;
         }
         else if (isChargingRight)
         {
             _armedShotType = ShotType.Right;
-            _currentThetaDeg = ThetaRightDeg;
             pressedTime += deltaTime;
         }
 
-        if (pressedTime > MaxChargeSeconds)
-            pressedTime = MaxChargeSeconds;
+        if (pressedTime > ShotGameplay.MaxChargeSeconds)
+            pressedTime = ShotGameplay.MaxChargeSeconds;
     }
 
     private void ResetCharge()
@@ -105,64 +92,19 @@ public class PenguinShotHandler
         _armedShotType = null;
     }
 
-    // Durata teorica su terreno piano (delega alla DLL C++)
-    public static float PredictFullFlightSeconds(int chargeMs, ShotType type)
-    {
-        return ShotPhysicsAPI.PredictFullFlightSeconds(
-            chargeMs, 
-            MaxChargeSeconds, 
-            DesiredFullChargeFlightTimeLowShot, 
-            type == ShotType.Left ? ThetaLeftDeg : ThetaRightDeg, 
-            ThetaLeftDeg
-        );
-    }
+    public readonly record struct ShotParameters(Vector2 Start, Vector2 GroundVelocity, float VerticalSpeed, float Gravity);
 
-    public static float ComputeGravityForLowShot(float maxWorldRange)
+    // La geometria del pinguino e i parametri del gioco sono in ShotGameplay.
+    // La DLL C++ riceve solo origine, direzione e dati fisici.
+    public static ShotParameters ComputeShotParameters(Vector2 penguinPosition, Vector2 target, float chargeSeconds, ShotType type)
     {
-        float thetaLowRad = MathHelper.ToRadians(ThetaLeftDeg);
-        return ShotPhysicsAPI.ComputeGravityForLowShot(maxWorldRange, DesiredFullChargeFlightTimeLowShot, thetaLowRad);
-    }
-
-    private static float ComputeMaxV0(float gravity)
-    {
-        float thetaLowRad = MathHelper.ToRadians(ThetaLeftDeg);
-        return ShotPhysicsAPI.ComputeMaxV0(gravity, DesiredFullChargeFlightTimeLowShot, thetaLowRad);
-    }
-
-    public static float ComputeVerticalSpeed(float chargeSeconds, ShotType type, float gravity)
-    {
-        float thetaDeg = type == ShotType.Left ? ThetaLeftDeg : ThetaRightDeg;
-        float thetaLowRad = MathHelper.ToRadians(ThetaLeftDeg);
-        float maxV0 = ComputeMaxV0(gravity);
-        return ShotPhysicsAPI.ComputeVerticalSpeed(chargeSeconds, MaxChargeSeconds, maxV0, thetaDeg, ThetaLeftDeg);
-    }
-
-    public static float ComputeMaxWorldRange(Vector2 muzzleBase)
-    {
-        return ShotPhysicsAPI.ComputeMaxWorldRange(muzzleBase, GameWorld.Width, GameWorld.Height);
-    }
-
-    // Ricostruisce la stessa traiettoria delegando alla DLL C++
-    public static ShotLaunch ComputeLaunch(Vector2 penguinPosition, Vector2 target, float chargeSeconds, ShotType type)
-    {
-        float thetaDeg = type == ShotType.Left ? ThetaLeftDeg : ThetaRightDeg;
-        return ShotPhysicsAPI.ComputeLaunch(
-            penguinPosition,
-            target,
-            chargeSeconds,
-            MaxChargeSeconds,
-            DesiredFullChargeFlightTimeLowShot,
-            thetaDeg,
-            ThetaLeftDeg,
-            MuzzleOffsetY,
-            MuzzleDistance,
-            GameWorld.Width,
-            GameWorld.Height
-        );
+        return ShotGameplay.BuildShotParameters(penguinPosition, target, chargeSeconds, type);
     }
 
     // Per il locale, crea il tiro al rilascio del tasto armato e invia MsgShot.
     // Per il remoto, ricrea soltanto la palla usando i metadati ricevuti dal server.
+    // La posizione e il freeze definitivi restano autoritativi; l'effetto della
+    // palla (HIT predetto o dissolvenza su MISS) rimane esclusivamente locale.
     public void Shot(StateStruct stateStruct, Vector2 mousePosition, Vector2 position, string tagBall,
         ShotType? remoteShotType = null, ShotKey? remoteShotKey = null)
     {
@@ -214,37 +156,25 @@ public class PenguinShotHandler
             }
         }
 
-        if (shotTypeToFire == ShotType.Left)
-            _currentThetaDeg = ThetaLeftDeg;
-        else
-            _currentThetaDeg = ThetaRightDeg;
+        // La logica di gioco decide origine e parametri; C++ calcola la fisica.
+        ShotParameters launch = ComputeShotParameters(position, mousePosition, pressedTime, shotTypeToFire.Value);
 
-        // Tutta la matematica e' demandata alla DLL C++ tramite ComputeLaunch
-        ShotLaunch launch = ComputeLaunch(position, mousePosition, pressedTime, shotTypeToFire.Value);
-        _currentVerticalSpeed = launch.VerticalSpeed;
-
-        // L'identita' della palla e' (giocatore, tick di tiro).
+        // L'identita' della palla e' (giocatore, tick di tiro). Locale e server
+        // devono riferirsi alla stessa chiave per collegare tiro ed esito.
+        // Il remoto conserva la chiave originale; non ne genera una nuova.
         ShotKey shotKey = isRemoteShot
             ? remoteShotKey ?? throw new ArgumentException("Remote shot must carry a ShotKey.", nameof(remoteShotKey))
             : new ShotKey(_ownerPlayerId, GameSession.LocalTick);
 
-        // Creiamo la palla da mostrare localmente
+        // Creiamo la palla da mostrare localmente e registriamo quando inizia
+        // il suo volo su questa timeline, anche se proviene dall'avversario.
         Ball b = new Ball(_gameContext, _tag, launch.Start, launch.GroundVelocity, launch.VerticalSpeed,
             shotKey.CollisionTag(tagBall), launch.Gravity, shotKey);
         _gameContext.Components.Add(b);
         
-        b.MarkObservedStart(GameSession.LocalTick, isRemoteShot ? "REMOTE" : "OWNER");
-        if (!isRemoteShot)
-        {
-            int chargeMs = (int)MathF.Round(pressedTime * 1000f);
-            float expected = PredictFullFlightSeconds(chargeMs, shotTypeToFire.Value);
-            ShotTrace.Log($"[SHOT_FLIGHT_A] key={shotKey} chargeMs={chargeMs} type={shotTypeToFire.Value} " +
-                          $"actualDuration={b.FlightDurationSeconds:F7} theoreticalDuration={expected:F7} " +
-                          $"durationDelta={b.FlightDurationSeconds - expected:F7} " +
-                          $"flightTicks={ShotFlightTiming.LandingTicks(b.FlightDurationSeconds, GameSession.TickRateHz)}");
-        }
-
-        // Solo il proprietario invia MsgShot
+        b.MarkObservedStart(GameSession.LocalTick);
+        // Solo il proprietario invia MsgShot: il remoto sta gia' riproducendo
+        // un tiro che il server ha ricevuto e autorizzato.
         if (!isRemoteShot)
         {
             ShotStruct shotStruct = new ShotStruct

@@ -10,15 +10,10 @@ import (
 )
 
 const (
-	shotThetaLeftDeg                   = 30.0
-	shotThetaRightDeg                  = 60.0
-	shotMaxChargeSeconds               = 1.5
-	shotDesiredFullChargeFlightTimeLow = 0.5
 
-	shotPlanePerspectiveY              = 0.70
-	shotMuzzleOffsetY                  = 18.0
-	shotMuzzleDistance                 = 22.0
-	shotColliderDisableHeightThreshold = 30.0
+	// Le altezze di pinguino e ostacolo sono definite in collision_manager.go.
+	// Qui impostiamo le sagome per la collisione; la DLL controlla se la quota
+	// della palla rientra tra il terreno e l'altezza massima dell'oggetto.
 
 	shotColliderWidth  int32 = 20
 	shotColliderHeight int32 = 25
@@ -55,25 +50,6 @@ type GameRoom struct {
 
 	tickRateHz uint32
 	matchTick  uint32
-}
-
-func clamp01(v float32) float32 {
-	if v < 0 {
-		return 0
-	}
-	if v > 1 {
-		return 1
-	}
-	return v
-}
-
-func normalize2D(x, y float32) (float32, float32) {
-	lenSq := x*x + y*y
-	if lenSq <= 0.0001 {
-		return 1, 0
-	}
-	invLen := float32(1.0 / math.Sqrt(float64(lenSq)))
-	return x * invLen, y * invLen
 }
 
 // Stessa tolleranza in tick del client C#: evita +1 tick per rumore float.
@@ -168,7 +144,7 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 		gameRoom.firstPlayer.X+penguinHalfTextureFractionWidth,
 		gameRoom.firstPlayer.Y+penguinHalfTextureFractionHeight,
 		penguinTextureFractionWidth,
-		penguinHalfTextureFractionHeight,
+		penguinHalfTextureFractionHeight, 0, penguinCollisionHeight,
 	)
 
 	gameRoom.collisionManager.AddObject(
@@ -176,7 +152,7 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 		gameRoom.secondPlayer.X+penguinHalfTextureFractionWidth,
 		gameRoom.secondPlayer.Y+penguinHalfTextureFractionHeight,
 		penguinTextureFractionWidth,
-		penguinHalfTextureFractionHeight,
+		penguinHalfTextureFractionHeight, 0, penguinCollisionHeight,
 	)
 
 	// Collider persistenti degli ostacoli, con tag univoco
@@ -189,7 +165,7 @@ func NewGameRoom(firstPlayerConnection, secondPlayerConnection *PlayerConnection
 			posCollX,
 			posCollY+obstacleColliderYOffset,
 			obstacleHalfTextureFractionWidth+obstacleColliderExtraWidth,
-			obstacleHalfTextureFractionHeight,
+			obstacleHalfTextureFractionHeight, 0, obstacleCollisionHeight,
 		)
 	}
 
@@ -349,7 +325,6 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 	// Se arriva Reload, annulliamo anche il tiro in attesa del pacchetto.
 	if (mask & Reload) != 0 {
 		if ps.Active {
-			log.Printf("[SHOT CANCEL] owner=%d press=%d reloadTick=%d", player.ID, ps.PressTick, seqN)
 			*ps = PendingShot{WaitingNeutral: leftNow || rightNow}
 		} else if ps.WaitingNeutral && !leftNow && !rightNow {
 			ps.WaitingNeutral = false
@@ -367,7 +342,6 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 	// Un rilascio annullato dal client (freeze predetto, perdita del focus, ecc.)
 	// puo' non produrre MsgShot: una nuova pressione avvia una nuova carica.
 	if ps.Active && ps.WaitingShotPacket && (leftJustPressed || rightJustPressed) {
-		log.Printf("[SHOT ABANDONED] owner=%d releaseTick=%d newPressTick=%d", player.ID, ps.ReleaseTick, seqN)
 		*ps = PendingShot{}
 	}
 
@@ -380,7 +354,6 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 			ps.WaitingShotPacket = false
 			ps.ShotPacket = nil
 
-			log.Printf("[SHOT PRESS] owner=%d mode=LEFT pressedTick=%d", player.ID, seqN)
 			return
 		}
 
@@ -392,7 +365,6 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 			ps.WaitingShotPacket = false
 			ps.ShotPacket = nil
 
-			log.Printf("[SHOT PRESS] owner=%d mode=RIGHT pressedTick=%d", player.ID, seqN)
 			return
 		}
 
@@ -408,14 +380,12 @@ func (gameRoom *GameRoom) updatePendingShot(player *Player, mask int32, seqN uin
 		if !leftNow {
 			ps.ReleaseTick = seqN
 			ps.WaitingShotPacket = true
-			log.Printf("[SHOT RELEASE] owner=%d mode=LEFT releasedTick=%d", player.ID, seqN)
 		}
 
 	case ChargeRight:
 		if !rightNow {
 			ps.ReleaseTick = seqN
 			ps.WaitingShotPacket = true
-			log.Printf("[SHOT RELEASE] owner=%d mode=RIGHT releasedTick=%d", player.ID, seqN)
 		}
 	}
 }
@@ -468,19 +438,6 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 			applied++
 
 			ps := &player.PendingShot
-			if ps.Active && ps.WaitingShotPacket && ps.ReleaseTick == inputState.SeqN {
-				log.Printf(
-					"[SHOT RELEASE AUTHPOS] owner=%d releaseClientTick=%d serverMatchTick=%d authPosAtRelease=(%.1f, %.1f) lastSeq=%d mask=%d",
-					player.ID,
-					ps.ReleaseTick,
-					gameRoom.matchTick,
-					player.X,
-					player.Y,
-					player.LastSeqN,
-					player.LastMask,
-				)
-			}
-
 			if ps.Active && ps.WaitingShotPacket && ps.ShotPacket != nil {
 				shot := gameRoom.createShotFromEvent(player, *ps.ShotPacket)
 				if shot.ShotID != 0 {
@@ -496,24 +453,10 @@ func (gameRoom *GameRoom) applyMaturePendingEvents(
 		case EventShot:
 			shotEvent := event.Shot
 			if gameRoom.isServerFrozen(player) {
-				log.Printf("[SHOT REJECT FROZEN] owner=%d shotClientTick=%d serverMatchTick=%d freeze=[%d,%d)", player.ID, shotEvent.SeqN, gameRoom.matchTick, player.FreezeStartTick, player.FreezeEndTick)
 				consumeCount++
 				continue
 			}
 			ps := &player.PendingShot
-
-			log.Printf(
-				"[SHOT PKT] owner=%d shotClientTick=%d serverMatchTick=%d target=(%.1f, %.1f) localChargeMs=%d currentAuthPos=(%.1f, %.1f) releaseTickSeen=%d",
-				player.ID,
-				shotEvent.SeqN,
-				gameRoom.matchTick,
-				shotEvent.X,
-				shotEvent.Y,
-				shotEvent.Charge,
-				player.X,
-				player.Y,
-				ps.ReleaseTick,
-			)
 
 			if ps.Active {
 				copied := shotEvent
@@ -562,39 +505,7 @@ func (gameRoom *GameRoom) updatePlayerColliders() {
 	)
 }
 
-func (gameRoom *GameRoom) computeMaxWorldRange(muzzleBaseX, muzzleBaseY float32) float32 {
-	corners := [][2]float32{
-		{0, 0},
-		{gameWorldWidth, 0},
-		{0, gameWorldHeight},
-		{gameWorldWidth, gameWorldHeight},
-	}
-
-	var maxWorldRangeSq float32 = 0
-
-	for _, c := range corners {
-		dx := c[0] - muzzleBaseX
-		dyWorld := (c[1] - muzzleBaseY) / shotPlanePerspectiveY
-		distSq := dx*dx + dyWorld*dyWorld
-		if distSq > maxWorldRangeSq {
-			maxWorldRangeSq = distSq
-		}
-	}
-
-	return float32(math.Sqrt(float64(maxWorldRangeSq)))
-}
-
-func computeGravityForLowShot(maxWorldRange float32) float32 {
-	thetaLowRad := float32(math.Pi * shotThetaLeftDeg / 180.0)
-	return (2.0 * maxWorldRange * float32(math.Tan(float64(thetaLowRad)))) /
-		(shotDesiredFullChargeFlightTimeLow * shotDesiredFullChargeFlightTimeLow)
-}
-
-func computeMaxV0(gravity float32) float32 {
-	thetaLowRad := float32(math.Pi * shotThetaLeftDeg / 180.0)
-	return (gravity * shotDesiredFullChargeFlightTimeLow) / (2.0 * float32(math.Sin(float64(thetaLowRad))))
-}
-
+// Il server autorizza carica/angolo e usa la stessa fisica nativa del client.
 func (gameRoom *GameRoom) buildServerShotRuntime(player *Player, shotEvent ShotEvent, shotType ShotType, authChargeMs uint32) (
 	startX, startY float32,
 	groundVelX, groundVelY float32,
@@ -602,74 +513,25 @@ func (gameRoom *GameRoom) buildServerShotRuntime(player *Player, shotEvent ShotE
 	gravity float32,
 	flightDuration float32,
 ) {
-	muzzleBaseX := player.X + 48.0
-	muzzleBaseY := player.Y + shotMuzzleOffsetY
-
-	diffX := shotEvent.X - muzzleBaseX
-	diffY := shotEvent.Y - muzzleBaseY
-	diffY /= shotPlanePerspectiveY
-
-	diffX, diffY = normalize2D(diffX, diffY)
-
-	maxWorldRange := gameRoom.computeMaxWorldRange(muzzleBaseX, muzzleBaseY)
-	gravity = computeGravityForLowShot(maxWorldRange)
-	maxV0 := computeMaxV0(gravity)
-
-	chargeSeconds := float32(authChargeMs) / 1000.0
-	charge01 := clamp01(chargeSeconds / shotMaxChargeSeconds)
-	power01 := float32(math.Sqrt(float64(charge01)))
-	v0 := power01 * maxV0
-
-	thetaDeg := float32(shotThetaLeftDeg)
-	if shotType == ShotTypeRight {
-		thetaDeg = shotThetaRightDeg
-	}
-	thetaRad := float32(math.Pi) * thetaDeg / 180.0
-
-	groundSpeed := v0 * float32(math.Cos(float64(thetaRad)))
-	startVerticalSpeed = v0 * float32(math.Sin(float64(thetaRad)))
-
-	groundVelX = diffX * groundSpeed
-	groundVelY = diffY * groundSpeed
-
-	aimScreenDirX, aimScreenDirY := normalize2D(shotEvent.X-muzzleBaseX, shotEvent.Y-muzzleBaseY)
-
-	startX = muzzleBaseX + aimScreenDirX*shotMuzzleDistance
-	startY = muzzleBaseY + aimScreenDirY*shotMuzzleDistance
-
-	if gravity > 0 {
-		flightDuration = (2.0 * startVerticalSpeed) / gravity
-	}
-
-	return
+	launch := buildShotParameters(player.Position, shotEvent.Position,
+		float32(authChargeMs)/1000, shotType)
+	return launch.startX, launch.startY, launch.vx, launch.vy, launch.vz,
+		launch.gravity, nativeShotFlightDuration(launch.vz, launch.gravity)
 }
 
+// Esito e tick restano autoritativi nel server; parabola e proiezioni sono native.
 func (gameRoom *GameRoom) computeShotScreenAndHeight(shot *Shot) (screenX, screenY, shadowX, shadowY, z float32, expired bool) {
 	if !shot.IsAlive {
 		return 0, 0, 0, 0, 0, true
 	}
-
 	elapsedTicks := gameRoom.matchTick - shot.SpawnTick
-	t := float32(elapsedTicks) / float32(gameRoom.tickRateHz)
-
 	if elapsedTicks >= shotLandingTicks(shot.FlightDuration, gameRoom.tickRateHz) {
 		return 0, 0, 0, 0, 0, true
 	}
-
-	worldDeltaX := shot.GroundVelX * t
-	worldDeltaY := shot.GroundVelY * t
-
-	z = (shot.StartVerticalSpeed * t) - (0.5 * shot.Gravity * t * t)
-	if z < 0 {
-		z = 0
-	}
-
-	screenX = shot.StartX + worldDeltaX
-	screenY = shot.StartY + (shotPlanePerspectiveY * worldDeltaY) - (0.35 * z)
-
-	shadowX = shot.StartX + worldDeltaX
-	shadowY = shot.StartY + (shotPlanePerspectiveY * worldDeltaY)
-
+	t := float32(elapsedTicks) / float32(gameRoom.tickRateHz)
+	screenX, screenY, shadowX, shadowY, z =
+		nativeSampleShot(shot.StartX, shot.StartY, shot.GroundVelX, shot.GroundVelY,
+			shot.StartVerticalSpeed, shot.Gravity, t)
 	return screenX, screenY, shadowX, shadowY, z, false
 }
 
@@ -682,6 +544,7 @@ func (gameRoom *GameRoom) updateShotColliders() {
 		}
 
 		_, _, shadowX, shadowY, z, expired := gameRoom.computeShotScreenAndHeight(shot)
+		shot.CurrentHeight = z
 		shotTag := shotCollisionTag(shot.ShotID)
 
 		if expired {
@@ -689,35 +552,13 @@ func (gameRoom *GameRoom) updateShotColliders() {
 			continue
 		}
 
-		log.Printf(
-			"[SHOT POS] tick=%d shot=%s shadow=(%.1f, %.1f) z=%.1f",
-			gameRoom.matchTick,
-			shotTag,
-			shadowX,
-			shadowY,
-			z,
+		// La collisione XY e' sempre rilevata: la DLL decide poi se
+		// la quota Z consente di colpire un ostacolo oppure un pinguino.
+		posCollX := float32(int32(shadowX) + shotColliderWidth/2)
+		posCollY := float32(int32(shadowY) + shotColliderHeight/2)
+		gameRoom.collisionManager.ModifyObject(
+			shotTag, posCollX, posCollY, shotColliderWidth, shotColliderHeight, z, z,
 		)
-
-		if z >= shotColliderDisableHeightThreshold {
-			gameRoom.collisionManager.ModifyObject(
-				shotTag,
-				-1000,
-				-1000,
-				shotColliderWidth,
-				shotColliderHeight,
-			)
-		} else {
-			posCollX := float32(int32(shadowX) + shotColliderWidth/2)
-			posCollY := float32(int32(shadowY) + shotColliderHeight/2)
-
-			gameRoom.collisionManager.ModifyObject(
-				shotTag,
-				posCollX,
-				posCollY,
-				shotColliderWidth,
-				shotColliderHeight,
-			)
-		}
 	}
 }
 
@@ -728,7 +569,6 @@ func (gameRoom *GameRoom) resolveShot(shot *Shot, outcome ShotOutcome, hitPlayer
 	}
 
 	shot.IsAlive = false
-	log.Printf("[SHOT_TRACE] role=SERVER event=RESOLVED key=%d:%d spawnTick=%d hitTick=%d flightTicks=%d outcome=%d victim=%d utc=%s", shot.OwnerPlayerID, shot.ClientShotTick, shot.SpawnTick, gameRoom.matchTick, gameRoom.matchTick-shot.SpawnTick, outcome, hitPlayerID, time.Now().UTC().Format(time.RFC3339Nano))
 	shotTag := shotCollisionTag(shot.ShotID)
 	gameRoom.collisionManager.RemoveObject(shotTag)
 
@@ -767,10 +607,6 @@ func (gameRoom *GameRoom) resolveShot(shot *Shot, outcome ShotOutcome, hitPlayer
 	gameRoom.firstPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
 	gameRoom.secondPlayerConnection.TryEnqueueOutgoingPacket(packet, true)
 
-	log.Printf(
-		"[SHOT RESOLVED] tick=%d shot=%s owner=%d clientTick=%d outcome=%d victim=%d",
-		gameRoom.matchTick, shotTag, shot.OwnerPlayerID, shot.ClientShotTick, outcome, hitPlayerID,
-	)
 }
 
 func (gameRoom *GameRoom) resolveCollisionResults() {
@@ -781,39 +617,21 @@ func (gameRoom *GameRoom) resolveCollisionResults() {
 			continue
 		}
 
-		log.Printf(
-			"[CPP COLLISION] tick=%d my=%s other=%s type=%d",
-			gameRoom.matchTick,
-			result.MyTag,
-			result.OtherTag,
-			result.Type,
-		)
-
 		// SHOT vs OBSTACLE
 		if (isShotTag(result.MyTag) && isObstacleTag(result.OtherTag)) ||
 			(isShotTag(result.OtherTag) && isObstacleTag(result.MyTag)) {
 
-			var shotTag, obstacleTag string
+			var shotTag string
 			if isShotTag(result.MyTag) {
 				shotTag = result.MyTag
-				obstacleTag = result.OtherTag
 			} else {
 				shotTag = result.OtherTag
-				obstacleTag = result.MyTag
 			}
 
 			shot, ok := findShotByTag(shotTag, gameRoom.activeShots)
 			if !ok || !shot.IsAlive {
 				continue
 			}
-
-			log.Printf(
-				"[SHOT HIT OBSTACLE] tick=%d shot=%s owner=%d obstacle=%s",
-				gameRoom.matchTick,
-				shotTag,
-				shot.OwnerPlayerID,
-				obstacleTag,
-			)
 
 			gameRoom.resolveShot(shot, ShotOutcomeObstacle, 0)
 			continue
@@ -840,23 +658,8 @@ func (gameRoom *GameRoom) resolveCollisionResults() {
 			ownerTag := playerCollisionTag(shot.OwnerPlayerID)
 
 			if penguinTag == ownerTag {
-				log.Printf(
-					"[SHOT SELF-COLLISION IGNORED] tick=%d shot=%s owner=%d penguin=%s",
-					gameRoom.matchTick,
-					shotTag,
-					shot.OwnerPlayerID,
-					penguinTag,
-				)
 				continue
 			}
-
-			log.Printf(
-				"[SHOT HIT PENGUIN] tick=%d shot=%s owner=%d penguin=%s",
-				gameRoom.matchTick,
-				shotTag,
-				shot.OwnerPlayerID,
-				penguinTag,
-			)
 
 			hitPlayerID := uint32(1)
 			if penguinTag == playerCollisionTag(2) {
@@ -971,23 +774,19 @@ func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEven
 	ps := &player.PendingShot
 
 	if !ps.Active {
-		log.Printf("[SHOT] owner=%d arrivato MsgShot ma nessuna carica attiva", player.ID)
 		return Shot{}
 	}
 
 	if !ps.WaitingShotPacket {
-		log.Printf("[SHOT] owner=%d arrivato MsgShot ma la carica non è stata ancora rilasciata", player.ID)
 		return Shot{}
 	}
 
 	if ps.ReleaseTick < ps.PressTick {
-		log.Printf("[SHOT] owner=%d releaseTick < pressTick", player.ID)
 		return Shot{}
 	}
 
 	// Il pacchetto deve appartenere proprio a questo rilascio.
 	if shotEvent.SeqN != ps.ReleaseTick {
-		log.Printf("[SHOT REJECT] owner=%d shotTick=%d releaseTick=%d", player.ID, shotEvent.SeqN, ps.ReleaseTick)
 		return Shot{}
 	}
 
@@ -1017,8 +816,6 @@ func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEven
 		gravity,
 		flightDuration := gameRoom.buildServerShotRuntime(player, shotEvent, shotType, authChargeMs)
 
-	log.Printf("[SHOT_TRACE] role=SERVER event=START key=%d:%d tick=%d utc=%s", player.ID, shotEvent.SeqN, gameRoom.matchTick, time.Now().UTC().Format(time.RFC3339Nano))
-	log.Printf("[SHOT_FLIGHT_SERVER] key=%d:%d chargeMs=%d type=%d fullDuration=%.7f expectedLandingTicks=%d", player.ID, shotEvent.SeqN, authChargeMs, shotType, flightDuration, shotLandingTicks(flightDuration, gameRoom.tickRateHz))
 	shot := Shot{
 		ShotID:         gameRoom.nextShotID,
 		ClientShotTick: shotEvent.SeqN,
@@ -1051,34 +848,7 @@ func (gameRoom *GameRoom) createShotFromEvent(player *Player, shotEvent ShotEven
 		shot.StartX,
 		shot.StartY,
 		shotColliderWidth,
-		shotColliderHeight,
-	)
-
-	log.Printf(
-		"[SHOT CREATE] owner=%d shotId=%d serverMatchTick=%d press=%d release=%d shotPktSeq=%d currentAuthPosAtCreate=(%.1f, %.1f)",
-		player.ID,
-		shot.ShotID,
-		gameRoom.matchTick,
-		shot.PressedTick,
-		shot.ReleasedTick,
-		shotEvent.SeqN,
-		player.X,
-		player.Y,
-	)
-
-	log.Printf(
-		"[SHOT CMP] owner=%d shotId=%d type=%d press=%d release=%d localChargeMs=%d authChargeTicks=%d authChargeMs=%d deltaMs=%d target=(%.1f, %.1f)",
-		shot.OwnerPlayerID,
-		shot.ShotID,
-		shot.Type,
-		shot.PressedTick,
-		shot.ReleasedTick,
-		shot.LocalCharge,
-		shot.AuthCharge,
-		authChargeMs,
-		deltaMs,
-		shot.TargetX,
-		shot.TargetY,
+		shotColliderHeight, 0, 0,
 	)
 
 	// Reset FSM shot dopo la creazione.

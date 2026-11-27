@@ -1,4 +1,4 @@
-﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace ApocalypseSnow;
@@ -46,6 +46,9 @@ public class Obstacle:DrawableGameComponent
         //Vector2 position = GetPosition(_posX,  _posY);
         load_texture(GraphicsDevice, "Content/images/ostacoli1.png");
         Vector2 position = GetPosition(/*_posX,  _posY*/);
+        // TODO C++: centralizzare anche la geometria LOGICA dell'ostacolo
+        // (larghezza, altezza e offset del collider), oggi replicata nel Go.
+        // Le dimensioni della texture e il rettangolo grafico restano in C#.
         _textureFractionWidth = _texture.Width / 2;
         _textureFractionHeight = _texture.Height / 2;
         _halfTextureFractionWidth = _textureFractionWidth / 2;
@@ -53,7 +56,11 @@ public class Obstacle:DrawableGameComponent
         int posCollX = (int)_position.X + _halfTextureFractionWidth;
         int posCollY = (int)_position.Y + _halfTextureFractionHeight;
         _sourceRect = new Rectangle((int)position.X, (int)position.Y, _textureFractionWidth, _textureFractionHeight);
-        CollisionManager.Instance.addObject(_tag, posCollX, posCollY+25, _halfTextureFractionWidth+60, _halfTextureFractionHeight);
+        // In XY usiamo la sagoma a terra dell'ostacolo; in Z il muro arriva a 90.
+        // La palla lo supera soltanto quando passa all'altezza 90 o superiore.
+        CollisionManager.Instance.addObject(_tag, posCollX, posCollY+25,
+            _halfTextureFractionWidth+60, _halfTextureFractionHeight,
+            minZ: 0f, maxZ: GameWorld.ObstacleCollisionHeight);
     }
 
     public void Draw(SpriteBatch spriteBatch)

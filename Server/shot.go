@@ -42,4 +42,6 @@ type Shot struct {
 	StartVerticalSpeed float32
 	Gravity            float32
 	FlightDuration     float32
+	// Quota al tick corrente, usata nel filtro verticale delle collisioni.
+	CurrentHeight float32
 }

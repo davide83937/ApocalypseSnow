@@ -4,10 +4,6 @@
 #include <algorithm>
 
 
-const char* PhysicsBuildInfo() {
-    return "PhysicsDLL build: " __DATE__ " " __TIME__;
-}
-
 void uniform_rectilinear_motion(float *position, float velocity, float deltaTime) {
     *position = *position + (velocity * deltaTime);
 }
@@ -29,12 +25,27 @@ void normalizeVelocity(float* velX, float* velY) {
 }*/
 
 
+// TODO C++: riutilizzare il test AABB sottostante per una nuova funzione
+// resolve_obstacle_overlaps: correzione della penetrazione e ciclo su tutti
+// gli ostacoli devono essere unici nella DLL, non duplicati in Go e C#.
+// Mantenere intatta l'API di rilevamento eventi check_collisions.
+// Intersezione tra intervalli verticali semiaperti [minZ,maxZ).
+// La palla ha spessore nullo in Z: [z,z] rappresenta il punto z.
+static bool z_overlaps(const CollisionDataIn& a, const CollisionDataIn& b) {
+    const bool pointA = a.minZ == a.maxZ;
+    const bool pointB = b.minZ == b.maxZ;
+    if (pointA && pointB) return a.minZ == b.minZ;
+    if (pointA) return a.minZ >= b.minZ && a.minZ < b.maxZ;
+    if (pointB) return b.minZ >= a.minZ && b.minZ < a.maxZ;
+    return a.minZ < b.maxZ && b.minZ < a.maxZ;
+}
+
 void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int count) {
     int found = 0;
     for (int i = 0; i < count; i++) {
         for (int j = i + 1; j < count; j++) {
             // Controlla i tag per evitare collisioni tra oggetti dello stesso tipo (es. player vs player)
-            if (strcmp(data[i].tag, data[j].tag) != 0) {
+            if (strcmp(data[i].tag, data[j].tag) != 0 && z_overlaps(data[i], data[j])) {
 
                 // Distanza tra i centri
                 float dx = data[i].x - data[j].x;

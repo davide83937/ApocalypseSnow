@@ -14,6 +14,10 @@ func NormalizeVelocity(velocityX, velocityY *float32) {
 	normalizeVelocity(velocityX, velocityY)
 }
 
+// TODO C++: unificare con PhysicsWrapper.StepFromStateRef del client anche
+// interpretazione della bitmask e passo di movimento, non soltanto le primitive
+// di normalizzazione/moto gia' native. Il server mantiene autorita' su tick
+// e freeze; la DLL riceve stato, velocita' e dt e restituisce la posizione.
 func StepFromState(x, y float32, mask int32, dt float32) (float32, float32) {
 	if (mask&Reload) != 0 || (mask&Freezing) != 0 {
 		return x, y

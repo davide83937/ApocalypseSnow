@@ -87,12 +87,10 @@ public class EggsEvent:GameComponent
 
         if (penguin != null)
         {
-            ShotTrace.Log($"[EGG_DROP] penguin={penguin._tag} egg={penguin._myEgg ?? "none"} at=({penguin._position.X:F1},{penguin._position.Y:F1})");
             foreach (Egg egg in _eggs)
             {
                 if (egg._tag == penguin._myEgg)
                 {
-                    ShotTrace.Log($"[EGG_DROP] found={egg._tag}");
                     if (!Game.Components.Contains(egg)) Game.Components.Add(egg); // Evita duplicati
 
                     // Il punto iniziale di rilascio e' vicino al pinguino.
@@ -105,7 +103,6 @@ public class EggsEvent:GameComponent
                     egg._position = penguinCenter + new Vector2(40, 60) - eggHalfSize;
                     egg.ResolveObstacleOverlaps();
 
-                    ShotTrace.Log($"[EGG_DROP] placed={egg._tag} at=({egg._position.X:F1},{egg._position.Y:F1})");
                     CollisionManager.Instance.addObject(egg._tag,
                         egg._position.X + eggHalfSize.X, egg._position.Y + eggHalfSize.Y,
                         egg._texture.Width, egg._texture.Height);

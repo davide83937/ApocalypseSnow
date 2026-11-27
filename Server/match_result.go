@@ -29,6 +29,9 @@ func (gameRoom *GameRoom) recordEggDelivery(player *Player, eggID int32) bool {
 		return false
 	}
 
+	// TODO C++: il test geometrico AABB tra pinguino e piattaforma puo'
+	// riutilizzare la funzione nativa delle collisioni e la hitbox condivisa.
+	// Verifica di possesso, timer del deposito e punteggio restano nel Go.
 	// La base usa uno sprite 140x140: sovrapposizione con la stessa hitbox
 	// del pinguino usata dal server (centro X+48,Y+64; dimensioni 96x64).
 	const platformSize float32 = 140

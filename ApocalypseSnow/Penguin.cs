@@ -68,8 +68,13 @@ public class Penguin : CollisionExtensions //,GameComponent
         _penguinInputHandler._animationManager.Load_Content(GraphicsDevice);
         CollisionManager.Instance.addObject(_tag, _position.X, _position.Y,
             _penguinInputHandler._animationManager.Texture.Width,
-            _penguinInputHandler._animationManager.Texture.Height);
+            _penguinInputHandler._animationManager.Texture.Height,
+            minZ: 0f, maxZ: GameWorld.PenguinCollisionHeight);
         base.LoadContent();
+        // TODO C++: centralizzare la geometria LOGICA della hitbox del pinguino
+        // (dimensioni e offset dal punto di disegno), condivisa col server Go.
+        // Prima verificare che i valori derivati dalla texture siano identici
+        // a quelli del server; il rendering della texture resta in C#.
         _textureFractionWidth = _penguinInputHandler._animationManager.Texture.Width / 3;
         _textureFractionHeight = _penguinInputHandler._animationManager.Texture.Height / 3;
         _halfTextureFractionWidth = _textureFractionWidth / 2;
@@ -99,9 +104,7 @@ public class Penguin : CollisionExtensions //,GameComponent
     public void HandleConfirmedHit()
     {
         // Diagnostica: distingue un HIT confermato dal semplice freeze predetto.
-        ShotTrace.Log($"[EGG_HIT] penguin={_tag} tick={GameSession.LocalTick} beforeEgg={_myEgg ?? "none"} beforeWithEgg={_penguinColliderHandler.isWithEgg}");
         _penguinColliderHandler.HandleHitByBall(ref _myEgg);
-        ShotTrace.Log($"[EGG_HIT] penguin={_tag} tick={GameSession.LocalTick} afterEgg={_myEgg ?? "none"} afterWithEgg={_penguinColliderHandler.isWithEgg}");
     }
 
     public void HandleRemoteShot(Vector2 target, int charge, ShotType shotType, ShotKey shotKey)
@@ -134,10 +137,9 @@ public class Penguin : CollisionExtensions //,GameComponent
                 break;
             case string t when _penguinColliderHandler.IsEnemyBall(t):
                 Ball ball = _gameContext.Components.OfType<Ball>().FirstOrDefault(b => b._tag == t);
-                if (ball != null && ball._currentHeight < 30f)
+                if (ball != null && ball.CanPredictPenguinHit())
                 {
                     uint hitTick = GameSession.LocalTick;
-                    ShotTrace.Log($"[SHOT_TRACE] role={(_tag.EndsWith("Red") ? "REMOTE_TARGET" : "LOCAL_TARGET")} event=PRED_HIT key={ball.ShotKey} tick={hitTick} startTick={ball.ObservedStartTick} flightTicks={hitTick - ball.ObservedStartTick} utc={DateTime.UtcNow:O}");
                     bool predictedFreeze = LocalFreeze.Predict(ball.ShotKey, hitTick);
                     ball.PredictPenguinImpact();
                     if (predictedFreeze)
@@ -154,6 +156,9 @@ public class Penguin : CollisionExtensions //,GameComponent
 
     // La geometria della hitbox appartiene al pinguino: prediction e replay
     // usano così le stesse dimensioni, senza duplicare numeri in GameSession.
+    // TODO C++: dopo avere esposto la geometria del pinguino dalla DLL,
+    // trasferire qui la posizione di origine e ricevere quella corretta;
+    // evitare conversioni centro/origine replicate fra C# e Go.
     public Vector2 ResolveObstacleOverlaps(Vector2 position)
     {
         Vector2 half = new(_halfTextureFractionWidth, _halfTextureFractionHeight);

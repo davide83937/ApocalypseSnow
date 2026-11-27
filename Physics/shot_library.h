@@ -3,49 +3,33 @@
 
 #include "library.h"
 
-#ifdef _WIN32
-    #ifdef PHYSICS_BUILD_DLL
-        #define SHOT_PHYSICS_API __declspec(dllexport)
-    #else
-        #define SHOT_PHYSICS_API __declspec(dllimport)
-    #endif
-#else
-    #define SHOT_PHYSICS_API
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+// Stato iniziale di un proiettile, indipendente dagli oggetti del gioco.
 typedef struct {
     Vector2 start;
     Vector2 groundVelocity;
     float verticalSpeed;
     float gravity;
-} ShotLaunch;
+} ShotParameters;
 
-SHOT_PHYSICS_API float PredictFullFlightSeconds(int chargeMs, float maxChargeSeconds, float desiredFlightTimeLow, float thetaDeg, float thetaLowDeg);
-SHOT_PHYSICS_API float ComputeGravityForLowShot(float maxWorldRange, float desiredFlightTimeLow, float thetaLowRad);
-SHOT_PHYSICS_API float ComputeMaxV0(float gravity, float desiredFlightTimeLow, float thetaLowRad);
-SHOT_PHYSICS_API float ComputeVerticalSpeed(float chargeSeconds, float maxChargeSeconds, float maxV0, float thetaDeg, float thetaLowDeg);
-SHOT_PHYSICS_API float ComputeMaxWorldRange(Vector2 muzzleBase, float gameWorldWidth, float gameWorldHeight);
+// La libreria riceve solo dati fisici: origine, direzione sul piano,
+// modulo della velocita', angolo in gradi e gravita'.
+// Non conosce sprite, pinguini, offset della mano o tipi di tiro.
+// La direzione puo' essere non normalizzata (fallback verso destra).
+PHYSICS_API ShotParameters ComputeShotParameters(
+    Vector2 origin, Vector2 direction, float speed, float angleDegrees, float gravity);
 
-SHOT_PHYSICS_API ShotLaunch ComputeLaunch(
-    Vector2 penguinPosition,
-    Vector2 target,
-    float chargeSeconds,
-    float maxChargeSeconds,
-    float desiredFlightTimeLow,
-    float thetaDeg,
-    float thetaLowDeg,
-    float muzzleOffsetY,
-    float muzzleDistance,
-    float gameWorldWidth,
-    float gameWorldHeight
-);
+// Durata del volo fino al ritorno a quota zero.
+PHYSICS_API float ShotFlightDuration(float initialVerticalSpeed, float gravity);
+
+// Altezza massima rispetto al punto di partenza.
+PHYSICS_API float ShotMaximumHeight(float initialVerticalSpeed, float gravity);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // SHOT_PHYSICS_LIBRARY_H
+#endif

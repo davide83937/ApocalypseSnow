@@ -433,6 +433,9 @@ FodyWeavers.xsd
 # ===============================
 # CLion / CMake
 # ===============================
+# Cartella temporanea della compilazione C++ (contiene anche libPhysicsDll.dll.a).
+# Non contiene sorgenti da salvare su Git: CMake la rigenera automaticamente.
+/build_native/
 .idea/
 **/.idea/
 cmake-build-*/

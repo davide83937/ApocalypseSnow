@@ -1,6 +1,12 @@
 package main
 
 /*
+// La compilazione Go trova gli header e la DLL nella cartella Shared.
+// Quando avviamo il server Windows cerca invece la DLL accanto al programma.
+// Per questo, dopo ogni build C++, CMake copia automaticamente la DLL in Server.
+// Non copiare manualmente le DLL: il punto di partenza e' sempre Shared.
+// Il file .dll.a prodotto da MinGW non va copiato: con -l:libPhysicsDll.dll
+// Go usa direttamente la DLL per il collegamento (verificato con go build -a).
 #cgo CFLAGS: -I../Shared
 #cgo LDFLAGS: -L../Shared -l:libPhysicsDll.dll
 #include "library.h"
@@ -16,6 +22,16 @@ const (
 	collisionTagPenguin2 = "penguin2"
 	collisionTagObstacle = "obstacle"
 
+	// Altezza fisica dal terreno (Z = 0), non altezza dello sprite in pixel.
+	// Sono gli stessi valori di GameWorld.cs: un tiro a Z = 65 passa sopra
+	// il pinguino (60), ma sbatte ancora contro l'ostacolo (90).
+	penguinCollisionHeight  float32 = 60
+	obstacleCollisionHeight float32 = 90
+
+	// TODO C++: centralizzare dimensioni e offset LOGICI delle hitbox
+	// di pinguino e ostacoli nella DLL; esporli a Go e C# per la
+	// registrazione dei collider. Verificare i valori derivati dalle
+	// texture del client prima di eliminare queste costanti.
 	// Replica server-side della geometria usata dal client.
 	// Riferimenti:
 	// - ApocalypseSnow/Penguin.cs
@@ -51,18 +67,24 @@ func NewCollisionManager() *CollisionManager {
 	}
 }
 
-func (cm *CollisionManager) AddObject(tag string, x, y float32, width, height int32) {
+func (cm *CollisionManager) AddObject(tag string, x, y float32, width, height int32, zBounds ...float32) {
 	cm.collisionRecordIns = append(cm.collisionRecordIns,
-		NewCollisionRecordIn(tag, x, y, width, height))
+		NewCollisionRecordIn(tag, x, y, width, height, zBounds...))
 }
 
-func (cm *CollisionManager) ModifyObject(tag string, x, y float32, width, height int32) {
+func (cm *CollisionManager) ModifyObject(tag string, x, y float32, width, height int32, zBounds ...float32) {
 	for i := range cm.collisionRecordIns {
 		if cm.collisionRecordIns[i].Tag == tag {
 			cm.collisionRecordIns[i].X = x
 			cm.collisionRecordIns[i].Y = y
 			cm.collisionRecordIns[i].Width = width
 			cm.collisionRecordIns[i].Height = height
+			if len(zBounds) == 2 {
+				cm.collisionRecordIns[i].MinZ = zBounds[0]
+				cm.collisionRecordIns[i].MaxZ = zBounds[1]
+			} else if len(zBounds) != 0 {
+				panic("ModifyObject requires both minZ and maxZ")
+			}
 			return
 		}
 	}
@@ -93,6 +115,8 @@ func (cm *CollisionManager) SendToCpp() {
 		dataIn[i].y = C.float(record.Y)
 		dataIn[i].width = C.int(record.Width)
 		dataIn[i].height = C.int(record.Height)
+		dataIn[i].minZ = C.float(record.MinZ)
+		dataIn[i].maxZ = C.float(record.MaxZ)
 	}
 
 	resCount := count * (count - 1) / 2
@@ -125,6 +149,10 @@ func playerCollisionTag(playerID uint32) string {
 
 // Risolve l'intersezione della posizione appena calcolata con gli ostacoli fissi.
 // Stessa funzione C++ e stessa regola del client, senza alterare la scena registrata.
+// TODO C++: eliminare questa copia Go del risolutore C#; spostare nella DLL
+// costruzione della hitbox del pinguino, ciclo sugli ostacoli, penetrazione,
+// correzione per asse e limite di 8 passaggi. Go passera' posizione e ostacoli.
+// Conservare i collider registrati e gli stessi esiti dei test attuali.
 func (cm *CollisionManager) ResolvePlayerObstacleOverlaps(playerTag string, x, y float32) (float32, float32) {
 	cx := x + penguinHalfTextureFractionWidth
 	cy := y + penguinHalfTextureFractionHeight
@@ -144,10 +172,12 @@ func (cm *CollisionManager) ResolvePlayerObstacleOverlaps(playerTag string, x, y
 			input[0].x, input[0].y = C.float(cx), C.float(cy)
 			input[0].width = C.int(penguinTextureFractionWidth)
 			input[0].height = C.int(penguinHalfTextureFractionHeight)
+			input[0].minZ, input[0].maxZ = C.float(0), C.float(penguinCollisionHeight)
 
 			writeCollisionTag((*C.char)(unsafe.Pointer(&input[1].tag[0])), obstacle.Tag)
 			input[1].x, input[1].y = C.float(obstacle.X), C.float(obstacle.Y)
 			input[1].width, input[1].height = C.int(obstacle.Width), C.int(obstacle.Height)
+			input[1].minZ, input[1].maxZ = C.float(obstacle.MinZ), C.float(obstacle.MaxZ)
 
 			C.check_collisions(&input[0], &result[0], 2)
 

@@ -38,12 +38,14 @@ namespace ApocalypseSnow;
         //private static extern void check_collisions(CollisionRecordIn[] collisionRecordIn, [Out] CollisionRecordOut[] collisionRecordOut, int count);
         
 
-        public void addObject(string tag, float x, float y, int w, int h)
+        public void addObject(string tag, float x, float y, int w, int h,
+            float minZ = 0f, float maxZ = float.MaxValue)
         {
-            _collisionRecordIns.Add(new CollisionRecordIn(tag, x, y, w, h));
+            _collisionRecordIns.Add(new CollisionRecordIn(tag, x, y, w, h, minZ, maxZ));
         }
 
-        public void modifyObject(string tag, float x, float y, int w, int h)
+        public void modifyObject(string tag, float x, float y, int w, int h,
+            float? minZ = null, float? maxZ = null)
         {
             int index = _collisionRecordIns.FindIndex(r => r._tag == tag);
 
@@ -56,6 +58,8 @@ namespace ApocalypseSnow;
                 record._y = y;
                 record._width = w;
                 record._height = h;
+                if (minZ.HasValue) record._minZ = minZ.Value;
+                if (maxZ.HasValue) record._maxZ = maxZ.Value;
                 _collisionRecordIns[index] = record;
                 // ... logica di modifica ...
             }
@@ -74,6 +78,25 @@ namespace ApocalypseSnow;
             resultsBuffer = new CollisionRecordOut[inputCount];
             
                 PhysicsAPI.check_collisions(inputData, resultsBuffer, inputData.Length);
+        }
+
+        // I risultati dell'intero frame sono disponibili prima di inviare gli
+        // eventi. Il pinguino puo' quindi riconoscere un ostacolo anche quando
+        // il suo evento di collisione arriva prima di quello della palla.
+        public bool ShotOverlapsObstacle(string shotTag)
+        {
+            if (resultsBuffer == null)
+                return false;
+
+            foreach (var result in resultsBuffer)
+            {
+                if (result._type <= 0)
+                    continue;
+                if ((result._myTag == shotTag && result._otherTag == "obstacle") ||
+                    (result._otherTag == shotTag && result._myTag == "obstacle"))
+                    return true;
+            }
+            return false;
         }
 
         public override void Update(GameTime gameTime)
@@ -116,6 +139,10 @@ namespace ApocalypseSnow;
         // Se una hitbox mobile penetra in un ostacolo fermo, la porta appena fuori.
         // Lavora su coordinate del CENTRO, non modifica i collider registrati.
         // Ogni passo di movimento (prediction, server e replay) applica questa regola.
+        // TODO C++: spostare nella DLL l'intero risolutore (ciclo sugli ostacoli,
+        // correzione minima per asse e massimo 8 passaggi). C# dovra' solo
+        // passare la hitbox e gli ostacoli e ricevere il centro corretto.
+        // Riutilizzare check_collisions senza modificare i collider registrati.
         public Vector2 ResolveObstacleOverlaps(Vector2 center, int width, int height)
         {
             const string candidateTag = "candidate";

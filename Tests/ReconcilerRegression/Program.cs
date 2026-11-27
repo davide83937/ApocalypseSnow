@@ -22,10 +22,11 @@ internal static class Program
             foreach (var (name, chargeMs, shotType) in FlightCases())
             {
                 // Stessi metodi chiamati da Shot() e dal costruttore reale di Ball.
-                float gravity = PenguinShotHandler.ComputeGravityForLowShot(1000f);
-                float startVerticalSpeed = PenguinShotHandler.ComputeVerticalSpeed(chargeMs / 1000f, shotType, gravity);
-                float seconds = Ball.ComputeFlightDurationSeconds(startVerticalSpeed, gravity);
-                float independent = PenguinShotHandler.PredictFullFlightSeconds(chargeMs, shotType);
+                var launch = PenguinShotHandler.ComputeShotParameters(
+                    new Vector2(100f, 300f), new Vector2(700f, 200f),
+                    chargeMs / 1000f, shotType);
+                float seconds = Ball.ComputeFlightDurationSeconds(launch.VerticalSpeed, launch.Gravity);
+                float independent = PredictFullFlightSeconds(chargeMs, shotType);
                 if (MathF.Abs(seconds - independent) > 0.0001f)
                     throw new Exception($"Ball flight and independent C# model mismatch: {name}");
                 uint ticks = ShotFlightTiming.LandingTicks(seconds, 30);
@@ -49,7 +50,7 @@ internal static class Program
             foreach (int charge in charges)
             foreach (ShotType kind in new[] { ShotType.Left, ShotType.Right })
             {
-                var launch = PenguinShotHandler.ComputeLaunch(origins[i], targets[i], charge / 1000f, kind);
+                var launch = PenguinShotHandler.ComputeShotParameters(origins[i], targets[i], charge / 1000f, kind);
                 float duration = Ball.ComputeFlightDurationSeconds(launch.VerticalSpeed, launch.Gravity);
                 uint landingTicks = ShotFlightTiming.LandingTicks(duration, 30);
                 foreach (uint tick in ticks)
@@ -115,6 +116,9 @@ internal static class Program
             ("Remote snapshots respect authoritative freeze", RemoteSnapshotBlockedByServerFreeze),
             ("Penetration resolution is replayed every tick", ObstacleCollision),
             ("Native penetration resolution does not alter collider state", CollisionQueryIsReadOnly),
+            ("Native shot height discriminates obstacle from penguin", NativeShotHeight),
+            ("Obstacle collision suppresses false local HIT without changing visuals", ObstacleBlocksPredictedHit),
+            ("Local obstacle impact stops flight and leaves fragment at impact", ObstacleImpactStopsFlight),
             ("Diagonal movement uses normalized native physics", DiagonalMovement),
             ("Twenty buffered inputs replay despite partial ACK", InputBurst),
             ("Subsequent ACK replays only new pending inputs", ConsecutiveAcknowledgements),
@@ -151,6 +155,18 @@ internal static class Program
 
         Console.WriteLine($"RESULT: {tests.Length - errors}/{tests.Length} passed");
         return errors == 0 ? 0 : 1;
+    }
+
+    // Modello teorico indipendente, usato solo per verificare la simulazione.
+    private static float PredictFullFlightSeconds(int chargeMs, ShotType type)
+    {
+        const float maxChargeSeconds = 1.5f;
+        const float referenceDuration = 0.5f;
+        float chargeSeconds = MathHelper.Clamp(chargeMs / 1000f, 0f, maxChargeSeconds);
+        float theta = MathHelper.ToRadians(type == ShotType.Left ? 30f : 60f);
+        float thetaLow = MathHelper.ToRadians(30f);
+        return referenceDuration * MathF.Sqrt(chargeSeconds / maxChargeSeconds)
+               * MathF.Sin(theta) / MathF.Sin(thetaLow);
     }
 
     private static IEnumerable<(string Name, int ChargeMs, ShotType Type)> FlightCases()
@@ -329,7 +345,7 @@ internal static class Program
         int drops = 0;
         int pickups = 0;
         collider.eggPutEvent += (_, _) => drops++;
-        collider.eggTakenEvent += (_, _) => pickups++;
+        collider.eggTakenEvent += _ => pickups++;
         var eggOnGround = new List<string> { "egg4" };
 
         collider.HandleHitByBall(ref egg);
@@ -398,7 +414,7 @@ internal static class Program
         var collider = new PenguinColliderHandler("penguin");
         string egg = default!;
         int picks = 0;
-        collider.eggTakenEvent += (_, _) => picks++;
+        collider.eggTakenEvent += _ => picks++;
 
         var takingEgg = new StateStruct { Current = StateList.TakingEgg };
         collider.isFrozen = true;
@@ -427,7 +443,7 @@ internal static class Program
         string egg = null!;
         int picks = 0;
         string pickedTag = "";
-        collider.eggTakenEvent += (_, tag) => { picks++; pickedTag = tag; };
+        collider.eggTakenEvent += tag => { picks++; pickedTag = tag; };
 
         collider.HandleEggPickup(["egg12", "egg3", "egg10"], state, 0.40f, ref egg);
         collider.HandleEggPickup(["egg10", "egg12", "egg3"], state, 0.40f, ref egg);
@@ -463,7 +479,7 @@ internal static class Program
         var state = new StateStruct { Current = StateList.TakingEgg };
         string egg = null!;
         int picks = 0;
-        collider.eggTakenEvent += (_, _) => picks++;
+        collider.eggTakenEvent += _ => picks++;
 
         collider.HandleEggPickup(["egg2", "egg8"], state, 0.65f, ref egg);
         collider.HandleEggPickup(["egg8"], state, 0.35f, ref egg);
@@ -483,7 +499,7 @@ internal static class Program
         var state = new StateStruct { Current = StateList.TakingEgg };
         string egg = null!;
         int picks = 0;
-        collider.eggTakenEvent += (_, _) => picks++;
+        collider.eggTakenEvent += _ => picks++;
 
         collider.HandleEggPickup(["egg11", "egg2"], state, 2f, ref egg);
         Equal(picks, 0);
@@ -500,7 +516,7 @@ internal static class Program
         var collider = new PenguinColliderHandler("penguinRed");
         string egg = default!;
         int picks = 0;
-        collider.eggTakenEvent += (_, _) => picks++;
+        collider.eggTakenEvent += _ => picks++;
 
         var networkState = new StateStruct { Current = StateList.TakingEgg };
         collider.HandleEggPickup(["egg8"], networkState, 3f, ref egg);
@@ -826,6 +842,122 @@ internal static class Program
 
     // Verifica che una prediction corretta non venga modificata.
     // Verifica anche il caso di contatto appena tangente (non collisione).
+    private static void NativeShotHeight(Reconciler r)
+    {
+        // Palla e bersagli sono sulla stessa posizione XY: qui controlliamo
+        // soltanto la quota Z. Da 60 in poi il pinguino non viene colpito;
+        // il muro continua a bloccare la palla fino a Z = 90 (escluso).
+        Equal(GameWorld.PenguinCollisionHeight, 60f);
+        Equal(GameWorld.ObstacleCollisionHeight, 90f);
+        foreach (var (z, penguin, obstacle) in new (float Z, bool Penguin, bool Obstacle)[]
+        {
+            (0f, true, true), (29.9f, true, true), (40f, true, true),
+            (59.9f, true, true), (60f, false, true), (65f, false, true),
+            (70f, false, true), (89.9f, false, true), (90f, false, false),
+            (90.1f, false, false)
+        })
+        {
+            var manager = (CollisionManager)RuntimeHelpers.GetUninitializedObject(typeof(CollisionManager));
+            var records = new List<CollisionRecordIn>
+            {
+                new("s1", 100f, 100f, 20, 25, z, z),
+                new("penguin", 100f, 100f, 96, 64, 0f, GameWorld.PenguinCollisionHeight),
+                new("obstacle", 100f, 100f, 185, 100, 0f, GameWorld.ObstacleCollisionHeight)
+            };
+            typeof(CollisionManager).GetField("_collisionRecordIns",
+                BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(manager, records);
+            manager.SendToCpp();
+            var results = (CollisionRecordOut[])typeof(CollisionManager)
+                .GetField("resultsBuffer", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(manager)!;
+            bool hitPenguin = results.Any(c => c._type > 0 &&
+                (c._myTag == "s1" || c._otherTag == "s1") &&
+                (c._myTag == "penguin" || c._otherTag == "penguin"));
+            bool hitObstacle = results.Any(c => c._type > 0 &&
+                (c._myTag == "s1" || c._otherTag == "s1") &&
+                (c._myTag == "obstacle" || c._otherTag == "obstacle"));
+            Equal(hitPenguin, penguin);
+            Equal(hitObstacle, obstacle);
+        }
+    }
+
+    private static void ObstacleImpactStopsFlight(Reconciler r)
+    {
+        // L'evento C++ deve arrestare la simulazione grafica nel punto in cui
+        // il collider ha effettivamente incontrato l'ostacolo.
+        var manager = (CollisionManager)RuntimeHelpers.GetUninitializedObject(typeof(CollisionManager));
+        var records = new List<CollisionRecordIn>
+        {
+            new("obstacle", 190, 250, 185, 100, 0f, GameWorld.ObstacleCollisionHeight),
+            new("s7", 180, 250, 20, 25, 55f, 55f),
+        };
+        typeof(CollisionManager).GetField("_collisionRecordIns",
+            BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(manager, records);
+        var instanceField = typeof(CollisionManager).GetField("_instance",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        var priorInstance = instanceField.GetValue(null);
+
+        try
+        {
+            instanceField.SetValue(null, manager);
+            var ball = (Ball)RuntimeHelpers.GetUninitializedObject(typeof(Ball));
+            ball._tag = "s7";
+            ball._position = new Vector2(180, 250);
+            ball._currentHeight = 55f; // La palla e' sotto il pinguino (60) e il muro (90).
+            var handler = typeof(Ball).GetMethod("OnCollisionEnter",
+                BindingFlags.NonPublic | BindingFlags.Instance)!;
+            handler.Invoke(ball, new object[] { "obstacle",
+                new CollisionRecordOut("s7", "obstacle", 3) });
+
+            Equal((bool)typeof(Ball).GetField("_locallyLanded",
+                BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(ball)!, true);
+            Equal(ball.CanPredictPenguinHit(), false);
+            Equal(records.Count, 1);
+            At(ball._position, 180, 250); // il frammento non avanza verso il pinguino.
+
+            // Sopra il muro C++ non deve generare alcun evento: e' questo,
+            // non un filtro nel callback, che permette alla palla di continuare.
+            records.Add(new CollisionRecordIn("s8", 180, 250, 20, 25, 95f, 95f));
+            manager.SendToCpp();
+            var collisions = (CollisionRecordOut[])typeof(CollisionManager)
+                .GetField("resultsBuffer", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(manager)!;
+            Equal(collisions.Any(c => c._type > 0 &&
+                (c._myTag == "s8" || c._otherTag == "s8") &&
+                (c._myTag == "obstacle" || c._otherTag == "obstacle")), false);
+        }
+        finally
+        {
+            instanceField.SetValue(null, priorInstance);
+        }
+    }
+
+    private static void ObstacleBlocksPredictedHit(Reconciler r)
+    {
+        // Altezza valida per entrambi, ma un muro gia' urtato deve avere priorita'.
+        Equal(Ball.ShouldPredictPenguinHit(false, false), true);
+        Equal(Ball.ShouldPredictPenguinHit(true, false), false);
+        Equal(Ball.ShouldPredictPenguinHit(false, true), false);
+        Equal(Ball.ShouldPredictPenguinHit(true, true), false);
+
+        // La coppia pinguino/palla potrebbe precedere muro/palla negli eventi:
+        // il filtro deve leggere tutti i risultati C++ prima dei callback.
+        var manager = (CollisionManager)RuntimeHelpers.GetUninitializedObject(typeof(CollisionManager));
+        var collisions = new CollisionRecordOut[]
+        {
+            new("penguinRed", "s7", 1),
+            new("obstacle", "s7", 2),
+            new("obstacle", "s8", 1),
+            new("obstacle", "s9", 0),
+        };
+        typeof(CollisionManager).GetField("resultsBuffer", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(manager, collisions);
+        Equal(manager.ShotOverlapsObstacle("s7"), true);
+        Equal(manager.ShotOverlapsObstacle("s8"), true);
+        Equal(manager.ShotOverlapsObstacle("s9"), false);
+        Equal(manager.ShotOverlapsObstacle("s10"), false);
+    }
+
     private static void CollisionQueryIsReadOnly(Reconciler r)
     {
         var manager = (CollisionManager)RuntimeHelpers.GetUninitializedObject(typeof(CollisionManager));

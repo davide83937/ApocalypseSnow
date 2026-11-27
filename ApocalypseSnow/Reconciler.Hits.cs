@@ -19,7 +19,6 @@ public sealed partial class Reconciler
         {
             ShotResolutionMessage result = _matchEvents.PendingShotResolutions.Dequeue();
 
-            ShotTrace.Log($"[SHOT_TRACE] role=CLIENT event=SERVER_RESULT key={result.Key} outcome={result.Outcome} localTick={nextLocalTick} serverTick={result.ServerTick} hitAck={result.HitAck} hitPlayer={result.HitPlayerId} utc={DateTime.UtcNow:O}");
 
             bool hitLocal = result.Outcome == ShotOutcome.Penguin && result.HitPlayerId == _localPlayerId;
             bool hitOpponent = result.Outcome == ShotOutcome.Penguin && !hitLocal;

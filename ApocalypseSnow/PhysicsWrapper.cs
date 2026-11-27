@@ -1,14 +1,9 @@
 ﻿using ApocalypseSnow;
 using Microsoft.Xna.Framework;
-using System.Runtime.InteropServices;
 
 public static class PhysicsWrapper
 {
     //private static int i = 0;
-    // Build string della DLL (comoda e pronta all'uso)
-    public static string BuildInfo =>
-        Marshal.PtrToStringAnsi(PhysicsAPI.PhysicsBuildInfo()) ?? "(null)";
-
     public static void UniformMotion(ref float position, float velocity, float dt)
     {
         PhysicsAPI.uniform_rectilinear_motion(ref position, velocity, dt);
@@ -20,6 +15,10 @@ public static class PhysicsWrapper
         StepFromStateRef(ref pos, state, speed, dt, out _, out _);
     }
 
+    // TODO C++: valutare un unico passo fisico nativo condiviso col server Go:
+    // decodifica delle direzioni, normalizzazione e integrazione del movimento.
+    // Esportare anche dx/dy per l'animazione; la lettura degli input resta in C#.
+    // Allineare prima bitmask, velocita' e stati che bloccano il movimento.
     public static void StepFromStateRef(ref Vector2 pos, StateList state, float speed, float dt, out float dx, out float dy)
     {
         dx = 0;

@@ -24,6 +24,10 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>
+	<!-- DLL fisica C++: si compila nel progetto Physics e viene prodotta in Shared.
+	     CMake aggiorna subito le cartelle bin del client gia' compilate e Server.
+	     Questa regola serve quando compiliamo il client per la prima volta:
+	     copia la DLL da Shared accanto all'eseguibile, senza copiare file a mano. -->
 	<ItemGroup>
 		<None Include="..\Shared\libPhysicsDll.dll">
 			<Link>libPhysicsDll.dll</Link>

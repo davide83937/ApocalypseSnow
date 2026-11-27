@@ -164,6 +164,9 @@ public sealed partial class Reconciler
                 pendingInput.ReplayStateMask, movementSpeed, fixedDeltaTime);
 
             // Stessa risoluzione delle collisioni della prediction e del server.
+            // TODO C++: quando il risolutore sara' nativo, mantenere QUESTA
+            // correzione dopo OGNI input del replay (senza di essa il pinguino
+            // sfarfalla contro i muri). Cambiera' solo l'implementazione chiamata.
             if (resolveOverlap != null)
                 replayedPosition = resolveOverlap(replayedPosition);
         }

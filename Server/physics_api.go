@@ -7,10 +7,6 @@ package main
 */
 import "C"
 
-func PhysicsBuildInfo() string {
-	return C.GoString(C.PhysicsBuildInfo())
-}
-
 func uniformRectilinearMotion(position *float32, velocity, deltaTime float32) {
 	cPosition := C.float(*position)
 	C.uniform_rectilinear_motion(&cPosition, C.float(velocity), C.float(deltaTime))

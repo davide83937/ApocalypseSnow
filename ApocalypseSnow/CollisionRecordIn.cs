@@ -11,14 +11,19 @@ public struct CollisionRecordIn
     public float _y;
     public int _width;
     public int _height;
+    public float _minZ;
+    public float _maxZ;
 
-    public CollisionRecordIn(string tag, float x, float y, int width, int height)
+    public CollisionRecordIn(string tag, float x, float y, int width, int height,
+        float minZ = 0f, float maxZ = float.MaxValue)
     {
         this._tag = tag;
         this._y = y;
         this._x = x;
         this._width = width;
         this._height = height;
+        this._minZ = minZ;
+        this._maxZ = maxZ;
     }
 }
 

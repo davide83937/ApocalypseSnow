@@ -50,6 +50,9 @@ public class Egg:CollisionExtensions
     // Le collisioni con il muro non vanno corrette nell'evento (frame successivo).
     protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut) { }
 
+    // TODO C++: usare il futuro risolutore nativo generico anche per l'uovo.
+    // Le dimensioni arrivano dalla texture C#, ma il calcolo di penetrazione
+    // e spostamento minimo deve essere unico nella DLL condivisa.
     public void ResolveObstacleOverlaps()
     {
         Vector2 half = new(_texture.Width / 2f, _texture.Height / 2f);

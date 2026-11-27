@@ -33,21 +33,39 @@ public class Ball : CollisionExtensions
     public uint ObservedStartTick { get; private set; }
     private bool _hasObservedStart;
     
-    public void MarkObservedStart(uint tick, string role)
+    public void MarkObservedStart(uint tick)
     {
         ObservedStartTick = tick;
         _hasObservedStart = true;
-        ShotTrace.Log($"[SHOT_TRACE] role={role} event=START key={ShotKey} tick={tick} utc={DateTime.UtcNow:O}");
     }
 
     // Questi stati sono esclusivamente locali; ShotResolved non li modifica.
     private bool _locallyLanded;
     private bool _predictedHitVisual;
     private bool _predictedPenguinContact;
+    // L'ostacolo intercettato impedisce falsi HIT sul pinguino; il frammento
+    // grafico viene mantenuto nel punto di impatto, senza alterare il server.
+    private bool _predictedObstacleBlock;
     private float _landingVisualElapsed;
-    // Solo per MISS: 500 ms pienamente visibile, poi 2.5 secondi di dissolvenza.
+    // Frammento su impatto locale o atterraggio: 500 ms pienamente visibile, poi 2.5 s di dissolvenza.
     public const float LandingHoldSeconds = 0.5f;
     public const float LandingVisualSeconds = 3f;
+
+    // La DLL filtra gia' le collisioni XYZ; qui gestiamo solo la priorita'
+    // di un muro sulla prediction di HIT nello stesso frame.
+    public static bool ShouldPredictPenguinHit(bool obstacleAlreadyHit, bool obstacleOverlapsNow)
+        => !obstacleAlreadyHit && !obstacleOverlapsNow;
+
+    public bool CanPredictPenguinHit()
+    {
+        if (_locallyLanded || _predictedHitVisual)
+            return false;
+
+        bool currentObstacleOverlap = CollisionManager.Instance.ShotOverlapsObstacle(_tag);
+        if (currentObstacleOverlap)
+            _predictedObstacleBlock = true;
+        return ShouldPredictPenguinHit(_predictedObstacleBlock, currentObstacleOverlap);
+    }
 
     public static bool IsLandingFragmentVisible(float elapsed) => elapsed >= 0f && elapsed < LandingVisualSeconds;
 
@@ -76,26 +94,22 @@ public class Ball : CollisionExtensions
 
     // ===== PARAMETRI DEL MODELLO =====
 
-    // Quanto schiacciamo il piano sull'asse Y a schermo
-    private const float PlanePerspectiveY = 0.70f;
-
-    // Quanto la quota z "alza" visivamente la palla
-    private const float HeightProjection = 0.35f;
-
     // Scala visiva della palla in base alla quota
     private const float ScaleMin = 1.0f;
     private const float ScaleMax = 1.35f;
 
     // Tempo totale di volo e altezza massima
     private readonly float _flightDuration;
-    public float FlightDurationSeconds => _flightDuration;
-    
+    // TODO C++: valutare di centralizzare anche durata e quota massima
+    // del volo con i calcoli balistici Go/C#; il campionamento 2.5D di
+    // SampleTrajectory usa gia' le funzioni native della DLL.
+    // Dissolvenza, ombra e rendering devono rimanere locali al client.
     public static float ComputeFlightDurationSeconds(float startVerticalSpeed, float gravity)
-        => (2f * startVerticalSpeed) / gravity;
+        => ShotPhysicsAPI.ShotFlightDuration(startVerticalSpeed, gravity);
 
     public readonly record struct FlightSample(Vector2 Screen, Vector2 Shadow, float Height);
 
-    // Stesso campionamento realmente usato da Ball.Update, verificabile nei test Go/C#.
+    // Calcola le posizioni della palla e dell'ombra, con la quota fisica.
     public static FlightSample SampleTrajectory(Vector2 start, Vector2 velocity, float verticalSpeed,
         float gravity, float seconds)
     {
@@ -128,7 +142,7 @@ public class Ball : CollisionExtensions
         this.tagPenguin = tagPenguin;
 
         _flightDuration = ComputeFlightDurationSeconds(_startVerticalVelocity, _gravity);
-        _maxHeight = (_startVerticalVelocity * _startVerticalVelocity) / (2f * _gravity);
+        _maxHeight = ShotPhysicsAPI.ShotMaximumHeight(_startVerticalVelocity, _gravity);
 
         _shadowPosition = startPosition;
         _shadowScale = 1.0f;
@@ -146,7 +160,8 @@ public class Ball : CollisionExtensions
         _texture = load_texture("Content/images/palla1.png");
         _brokenTexture = load_texture("Content/images/palla_rotta.png");
 
-        CollisionManager.Instance.addObject(_tag, _position.X, _position.Y, _texture.Width, _texture.Height);
+        CollisionManager.Instance.addObject(_tag, _position.X, _position.Y,
+            _texture.Width, _texture.Height, minZ: 0f, maxZ: 0f);
         base.LoadContent();
 
         _halfTextureFractionWidth = _texture.Width / 2;
@@ -221,14 +236,24 @@ public class Ball : CollisionExtensions
 
     protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
     {
-        if (_predictedHitVisual || _locallyLanded || _currentHeight >= 30f)
+        if (_predictedHitVisual || _locallyLanded)
             return;
 
-        // L'ostacolo non e' una sentenza locale: la palla resta DAVANTI al muro
-        // fino al tick di impatto deciso dal server, anche con jitter.
+        // L'urto contro il muro e' previsto localmente: la palla smette di
+        // volare e lascia il frammento nel punto d'impatto. Il server continua
+        // a determinare l'esito autoritativo e gli eventuali effetti di gioco.
+        if (otherTag == "obstacle")
+        {
+            _predictedObstacleBlock = true;
+            _locallyLanded = true;
+            _landingVisualElapsed = 0f;
+            CollisionManager.Instance.removeObject(_tag);
+            return;
+        }
+
         // Il pinguino gestisce gia' la prediction dell'HIT nell'altro handler.
         if ((otherTag == "penguin" || otherTag == "penguinRed") &&
-            otherTag != tagPenguin && !_predictedPenguinContact)
+            otherTag != tagPenguin && !_predictedPenguinContact && CanPredictPenguinHit())
         {
             _predictedPenguinContact = true;
             // Una singola prediction per palla, senza duplicati nei frame seguenti.
@@ -274,7 +299,6 @@ public class Ball : CollisionExtensions
             _locallyLanded = true;
             _landingVisualElapsed = 0f;
             CollisionManager.Instance.removeObject(_tag);
-            ShotTrace.Log($"[SHOT_LOCAL_LANDING] key={ShotKey} tick={GameSession.LocalTick}; fade_local");
             return;
         }
 
@@ -295,17 +319,11 @@ public class Ball : CollisionExtensions
         _shadowScale = PhysicsAPI.LerpFloat(1.0f, 0.5f, alpha);
         _shadowOpacity = PhysicsAPI.LerpFloat(0.4f, 0.15f, alpha);
 
-        if (_currentHeight >= 30f) 
-        {
-            // Spostiamo il collider fuori campo temporaneamente
-            CollisionManager.Instance.modifyObject(_tag, -1000, -1000, _texture.Width, _texture.Height);
-        }
-        else 
-        {
-            // La palla è bassa, aggiorniamo il collider sulla posizione reale (ombra)
-            int posCollX = (int)shadowScreenX + _halfTextureFractionWidth;
-            int posCollY = (int)shadowScreenY + _halfTextureFractionHeight;
-            CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY, _texture.Width, _texture.Height);
-        }
+        // Manteniamo la collisione XY anche in quota: il controllo Z viene
+        // eseguito per il singolo bersaglio dalla DLL condivisa con Go.
+        int posCollX = (int)shadowScreenX + _halfTextureFractionWidth;
+        int posCollY = (int)shadowScreenY + _halfTextureFractionHeight;
+        CollisionManager.Instance.modifyObject(_tag, posCollX, posCollY,
+            _texture.Width, _texture.Height, minZ: _currentHeight, maxZ: _currentHeight);
     }
 }
