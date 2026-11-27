@@ -25,7 +25,7 @@ public class Ball : CollisionExtensions
     private readonly float _gravity;
     private readonly float _flightDuration;
     private readonly float _maxHeight;
-    private readonly string _shooterTag;
+    private readonly string tagPenguin;
 
     public ShotKey ShotKey { get; }
     public uint ObservedStartTick { get; private set; }
@@ -48,6 +48,7 @@ public class Ball : CollisionExtensions
     private Texture2D _brokenTexture;
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
+    private bool _hitObstacle = false;
     private Vector2 _shadowPosition;
     private float _shadowScale;
     private float _shadowOpacity;
@@ -60,11 +61,13 @@ public class Ball : CollisionExtensions
         float startVerticalVelocity,
         string tag,
         float gravity,
+        
+        
         ShotKey shotKey
     ) : base(game, tag, startPosition)
     {
         ShotKey = shotKey;
-        _shooterTag = tagPenguin;
+        this.tagPenguin = tagPenguin;
         _startPosition = startPosition;
         _groundVelocityWorld = groundVelocityWorld;
         _startVerticalVelocity = startVerticalVelocity;
@@ -206,20 +209,32 @@ public class Ball : CollisionExtensions
 
     protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
     {
-        if (_predictedHitVisual || _locallyLanded)
-            return;
-
-        if (otherTag == "obstacle")
+        if (_currentHeight >= 30f) return;
+        switch (otherTag)
         {
-            // Collisione XY non significa necessariamente impatto:
-            // la palla puo' passare sopra il muro.
-            if (_currentHeight >= GameWorld.ObstacleCollisionHeight)
-                return;
+            case "obstacle":
+                _hitObstacle = true;
+                Game.Components.Remove(this);
+                CollisionManager.Instance.removeObject(_tag);
+                break;
 
-            _predictedObstacleBlock = true;
-            BeginLandingVisual();
-            return;
+            case string t when isDeleteConditions(t):
+                Console.WriteLine("Palla eliminata");
+                Game.Components.Remove(this);
+                CollisionManager.Instance.removeObject(_tag);
+                break;
         }
+    }
+    
+    private bool isDeleteConditions(string otherTag)
+    {
+        return (
+            otherTag != "obstacle" &&
+            otherTag != tagPenguin &&
+            !otherTag.EndsWith("P") &&
+            !otherTag.StartsWith("egg") 
+        );
+    }
 
         // La prediction dell'HIT e del freeze viene effettuata dal Penguin.
         // Qui impediamo solamente che il medesimo contatto venga elaborato

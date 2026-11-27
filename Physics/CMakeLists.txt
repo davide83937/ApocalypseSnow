@@ -15,7 +15,9 @@ add_library(PhysicsDll SHARED
         shot_library.cpp
         shot_library.h
 )
-
+#message(STATUS "Compilatore C++: ${CMAKE_CXX_COMPILER}")
+#message(STATUS "ID compilatore: ${CMAKE_CXX_COMPILER_ID}")
+#message(STATUS "Versione: ${CMAKE_CXX_COMPILER_VERSION}")
 # Mentre compiliamo la DLL, PHYSICS_BUILD_DLL fa espandere PHYSICS_API
 # in __declspec(dllexport). Nei programmi che la usano resta dllimport.
 # PRIVATE: non propaga la macro ai programmi collegati alla libreria.
