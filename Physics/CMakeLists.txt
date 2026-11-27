@@ -1,12 +1,14 @@
+# Configurazione della sola libreria nativa di ApocalypseSnow.
+# Si apre questa cartella (Physics) direttamente in CLion.
+# CMake genera la DLL caricata sia dal client C# sia dal server Go.
 cmake_minimum_required(VERSION 4.1)
 project(Physics)
 
+# Richiesto per la libreria standard moderna usata dai calcoli C++
+# (per esempio std::numbers per convertire gradi in radianti).
 set(CMAKE_CXX_STANDARD 20)
 
 # Unica libreria CONDIVISA con fisica base e balistica, in file separati.
-# SHARED e' la scelta corretta: la DLL puo' essere caricata da C# e Go,
-# ma rimane collegabile anche da eventuali altri progetti C++.
-# Su MinGW viene generato anche un .dll.a, che NON dobbiamo distribuire.
 add_library(PhysicsDll SHARED
         library.cpp
         library.h
@@ -14,14 +16,20 @@ add_library(PhysicsDll SHARED
         shot_library.h
 )
 
+# Mentre compiliamo la DLL, PHYSICS_BUILD_DLL fa espandere PHYSICS_API
+# in __declspec(dllexport). Nei programmi che la usano resta dllimport.
+# PRIVATE: non propaga la macro ai programmi collegati alla libreria.
 target_compile_definitions(PhysicsDll PRIVATE PHYSICS_BUILD_DLL)
 
+# La DLL finale si chiama libPhysicsDll.dll su MinGW e viene scritta
+# in Shared (cartella comune alle sorgenti C#, C++ e Go).
 set_target_properties(PhysicsDll PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../Shared
         OUTPUT_NAME "PhysicsDll"
 )
 
-# Copia automatica di entrambi gli header nella cartella Shared
+# Dopo ogni build, copia in Shared gli header usati dal server Go.
+# POST_BUILD garantisce l'ordine: prima la compilazione, poi le copie.
 add_custom_command(TARGET PhysicsDll POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/library.h
@@ -35,16 +43,9 @@ add_custom_command(TARGET PhysicsDll POST_BUILD
 )
 
 # Il compilatore MinGW genera anche build_native/libPhysicsDll.dll.a.
-# Questo .a e' una libreria di importazione: NON e' la fisica del gioco.
-# Con '#cgo LDFLAGS: -L../Shared -l:libPhysicsDll.dll' Go usa la DLL
-# direttamente, quindi il .a puo' rimanere tra i file temporanei di CMake.
-# Verificato con 'go build -a' e test Go anche senza il .a.
-# Dopo OGNI compilazione della DLL aggiorniamo anche le copie usate dal gioco:
-# - Shared/libPhysicsDll.dll: file prodotto da questa build (copia di riferimento);
-# - Server/libPhysicsDll.dll: serve quando avviamo il programma Go;
-# - ApocalypseSnow/bin/.../libPhysicsDll.dll: serve al client C# gia' compilato.
-# Lo script cerca tutte le cartelle Debug/Release del client esistenti,
-# senza fissare a mano il percorso di una versione specifica di .NET.
+# $<TARGET_FILE:PhysicsDll> e' una generator expression di CMake:
+# risolve al percorso esatto della DLL prodotta dalla build corrente.
+# VERBATIM preserva correttamente gli argomenti e i percorsi con spazi.
 # Il .csproj mantiene la sua copia da Shared per la PRIMA compilazione del client.
 # Se una DLL e' bloccata dal gioco in esecuzione, il build segnala l'errore.
 add_custom_command(TARGET PhysicsDll POST_BUILD

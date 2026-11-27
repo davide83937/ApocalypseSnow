@@ -116,7 +116,7 @@ internal static class Program
             ("Remote snapshots respect authoritative freeze", RemoteSnapshotBlockedByServerFreeze),
             ("Penetration resolution is replayed every tick", ObstacleCollision),
             ("Native penetration resolution does not alter collider state", CollisionQueryIsReadOnly),
-            ("Native shot height discriminates obstacle from penguin", NativeShotHeight),
+            ("Native XY collision with client-side shot height", NativeShotHeight),
             ("Obstacle collision suppresses false local HIT without changing visuals", ObstacleBlocksPredictedHit),
             ("Local obstacle impact stops flight and leaves fragment at impact", ObstacleImpactStopsFlight),
             ("Diagonal movement uses normalized native physics", DiagonalMovement),
@@ -844,9 +844,8 @@ internal static class Program
     // Verifica anche il caso di contatto appena tangente (non collisione).
     private static void NativeShotHeight(Reconciler r)
     {
-        // Palla e bersagli sono sulla stessa posizione XY: qui controlliamo
-        // soltanto la quota Z. Da 60 in poi il pinguino non viene colpito;
-        // il muro continua a bloccare la palla fino a Z = 90 (escluso).
+        // La DLL restituisce le collisioni XY a qualunque quota.
+        // Ball.cs decide poi se colpire il pinguino (Z<60) o il muro (Z<90).
         Equal(GameWorld.PenguinCollisionHeight, 60f);
         Equal(GameWorld.ObstacleCollisionHeight, 90f);
         foreach (var (z, penguin, obstacle) in new (float Z, bool Penguin, bool Obstacle)[]
@@ -876,8 +875,38 @@ internal static class Program
             bool hitObstacle = results.Any(c => c._type > 0 &&
                 (c._myTag == "s1" || c._otherTag == "s1") &&
                 (c._myTag == "obstacle" || c._otherTag == "obstacle"));
-            Equal(hitPenguin, penguin);
-            Equal(hitObstacle, obstacle);
+            // Tutte le coppie si sovrappongono in XY, anche quando Z e' alta.
+            Equal(hitPenguin, true);
+            Equal(hitObstacle, true);
+
+            var instanceField = typeof(CollisionManager).GetField("_instance",
+                BindingFlags.NonPublic | BindingFlags.Static)!;
+            var oldInstance = instanceField.GetValue(null);
+            try
+            {
+                instanceField.SetValue(null, manager);
+                var ball = (Ball)RuntimeHelpers.GetUninitializedObject(typeof(Ball));
+                ball._tag = "s1";
+                ball._currentHeight = z;
+
+                // Prima proviamo il pinguino senza un muro sulla traiettoria.
+                typeof(CollisionManager).GetField("resultsBuffer",
+                    BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .SetValue(manager, new[] { new CollisionRecordOut("s1", "penguin", 1) });
+                Equal(ball.CanPredictPenguinHit(), penguin);
+
+                // Poi notifichiamo alla palla la collisione XY con il muro.
+                var handler = typeof(Ball).GetMethod("OnCollisionEnter",
+                    BindingFlags.NonPublic | BindingFlags.Instance)!;
+                handler.Invoke(ball, new object[] { "obstacle",
+                    new CollisionRecordOut("s1", "obstacle", 1) });
+                Equal((bool)typeof(Ball).GetField("_locallyLanded",
+                    BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(ball)!, obstacle);
+            }
+            finally
+            {
+                instanceField.SetValue(null, oldInstance);
+            }
         }
     }
 
@@ -915,8 +944,8 @@ internal static class Program
             Equal(records.Count, 1);
             At(ball._position, 180, 250); // il frammento non avanza verso il pinguino.
 
-            // Sopra il muro C++ non deve generare alcun evento: e' questo,
-            // non un filtro nel callback, che permette alla palla di continuare.
+            // Sopra il muro C++ restituisce comunque la collisione XY:
+            // e' Ball.OnCollisionEnter a ignorarla in base alla quota.
             records.Add(new CollisionRecordIn("s8", 180, 250, 20, 25, 95f, 95f));
             manager.SendToCpp();
             var collisions = (CollisionRecordOut[])typeof(CollisionManager)
@@ -924,7 +953,16 @@ internal static class Program
                 .GetValue(manager)!;
             Equal(collisions.Any(c => c._type > 0 &&
                 (c._myTag == "s8" || c._otherTag == "s8") &&
-                (c._myTag == "obstacle" || c._otherTag == "obstacle")), false);
+                (c._myTag == "obstacle" || c._otherTag == "obstacle")), true);
+
+            var highBall = (Ball)RuntimeHelpers.GetUninitializedObject(typeof(Ball));
+            highBall._tag = "s8";
+            highBall._currentHeight = 95f;
+            handler.Invoke(highBall, new object[] { "obstacle",
+                new CollisionRecordOut("s8", "obstacle", 3) });
+            Equal((bool)typeof(Ball).GetField("_locallyLanded",
+                BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(highBall)!, false);
+            Equal(records.Count, 2);
         }
         finally
         {
@@ -956,6 +994,8 @@ internal static class Program
         Equal(manager.ShotOverlapsObstacle("s8"), true);
         Equal(manager.ShotOverlapsObstacle("s9"), false);
         Equal(manager.ShotOverlapsObstacle("s10"), false);
+        Equal(manager.ShotOverlapsObstacle("s7", 89.9f), true);
+        Equal(manager.ShotOverlapsObstacle("s7", 90f), false);
     }
 
     private static void CollisionQueryIsReadOnly(Reconciler r)

@@ -83,9 +83,11 @@ namespace ApocalypseSnow;
         // I risultati dell'intero frame sono disponibili prima di inviare gli
         // eventi. Il pinguino puo' quindi riconoscere un ostacolo anche quando
         // il suo evento di collisione arriva prima di quello della palla.
-        public bool ShotOverlapsObstacle(string shotTag)
+        public bool ShotOverlapsObstacle(string shotTag, float shotHeight = 0f)
         {
-            if (resultsBuffer == null)
+            // Il C++ segnala tutte le sovrapposizioni XY.
+            // Una palla sopra l'ostacolo non deve bloccare un HIT sul pinguino.
+            if (shotHeight >= GameWorld.ObstacleCollisionHeight || resultsBuffer == null)
                 return false;
 
             foreach (var result in resultsBuffer)

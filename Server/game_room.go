@@ -633,6 +633,11 @@ func (gameRoom *GameRoom) resolveCollisionResults() {
 				continue
 			}
 
+			// La DLL controlla soltanto XY: sopra il muro il tiro prosegue.
+			if shot.CurrentHeight >= obstacleCollisionHeight {
+				continue
+			}
+
 			gameRoom.resolveShot(shot, ShotOutcomeObstacle, 0)
 			continue
 		}
@@ -652,6 +657,11 @@ func (gameRoom *GameRoom) resolveCollisionResults() {
 
 			shot, ok := findShotByTag(shotTag, gameRoom.activeShots)
 			if !ok || !shot.IsAlive {
+				continue
+			}
+
+			// La DLL controlla soltanto XY: sopra il pinguino non e' un HIT.
+			if shot.CurrentHeight >= penguinCollisionHeight {
 				continue
 			}
 

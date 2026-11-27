@@ -3,11 +3,14 @@
 #include <cmath>
 #include <algorithm>
 
-
+// Integratore di moto rettilineo uniforme su un singolo asse.
+// L'aggiornamento e' in-place; deltaTime e' espresso in secondi.
 void uniform_rectilinear_motion(float *position, float velocity, float deltaTime) {
     *position = *position + (velocity * deltaTime);
 }
 
+// Porta la velocita' 2D a modulo 1 conservandone la direzione.
+// Serve, per esempio, a non accelerare muovendosi in diagonale.
 void normalizeVelocity(float* velX, float* velY) {
     // Calcoliamo la lunghezza del vettore (magnitudo)
     float length = std::sqrt(*velX * *velX + *velY * *velY);
@@ -25,29 +28,18 @@ void normalizeVelocity(float* velX, float* velY) {
 }*/
 
 
-// TODO C++: riutilizzare il test AABB sottostante per una nuova funzione
-// resolve_obstacle_overlaps: correzione della penetrazione e ciclo su tutti
-// gli ostacoli devono essere unici nella DLL, non duplicati in Go e C#.
-// Mantenere intatta l'API di rilevamento eventi check_collisions.
-// Intersezione tra intervalli verticali semiaperti [minZ,maxZ).
-// La palla ha spessore nullo in Z: [z,z] rappresenta il punto z.
-static bool z_overlaps(const CollisionDataIn& a, const CollisionDataIn& b) {
-    const bool pointA = a.minZ == a.maxZ;
-    const bool pointB = b.minZ == b.maxZ;
-    if (pointA && pointB) return a.minZ == b.minZ;
-    if (pointA) return a.minZ >= b.minZ && a.minZ < b.maxZ;
-    if (pointB) return b.minZ >= a.minZ && b.minZ < a.maxZ;
-    return a.minZ < b.maxZ && b.minZ < a.maxZ;
-}
 
+// Per ogni coppia i<j controlliamo la sovrapposizione AABB nel piano XY.
 void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int count) {
     int found = 0;
     for (int i = 0; i < count; i++) {
         for (int j = i + 1; j < count; j++) {
-            // Controlla i tag per evitare collisioni tra oggetti dello stesso tipo (es. player vs player)
-            if (strcmp(data[i].tag, data[j].tag) != 0 && z_overlaps(data[i], data[j])) {
+            // In questa implementazione si escludono tag IDENTICI:
+            // il filtro riguarda la stringa esatta, non una classe di oggetti.
+            // Il collider nativo ignora completamente le quote Z.
+            if (strcmp(data[i].tag, data[j].tag) != 0) {
 
-                // Distanza tra i centri
+                // Scarti tra i CENTRI delle hitbox (non tra i vertici).
                 float dx = data[i].x - data[j].x;
                 float dy = data[i].y - data[j].y;
 
@@ -65,7 +57,9 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
                     strcpy(dataOut[found].myTag, data[i].tag);
                     strcpy(dataOut[found].otherTag, data[j].tag);
 
-                    // La direzione della collisione è l'asse con la sovrapposizione minore
+                    // L'asse con penetrazione minima indica la correzione
+                    // meno invasiva; la risoluzione e' lasciata al chiamante.
+                    // Con overlapX == overlapY prevale l'asse verticale (else).
                     dataOut[found].penetration = std::min(overlapX, overlapY);
                     if (overlapX < overlapY) {
                         // Collisione Orizzontale (Left o Right)
@@ -90,12 +84,15 @@ void check_collisions(CollisionDataIn* data, CollisionDataOut* dataOut, int coun
 }
 
 
+// Distanza euclidea: sqrt((ax-bx)^2 + (ay-by)^2).
 float Distance(Vector2 a, Vector2 b) {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
     return std::sqrt(dx * dx + dy * dy);
 }
 
+// Interpolazione lineare fra a e b; t e' limitato a [0,1].
+// Per t=0 restituisce a, per t=1 restituisce b.
 Vector2 Lerp(Vector2 a, Vector2 b, float t) {
     if (t < 0.0f) t = 0.0f;
     if (t > 1.0f) t = 1.0f;
@@ -113,6 +110,11 @@ float LerpFloat(float v0, float v1, float t) {
     return v0 + t * (v1 - v0);
 }
 
+// Proiezione dal moto nel mondo alle coordinate dello schermo.
+// X conserva lo spostamento reale. Su Y agiscono due effetti diversi:
+// - lo spostamento sul piano viene compresso da PlanePerspectiveY;
+// - la quota Z alza il proiettile sullo schermo (Y diminuisce).
+// Client e server la usano per condividere la stessa posizione proiettata.
 Vector2 calculateScreenPosition(Vector2 startPos, float worldDeltaX, float worldDeltaY, float z) {
     Vector2 screenPos;
 
@@ -125,9 +127,9 @@ Vector2 calculateScreenPosition(Vector2 startPos, float worldDeltaX, float world
     return screenPos;
 }
 
-/**
- * Esempio di calcolo della scala visiva basata sull'altezza
- */
+// Solo resa grafica: l'altezza viene rapportata alla quota massima
+// per ottenere un fattore di interpolazione e un alpha.
+// Il limite superiore e' 1; i valori negativi non vengono corretti qui.
 float calculateVisualScale(float z, float maxHeight, float scaleMin, float scaleMax, float* outAlpha) {
     float alpha = (maxHeight > 0.0001f) ? (z / maxHeight) : 0.0f;
     if (alpha > 1.0f) alpha = 1.0f;
@@ -135,6 +137,10 @@ float calculateVisualScale(float z, float maxHeight, float scaleMin, float scale
     return std::lerp(scaleMin, scaleMax, alpha);
 }
 
+// Moto del proiettile: uniforme sul piano XY, uniformemente accelerato in Z.
+// La quota parte da zero, sale e poi scende sotto l'azione della gravita'.
+// Dopo l'atterraggio z viene bloccata a 0; i delta XY non vengono arrestati:
+// spetta al chiamante interrompere la simulazione al tick di arrivo.
 void calculate_parabolic_motion(
     float t,
     float groundVelocityWorldX, float groundVelocityWorldY,

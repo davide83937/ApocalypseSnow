@@ -2,26 +2,12 @@ package main
 
 import "testing"
 
-// Ogni oggetto passa il proprio intervallo Z alla stessa collisione nativa.
-func TestNativeShotHeightThresholds(t *testing.T) {
-	cases := []struct {
-		z                 float32
-		penguin, obstacle bool
-	}{
-		{0, true, true},
-		{29.9, true, true},
-		{40, true, true},
-		{59.9, true, true},
-		{60, false, true}, // Sopra il pinguino, ma ancora dentro il muro.
-		{65, false, true},
-		{70, false, true},
-		{89.9, false, true},
-		{90, false, false}, // Alla quota del bordo superiore, il muro e' superato.
-		{90.1, false, false},
-	}
-	for _, tc := range cases {
+// La DLL deve rilevare solo le intersezioni XY, senza filtrare per quota.
+func TestNativeXYCollisionIgnoresShotHeight(t *testing.T) {
+	cases := []float32{0, 29.9, 40, 59.9, 60, 65, 70, 89.9, 90, 90.1}
+	for _, z := range cases {
 		cm := NewCollisionManager()
-		cm.AddObject("s1", 100, 100, 20, 25, tc.z, tc.z)
+		cm.AddObject("s1", 100, 100, 20, 25, z, z)
 		cm.AddObject("penguin2", 100, 100, 96, 64, 0, penguinCollisionHeight)
 		cm.AddObject("o0", 100, 100, 185, 100, 0, obstacleCollisionHeight)
 		cm.SendToCpp()
@@ -37,13 +23,13 @@ func TestNativeShotHeightThresholds(t *testing.T) {
 				o = true
 			}
 		}
-		if p != tc.penguin || o != tc.obstacle {
-			t.Errorf("z=%v: hit penguin=%t obstacle=%t, want %t %t", tc.z, p, o, tc.penguin, tc.obstacle)
+		if !p || !o {
+			t.Errorf("z=%v: native XY collision with penguin=%t obstacle=%t, want both true", z, p, o)
 		}
 	}
 }
 
-// Una collisione XY e' valida solo se la stessa palla interseca anche la quota Z.
+// Il server riceve eventi XY e verifica Z prima di emettere un esito autoritativo.
 func TestShotHeightFiltersAuthoritativeCollision(t *testing.T) {
 	cases := []struct {
 		name    string

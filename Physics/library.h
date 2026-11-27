@@ -1,8 +1,7 @@
 #pragma once
 
-// Questo e' l'header originale della DLL C++.
-// Quando compiliamo la DLL, CMake ne crea una copia in Shared/library.h.
-// Il server Go usa quella copia: non serve un altro library.h dentro Server.
+// Interfaccia pubblica della DLL fisica, condivisa da client C# e server Go.
+// Quando compiliamo la DLL, CMake crea una copia in Shared/library.h.
 #ifdef PHYSICS_BUILD_DLL
     #define PHYSICS_API __declspec(dllexport)
 #else
@@ -16,10 +15,10 @@
 extern "C" {
 #endif
 
-    // Oggetto da controllare: il rettangolo sul terreno e la sua altezza.
-    // minZ e maxZ indicano i limiti dal suolo, non i pixel dello sprite.
-    // La palla e' trattata come un punto in altezza: minZ == maxZ.
-    // Un ostacolo con minZ=0 e maxZ=90 viene superato a quota Z >= 90.
+    // Hitbox di input: x e y sono il CENTRO del rettangolo sul piano XY,
+    // width e height sono le dimensioni, mentre tag identifica l'oggetto
+    // minZ/maxZ rimangono nel protocollo dei chiamanti, ma la DLL
+    // rileva soltanto la sovrapposizione XY; Z e' valutata da C# e Go.
     struct CollisionDataIn {
         char tag[16];
         float x;
@@ -30,20 +29,15 @@ extern "C" {
         float maxZ;
     };
 
+    // Risultato di UNA coppia di hitbox che si intersecano:
+    // i tag identificano la coppia, type e' un CollisionSide riferito
+    // all'oggetto myTag rispetto a otherTag; penetration e' la minima
+    // sovrapposizione sul piano XY, utile per correggere la posizione.
     struct CollisionDataOut {
         char myTag[16];
         char otherTag[16];
         int type;
         float penetration;
-    };
-
-    struct CollisionOrder {
-        char myTag[16];
-        char otherTag[16];
-        short traceLeft;
-        short traceRight;
-        short traceUp;
-        short traceDown;
     };
 
     // Da quale lato i due rettangoli si sono toccati sul terreno (XY).
@@ -55,6 +49,8 @@ extern "C" {
         COLLISION_RIGHT = 4   // Impatto dal lato destro
     };
 
+// Coppia di float usata sia sul piano XY sia per vettori di direzione.
+// Non ha metodi: la rappresentazione resta semplice e compatibile con C.
 typedef struct {
         float x;
         float y;
@@ -64,12 +60,23 @@ typedef struct {
     // Rimangono costanti interne C++: Go usa le funzioni della DLL,
     // quindi non deve avere un'altra copia di questi numeri.
 #ifdef __cplusplus
+    // Ogni unità di spostamento sul piano Y produce
+    // uno spostamento di 0,70 unità sullo schermo.
     const float PlanePerspectiveY = 0.70f;
+
+    // Ogni unità di altezza fisica Z produce
+    // uno spostamento verso l'alto di 0,35 unità sullo schermo.
     const float HeightProjection = 0.35f;
 #endif
 
+    // Aggiorna una coordinata usando posizione += velocita' * intervallo.
     PHYSICS_API void uniform_rectilinear_motion(float *position, float velocity, float deltaTime);
+    // Normalizza in-place (velX, velY): diagonali e assi hanno modulo 1.
+    // Un vettore nullo resta nullo, evitando divisioni per zero.
     PHYSICS_API void normalizeVelocity(float* velX, float* velY);
+
+    // Dichiarazione storica: l'implementazione e' attualmente commentata
+    // in library.cpp. Non usare questa API finche' non viene ripristinata.
     PHYSICS_API void parabolic_motion(
         float gravity,
         float start_positionX, float start_positionY,
@@ -82,9 +89,16 @@ typedef struct {
     // restituisca la posizione corretta senza modificare la scena.
     // Prevedere geometria condivisa del pinguino e costanti accessibili a C#/Go;
     // verificare prima le dimensioni effettive degli sprite sul client.
+    // Confronta tutte le coppie i<j soltanto in XY, SENZA
+    // spostare gli oggetti. Esclude coppie con tag identici.
+    // Il chiamante deve allocare dataOut per ALMENO count*(count-1)/2
+    // risultati potenziali. Questa API non restituisce il numero di hit:
+    // vengono scritte solo le prime celle corrispondenti alle collisioni.
     PHYSICS_API void check_collisions(struct CollisionDataIn* data, struct CollisionDataOut* dataOut,int count);
 
 
+    // API storica non implementata nella DLL attuale; conservata come
+    // dichiarazione ma da non usare nella logica corrente.
     PHYSICS_API float calculate_ball_scale_only(
         float startX, float startY,
         float finalX, float finalY,
@@ -94,11 +108,20 @@ typedef struct {
         float currentScale
     );
 
+    // Distanza euclidea e interpolazioni lineari con t limitato a [0,1].
     PHYSICS_API float Distance(Vector2 a, Vector2 b);
     PHYSICS_API Vector2 Lerp(Vector2 a, Vector2 b, float t);
     PHYSICS_API float LerpFloat(float v0, float v1, float t);
+
+    // Proietta il moto nel mondo (delta XY + quota Z) nelle coordinate
+    // dello schermo, usando prospettiva del piano e altezza apparente.
     PHYSICS_API Vector2 calculateScreenPosition(Vector2 startPos, float worldDeltaX, float worldDeltaY, float z);
+    // Produce la scala visuale della palla e scrive l'alpha tramite puntatore:
+    // e' un ausilio al rendering, non al rilevamento delle collisioni.
     PHYSICS_API float calculateVisualScale(float z, float maxHeight, float scaleMin, float scaleMax, float* outAlpha);
+
+    // Campiona il moto del proiettile all'istante t: spostamento sul
+    // piano XY e quota Z, con quota finale limitata a zero.
     PHYSICS_API void calculate_parabolic_motion(
         float t,
         float groundVelocityWorldX, float groundVelocityWorldY,
