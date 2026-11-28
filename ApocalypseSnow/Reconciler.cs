@@ -10,7 +10,7 @@ namespace ApocalypseSnow;
 /// riceve posizione e ACK del server, riesegue gli input in attesa
 /// e corregge eventuali errori della posizione predetta
 /// </summary>
-public sealed partial class Reconciler
+public sealed class Reconciler
 {
     private struct PendingMovementInput
     {
@@ -54,29 +54,19 @@ public sealed partial class Reconciler
         ClearMatchContext();
     }
 
-    // Contesto di partita condiviso dai due file partial.
+    // Snapshot autoritativi usati esclusivamente dalla reconciliation del movimento.
     private Events _matchEvents;
-    private Penguin _localPenguin;
-    private Penguin _opponentPenguin;
-    private uint _localPlayerId;
     private bool _hasLatestPositionSnapshot;
     private Events.AuthPositionSnapshot _latestPositionSnapshot;
 
-    public void AttachMatchContext(uint localPlayerId, Penguin localPenguin, Penguin opponentPenguin, Events matchEvents)
+    public void AttachMatchContext(Events matchEvents)
     {
-        _localPlayerId = localPlayerId;
-        _localPenguin = localPenguin;
-        _opponentPenguin = opponentPenguin;
         _matchEvents = matchEvents;
     }
 
     private void ClearMatchContext()
     {
-        _pendingHits.Clear();
-        _localPenguin = null;
-        _opponentPenguin = null;
         _matchEvents = null;
-        _localPlayerId = 0;
         _hasLatestPositionSnapshot = false;
         _latestPositionSnapshot = default;
     }

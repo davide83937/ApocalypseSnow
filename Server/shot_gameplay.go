@@ -3,7 +3,7 @@ package main
 import "math"
 
 // Geometria e bilanciamento di ApocalypseSnow, non della libreria fisica.
-// Da mantenere coerenti con ApocalypseSnow/ShotGameplay.cs.
+// Da mantenere coerenti con ApocalypseSnow/PenguinShotHandler.cs.
 // I fixture di traiettoria C# e Go controllano che restino equivalenti.
 const (
 	shotHandOffsetX          float32 = 48

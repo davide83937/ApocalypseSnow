@@ -100,8 +100,8 @@ public sealed class GameSession : GameComponent
         _redPenguin = new Penguin(Game,"penguinRed", _redPlatform._position, Vector2.Zero, movementsRed, NetDt, ack.PlayerId == 1 ? 2u : 1u);
 
         _eggsEvent = new EggsEvent(Game, _myPenguin, _redPenguin);
-        _events = new Events(Game, _redPenguin);
-        Reconciler.Instance.AttachMatchContext(ack.PlayerId, _myPenguin, _redPenguin, _events);
+        _events = new Events(Game, _myPenguin, _redPenguin);
+        Reconciler.Instance.AttachMatchContext(_events);
 
         // StartMatch viene eseguito da Update: registriamo i componenti sul thread principale.
         Game.Components.Add(_myPenguin);
@@ -123,6 +123,47 @@ public sealed class GameSession : GameComponent
             string outcome = winnerId == 3 ? "PAREGGIO!" :
                 winnerId == _localPlayerId ? "HAI VINTO!" : "HAI PERSO!";
             MatchResult = $"{outcome}  {_eggsEvent._myPenguinScore} - {_eggsEvent._redPenguinScore}";
+        }
+    }
+
+    // La palla e' solo grafica. Lo stato cambia esclusivamente su MsgShotResolved.
+    private void ApplyServerShotResults()
+    {
+        while (_events.PendingShotResolutions.Count > 0)
+        {
+            ShotResolutionMessage result = _events.PendingShotResolutions.Dequeue();
+            if (result.Outcome != ShotOutcome.Penguin)
+                continue;
+
+            bool hitLocal = result.HitPlayerId == _localPlayerId;
+            Penguin victim = hitLocal ? _myPenguin : _redPenguin;
+
+            // La posizione dell'impatto serve a collocare l'eventuale uovo perso.
+            // Non e' un teletrasporto: poi ripristiniamo la posizione piu' recente.
+            Vector2 previousPosition = victim._position;
+            victim._position = result.HitPosition;
+            victim.HandleConfirmedHit();
+
+            if (hitLocal)
+            {
+                uint ack = result.HitAck;
+                Vector2 position = result.HitPosition;
+                if (_events.HasLocalSnapshot && _events.LatestLocalSnapshot.Ack >= ack)
+                {
+                    ack = _events.LatestLocalSnapshot.Ack;
+                    position = _events.LatestLocalSnapshot.Position;
+                }
+                victim._position = position;
+                Reconciler.Instance.ReceiveAuthoritativePosition(ack, position);
+            }
+            else
+            {
+                victim._position = _events.HasRemotePosition
+                    ? _events.LatestRemotePosition : previousPosition;
+            }
+
+            // HandleConfirmedHit gestisce l'uovo, non la durata del freeze.
+            victim._penguinColliderHandler.isFrozen = victim.IsServerFrozen;
         }
     }
 
@@ -201,8 +242,8 @@ public sealed class GameSession : GameComponent
 
         // Acquisisce ultimo ACK e posizione dal server, senza correggere ancora il movimento.
         Reconciler.Instance.ReadAuthPosition();
-        // Per ogni tiro ricevuto: conferma/smentisce la prediction e gestisce gli HIT.
-        Reconciler.Instance.ReadAuthShot(LocalTick);
+        // Solo gli HIT confermati dal server possono cambiare lo stato di gioco.
+        ApplyServerShotResults();
 
         // Invia un input ogni NetDt secondi (30 Hz), recuperando eventuali tick arretrati.
         _tickAcc += (float)gameTime.ElapsedGameTime.TotalSeconds;
@@ -214,7 +255,7 @@ public sealed class GameSession : GameComponent
             // StateStruct e' una struct: modifichiamo la copia da inviare, non lo stato del pinguino.
             StateStruct stateToSend = _myPenguin._penguinInputHandler._stateStruct;
 
-            if (_myPenguin.LocalFreeze.IsFrozen(LocalTick))
+            if (_myPenguin.IsServerFrozen)
             {
                 stateToSend.Current |= StateList.Freezing;
                 stateToSend.Current &= ~StateMasks.InputsBlockedByFreeze;
@@ -235,8 +276,6 @@ public sealed class GameSession : GameComponent
 
         // Fuori dal ciclo a tick fisso: la riconciliazione viene eseguita una volta per Update().
 
-        // Dopo l'avanzamento dei tick, applica caduta uovo e correzioni di HIT ora dovuti.
-        Reconciler.Instance.ReconcileShot(LocalTick);
 
         // Replay degli input non confermati e correzione della posizione del pinguino locale.
         Reconciler.Instance.ReconcilePosition(
@@ -244,7 +283,7 @@ public sealed class GameSession : GameComponent
             200f,
             NetDt,
             _myPenguin.ResolveObstacleOverlaps,
-            isCurrentlyFrozen: _myPenguin.LocalFreeze.IsFrozen(LastSentInputTick)
+            isCurrentlyFrozen: _myPenguin.IsServerFrozen
         );
 
 

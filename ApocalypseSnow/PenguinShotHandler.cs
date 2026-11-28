@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using Microsoft.Xna.Framework;
 
 namespace ApocalypseSnow;
@@ -9,6 +9,16 @@ public class PenguinShotHandler
     private readonly string _tag;
     private readonly uint _ownerPlayerId;
 
+    // Regole del lancio, mantenute coerenti con Server/shot_gameplay.go.
+    private const float HandOffsetX = 48f;
+    private const float HandOffsetY = 18f;
+    private const float BallSpawnDistance = 22f;
+    private const float PlanePerspectiveY = 0.70f;
+    private const float MaxChargeSeconds = 1.5f;
+    private const float MaxInitialSpeed = 1900f;
+    private const float ShotGravity = 3800f;
+    private const float MinDirectionLengthSquared = 0.0001f;
+
     private int _ammo;
     public int Ammo { get => _ammo; set => _ammo = value; }
 
@@ -18,7 +28,7 @@ public class PenguinShotHandler
     public float pressedTime;
     public float _reloadTime;
 
-    // La durata massima della carica e' una regola di gioco (ShotGameplay).
+    // La durata massima della carica e' una regola di gioco.
 
 
     // Tipo di carica “armato” dall’input unificato.
@@ -82,8 +92,8 @@ public class PenguinShotHandler
             pressedTime += deltaTime;
         }
 
-        if (pressedTime > ShotGameplay.MaxChargeSeconds)
-            pressedTime = ShotGameplay.MaxChargeSeconds;
+        if (pressedTime > MaxChargeSeconds)
+            pressedTime = MaxChargeSeconds;
     }
 
     private void ResetCharge()
@@ -94,17 +104,31 @@ public class PenguinShotHandler
 
     public readonly record struct ShotParameters(Vector2 Start, Vector2 GroundVelocity, float VerticalSpeed, float Gravity);
 
-    // La geometria del pinguino e i parametri del gioco sono in ShotGameplay.
-    // La DLL C++ riceve solo origine, direzione e dati fisici.
+    // Le regole di gioco determinano il lancio; la DLL C++ calcola la fisica.
+    // Tenere le stesse formule e costanti di Server/shot_gameplay.go.
     public static ShotParameters ComputeShotParameters(Vector2 penguinPosition, Vector2 target, float chargeSeconds, ShotType type)
     {
-        return ShotGameplay.BuildShotParameters(penguinPosition, target, chargeSeconds, type);
+        Vector2 handPosition = new(penguinPosition.X + HandOffsetX, penguinPosition.Y + HandOffsetY);
+        Vector2 screenDelta = target - handPosition;
+
+        float lenSq = screenDelta.X * screenDelta.X + screenDelta.Y * screenDelta.Y;
+        Vector2 screenDirection = lenSq <= MinDirectionLengthSquared
+            ? new Vector2(1f, 0f)
+            : screenDelta * (1f / MathF.Sqrt(lenSq));
+
+        Vector2 origin = handPosition + screenDirection * BallSpawnDistance;
+        Vector2 worldDirection = new(screenDelta.X, screenDelta.Y / PlanePerspectiveY);
+        float power = MathF.Sqrt(Math.Clamp(chargeSeconds / MaxChargeSeconds, 0f, 1f));
+        float speed = power * MaxInitialSpeed;
+        float angleDegrees = type == ShotType.Right ? 60f : 30f;
+
+        return ShotPhysicsAPI.ComputeShotParameters(origin, worldDirection, speed, angleDegrees, ShotGravity);
     }
 
     // Per il locale, crea il tiro al rilascio del tasto armato e invia MsgShot.
     // Per il remoto, ricrea soltanto la palla usando i metadati ricevuti dal server.
     // La posizione e il freeze definitivi restano autoritativi; l'effetto della
-    // palla (HIT predetto o dissolvenza su MISS) rimane esclusivamente locale.
+    // palla (impatto visivo o dissolvenza) rimane esclusivamente locale.
     public void Shot(StateStruct stateStruct, Vector2 mousePosition, Vector2 position, string tagBall,
         ShotType? remoteShotType = null, ShotKey? remoteShotKey = null)
     {

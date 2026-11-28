@@ -5,9 +5,9 @@ const (
 	MsgState         byte = 1 // 9B  [type][mask:int32][seq:uint32]
 	MsgShot          byte = 2 // 17B [type][shotTick:uint32][x:float32][y:float32][charge:int32]
 	MsgJoin          byte = 3 // 9B  [type][name:8B]
-	MsgAuthState     byte = 4 // 13B [type][ack:uint32][x:float32][y:float32]
+	MsgAuthState     byte = 4 // 17B [type][ack:uint32][x:float32][y:float32][freezeRemaining:uint32]
 	MsgJoinAck       byte = 5 // 21B [type][playerId:uint32][spawnX:float32][spawnY:float32][oppX:float32][oppY:float32]
-	MsgRemoteState   byte = 6 // 13B [type][x:float32][y:float32][mask:int32]
+	MsgRemoteState   byte = 6 // 17B [type][x:float32][y:float32][mask:int32][freezeRemaining:uint32]
 	MsgRemoteShot    byte = 7 // 22B [type][x:float32][y:float32][charge:uint32][shotType:uint8][ownerId:uint32][shotTick:uint32]
 	MsgSpawnEgg      byte = 8 // 13B [type][id:int32][x:float32][y:float32]
 	MsgSpawnObstacle byte = 10

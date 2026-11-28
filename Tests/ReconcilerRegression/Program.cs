@@ -29,7 +29,7 @@ internal static class Program
                 float independent = PredictFullFlightSeconds(chargeMs, shotType);
                 if (MathF.Abs(seconds - independent) > 0.0001f)
                     throw new Exception($"Ball flight and independent C# model mismatch: {name}");
-                uint ticks = ShotFlightTiming.LandingTicks(seconds, 30);
+                uint ticks = Ball.LandingTicks(seconds, 30);
                 Console.WriteLine($"FLIGHT_CS|{name}|{seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture)}|{ticks}");
             }
             return 0;
@@ -52,7 +52,7 @@ internal static class Program
             {
                 var launch = PenguinShotHandler.ComputeShotParameters(origins[i], targets[i], charge / 1000f, kind);
                 float duration = Ball.ComputeFlightDurationSeconds(launch.VerticalSpeed, launch.Gravity);
-                uint landingTicks = ShotFlightTiming.LandingTicks(duration, 30);
+                uint landingTicks = Ball.LandingTicks(duration, 30);
                 foreach (uint tick in ticks)
                 {
                     if (tick >= landingTicks) continue;
@@ -71,9 +71,7 @@ internal static class Program
             ("No auth: never touch predicted position", NoAuthDoesNotCorrect),
             ("Auth only: authoritative position wins", AuthWithoutPending),
             ("Older ACK cannot rewind after newer ACK", OlderAckNeverRewinds),
-            ("False predicted HIT unfreezes immediately", FalsePredictedHitUnfreezes),
-            ("Wire MISS rejects predicted freeze without ghost movement", WireMissRejectsPredictedFreeze),
-            ("Rejected HIT preserves another active freeze", FalseHitDoesNotClearOtherFreeze),
+
             ("ACK removes acknowledged moves, replay keeps the rest", AckAndReplay),
             ("Durante il freeze gli ACK avanzano senza spostare il pinguino", FrozenPositionSkipsReplay),
             ("Replay matches prediction: no correction", AccuratePrediction),
@@ -85,18 +83,13 @@ internal static class Program
             ("Egg actions do not stop movement in position replay", EggReleaseMatchesReplay),
             ("Egg pickup requires continuous hitbox overlap", PickupRequiresContinuousOverlap),
             ("Locally frozen input masks skip movement in replay", RecordedFrozenInputs),
-            ("HIT confirmation does not assume HitAck+90 input freeze", HitConfirmationDoesNotFreezeByAck),
+
             ("New input replay respects each locally recorded freeze mask", LocalFreezeMasksControlFutureReplay),
-            ("Predicted freeze, confirmed freeze and false HIT use tick deadlines", FreezeTimelines),
-            ("Server flight duration maps to independent local timelines", FlightTimelineAcrossClients),
+
             ("Quantized flight duration does not gain a ghost tick", FlightTickQuantization),
-            ("Freeze ice fades across the 90 active ticks only", FreezeVisualFade),
-            ("Ball fragments expire and terminal outcomes do not remove early", BallVisualLifecycleBoundaries),
-            ("Remote shot before hit even when TCP messages arrive together", RemoteShotAndHitSameTcpBatch),
-            ("Confirmed freeze is half-open and late confirmations never restart it", AuthoritativeFreezeBoundaries),
-            ("Expired authoritative HIT does not drop a newly carried egg", ExpiredHitDoesNotDropEgg),
-            ("Confirmed HIT drops eggs at the same authoritative impact position", ConfirmedHitEggDropPosition),
-            ("Un HIT confermato in anticipo aspetta il tick di impatto", FutureHitWaitsForImpact),
+
+
+
             ("Predicted freeze cannot drop an egg before HIT confirmation", PredictedFreezeDoesNotDropEgg),
             ("Remote WithEgg loss during freeze waits for HIT confirmation", RemoteEggWaitsForConfirmedHit),
             ("Un HIT remoto ignora vecchi stati WithEgg", RemoteEggRequiresNewPickupAfterHit),
@@ -110,10 +103,10 @@ internal static class Program
             ("Remote egg drop notifies before clearing its tag", RemoteEggDropPreservesTag),
             ("Egg delivery emits only one score event", EggDeliveryScoresOnlyOnce),
             ("Egg delivery needs uninterrupted platform overlap", EggDeliveryRequiresContinuousOverlap),
-            ("Authoritative tick replaces an incorrect predicted impact", ConfirmedFreezeReplacesPrediction),
-            ("Movement replay skips exactly the locally recorded frozen ticks", LocalFreezeReplayBoundary),
-            ("Remote penguin obeys predicted freeze and clears it on rejection", RemotePredictedFreeze),
-            ("Remote snapshots respect authoritative freeze", RemoteSnapshotBlockedByServerFreeze),
+
+            ("Remote penguin uses the server freeze bit only", RemotePredictedFreeze),
+            ("Remote snapshots update position and freeze from server", RemoteSnapshotBlockedByServerFreeze),
+            ("Only a confirmed server HIT drops the egg", ConfirmedServerHitOnly),
             ("Penetration resolution is replayed every tick", ObstacleCollision),
             ("Native penetration resolution does not alter collider state", CollisionQueryIsReadOnly),
             ("Native XY collision with client-side shot height", NativeShotHeight),
@@ -187,109 +180,11 @@ internal static class Program
 
     // Il server fornisce la stessa HitPosition a entrambi i client:
     // il drop deve leggerla sia per il pinguino locale sia per quello remoto.
-    private static void ConfirmedHitEggDropPosition(Reconciler reconciler)
-    {
-        static Penguin DummyPenguin(string tag, Vector2 start)
-        {
-            var penguin = (Penguin)RuntimeHelpers.GetUninitializedObject(typeof(Penguin));
-            typeof(Penguin).GetField("LocalFreeze")!.SetValue(penguin, new FreezeTimeline());
-            penguin._penguinColliderHandler = new PenguinColliderHandler(tag);
-            penguin._position = start;
-            return penguin;
-        }
 
-        foreach (bool localVictim in new[] { true, false })
-        {
-            reconciler.Reset();
-            var local = DummyPenguin("penguin", new Vector2(400, 300));
-            var remote = DummyPenguin("penguinRed", new Vector2(700, 210));
-            var victim = localVictim ? local : remote;
-            victim._myEgg = "egg7";
-            victim._penguinColliderHandler.isWithEgg = true;
-
-            var match = (Events)RuntimeHelpers.GetUninitializedObject(typeof(Events));
-            typeof(Events).GetField("PendingShotResolutions")!
-                .SetValue(match, new Queue<ShotResolutionMessage>());
-
-            ShotKey key = new(localVictim ? 2u : 1u, 197u);
-            if (localVictim)
-            {
-                typeof(Events).GetField("_remoteShotStartTicks", BindingFlags.Instance | BindingFlags.NonPublic)!
-                    .SetValue(match, new Dictionary<ShotKey, uint> { [key] = 197u });
-            }
-
-            Vector2 droppedAt = default;
-            string? eggDuringDrop = null;
-            int dropCount = 0;
-            victim._penguinColliderHandler.eggPutEvent += (_, _) =>
-            {
-                droppedAt = victim._position;
-                eggDuringDrop = victim._myEgg;
-                dropCount++;
-            };
-
-            reconciler.AttachMatchContext(1, local, remote, match);
-            match.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
-                key, ShotOutcome.Penguin, localVictim ? 1u : 2u, 199u, 196u,
-                new Vector2(123, 87), 2u));
-            reconciler.ReadAuthShot(200);
-            // Leggere il verdetto non deve ancora applicare la caduta.
-            Equal(dropCount, 0);
-            reconciler.ReconcileShot(200);
-
-            Equal(dropCount, 1);
-            Equal(eggDuringDrop, "egg7");
-            At(droppedAt, 123, 87);
-            Equal(victim._myEgg, (string?)null);
-            Equal(victim._penguinColliderHandler.isWithEgg, false);
-        }
-    }
 
     // La conferma puo' arrivare prima dell'impatto: il freeze e' programmato,
     // ma la perdita dell'uovo avviene soltanto quando il tick viene oltrepassato.
-    private static void FutureHitWaitsForImpact(Reconciler reconciler)
-    {
-        static Penguin DummyPenguin(string tag, Vector2 start)
-        {
-            var penguin = (Penguin)RuntimeHelpers.GetUninitializedObject(typeof(Penguin));
-            typeof(Penguin).GetField("LocalFreeze")!.SetValue(penguin, new FreezeTimeline());
-            penguin._penguinColliderHandler = new PenguinColliderHandler(tag);
-            penguin._position = start;
-            return penguin;
-        }
 
-        var local = DummyPenguin("penguin", new Vector2(300, 200));
-        var remote = DummyPenguin("penguinRed", new Vector2(400, 250));
-        remote._myEgg = "egg6";
-        remote._penguinColliderHandler.isWithEgg = true;
-        int drops = 0;
-        remote._penguinColliderHandler.eggPutEvent += (_, _) => drops++;
-
-        var match = (Events)RuntimeHelpers.GetUninitializedObject(typeof(Events));
-        typeof(Events).GetField("PendingShotResolutions")!
-            .SetValue(match, new Queue<ShotResolutionMessage>());
-        reconciler.AttachMatchContext(1, local, remote, match);
-
-        match.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
-            new ShotKey(1, 200), ShotOutcome.Penguin, 2, 205, 200,
-            new Vector2(123, 87), 5));
-        reconciler.ReadAuthShot(202);
-        Equal(remote.LocalFreeze.IsFrozen(205), true);
-        Equal(drops, 0);
-        At(remote._position, 400, 250);
-
-        reconciler.ReconcileShot(205); // Il tick d'impatto non e' ancora completato.
-        Equal(drops, 0);
-        Equal(remote._myEgg, "egg6");
-
-        reconciler.ReconcileShot(206);
-        Equal(drops, 1);
-        Equal(remote._myEgg, (string?)null);
-        At(remote._position, 123, 87);
-
-        reconciler.ReconcileShot(207);
-        Equal(drops, 1);
-    }
 
     private static void PredictedFreezeDoesNotDropEgg(Reconciler reconciler)
     {
@@ -436,6 +331,11 @@ internal static class Program
 
     // Più collisioni nello stesso frame non devono accelerare il timer.
     // L'ID viene confrontato numericamente: egg3 precede egg10 ed egg12.
+    // Nello stesso frame E non deve raccogliere e rilasciare l'uovo.
+    // Nei frame successivi E mantenuto premuto non deve fare altro.
+
+    // Una sola pressione raccoglie l'uovo con ID più basso.
+    // Tenere premuto E non ripete la raccolta.
     private static void MultipleEggsPickLowestIdOnce(Reconciler reconciler)
     {
         var collider = new PenguinColliderHandler("penguin");
@@ -461,6 +361,7 @@ internal static class Program
 
     // Un uovo con ID più basso che entra nella collisione NON sostituisce
     // quello selezionato quando il giocatore ha iniziato a raccogliere.
+    // Se E rimane premuto, non viene scelto un altro uovo.
     private static void MultipleEggsKeepLockedTarget(Reconciler reconciler)
     {
         var collider = new PenguinColliderHandler("penguin");
@@ -473,6 +374,8 @@ internal static class Program
 
     // Se perdiamo il contatto con l'uovo bloccato, il tempo pregresso
     // non può essere trasferito all'altro uovo rimasto in collisione.
+    // E premuto lontano dalle uova non raccoglie automaticamente
+    // quando ci avviciniamo: serve un nuovo JustPressed.
     private static void MultipleEggsResetWhenTargetLeaves(Reconciler reconciler)
     {
         var collider = new PenguinColliderHandler("penguin");
@@ -559,6 +462,7 @@ internal static class Program
         Equal(puts, 1);
     }
 
+    // Una pressione di E sulla propria base deposita subito, una sola volta.
     private static void EggDeliveryScoresOnlyOnce(Reconciler reconciler)
     {
         var collider = new PenguinColliderHandler("penguin");
@@ -585,6 +489,8 @@ internal static class Program
     }
 
     // Se esci dalla piattaforma mentre tieni Spazio, il secondo riparte da zero.
+    // E fuori dalla base non deposita. Tenendolo premuto e entrando
+    // nella base non deposita comunque: serve una nuova pressione.
     private static void EggDeliveryRequiresContinuousOverlap(Reconciler reconciler)
     {
         var collider = new PenguinColliderHandler("penguin") { isWithEgg = true };
@@ -627,29 +533,7 @@ internal static class Program
         Equal(framer.TryRead(out _, out _), false);
     }
 
-    private static void FreezeVisualFade(Reconciler reconciler)
-    {
-        var timeline = new FreezeTimeline();
-        var first = new ShotKey(1, 10);
-        timeline.Predict(first, 100);
-        Equal(timeline.GetVisualOpacity(99), 0f);
-        Equal(timeline.GetVisualOpacity(100), 1f);
-        Equal(MathF.Abs(timeline.GetVisualOpacity(145) - 0.5f) < 0.0001f, true);
-        Equal(MathF.Abs(timeline.GetVisualOpacity(189) - 1f / 90f) < 0.0001f, true);
-        Equal(timeline.GetVisualOpacity(190), 0f);
 
-        // Un altro HIT ricrea il ghiaccio; un MISS lo elimina senza code grafiche.
-        var second = new ShotKey(2, 20);
-        timeline.Predict(second, 160);
-        Equal(timeline.GetVisualOpacity(160), 1f);
-        timeline.RejectPrediction(second);
-        Equal(MathF.Abs(timeline.GetVisualOpacity(160) - 30f / 90f) < 0.0001f, true);
-        timeline.RejectPrediction(first);
-        Equal(timeline.GetVisualOpacity(160), 0f);
-        timeline.ConfirmLocal(new ShotKey(1, 30), 200);
-        Equal(timeline.GetVisualOpacity(200), 1f);
-        Equal(timeline.GetVisualOpacity(290), 0f);
-    }
 
     // Controlla che due valori siano uguali.
     private static void Equal<T>(T actual, T expected)
@@ -659,112 +543,18 @@ internal static class Program
     }
 
     // Un esito vecchio non deve intervenire sulle uova attualmente trasportate.
-    private static void ExpiredHitDoesNotDropEgg(Reconciler reconciler)
-    {
-        static Penguin DummyPenguin(string tag)
-        {
-            var penguin = (Penguin)RuntimeHelpers.GetUninitializedObject(typeof(Penguin));
-            typeof(Penguin).GetField("LocalFreeze")!.SetValue(penguin, new FreezeTimeline());
-            penguin._penguinColliderHandler = new PenguinColliderHandler(tag);
-            return penguin;
-        }
 
-        var local = DummyPenguin("penguin");
-        var opponent = DummyPenguin("penguinRed");
-        var events = (Events)RuntimeHelpers.GetUninitializedObject(typeof(Events));
-        typeof(Events).GetField("PendingShotResolutions")!.SetValue(
-            events, new Queue<ShotResolutionMessage>());
-        reconciler.AttachMatchContext(1, local, opponent, events);
-
-        local._myEgg = "egg42";
-        local._penguinColliderHandler.isWithEgg = true;
-
-        // HIT avvenuto al tick 12: al tick 200 i 90 tick di freeze sono scaduti.
-        events.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
-            new ShotKey(1, 10), ShotOutcome.Penguin, 1, 12, 10,
-            new Vector2(50, 50), 2));
-        reconciler.ReadAuthShot(200);
-        reconciler.ReconcileShot(200);
-        Equal(local._myEgg, "egg42");
-        Equal(local._penguinColliderHandler.isWithEgg, true);
-
-        // HIT recente: il server impone invece il rilascio dell'uovo.
-        events.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
-            new ShotKey(1, 197), ShotOutcome.Penguin, 1, 198, 11,
-            new Vector2(50, 50), 2));
-        reconciler.ReadAuthShot(200);
-        Equal(local._myEgg, "egg42");
-        reconciler.ReconcileShot(200);
-        Equal(local._myEgg, (string?)null);
-        Equal(local._penguinColliderHandler.isWithEgg, false);
-    }
 
     // Applica il Reconciler con i parametri di movimento del gioco.
     private static void Apply(Reconciler r, ref Vector2 position, Func<Vector2, Vector2>? resolveOverlap = null)
         => r.ReconcilePosition(ref position, Speed, Dt, resolveOverlap);
 
     // Verifica che senza auth la posizione non cambi.
-    private static void WireMissRejectsPredictedFreeze(Reconciler r)
-    {
-        var freeze = new FreezeTimeline();
-        var key = new ShotKey(1, 33);
-        freeze.Predict(key, 100);
-        Vector2 pos = new Vector2(100, 80);
-        for (uint tick = 100; tick <= 104; tick++)
-        {
-            Equal(freeze.IsFrozen(tick), true);
-            r.RecordPendingInput(tick, StateList.None);
-        }
-        byte[] packet = ResolutionPacket(outcome: ShotOutcome.Expired, hitPlayerId: 0);
-        var framer = new NetworkPacketFramer();
-        framer.Append(packet);
-        if (!framer.TryRead(out _, out var payload))
-            throw new Exception("MISS packet not received");
-        var result = ShotResolutionMessage.Parse(payload);
-        Equal(result.Key, key);
-        Equal(result.Outcome, ShotOutcome.Expired);
-        freeze.RejectPrediction(result.Key);
-        Equal(freeze.IsFrozen(105), false);
-        r.ReceiveAuthoritativePosition(99, pos);
-        Apply(r, ref pos);
-        At(pos, 100, 80);
-        r.RecordPendingInput(105, StateList.Right);
-        var lastAuthPos = pos;
-        pos.X += Step; // il client predice il nuovo input visibile
-        r.ReceiveAuthoritativePosition(104, lastAuthPos);
-        Apply(r, ref pos);
-        At(pos, 100 + Step, 80);
-    }
 
-    private static void FalsePredictedHitUnfreezes(Reconciler r)
-    {
-        var f = new FreezeTimeline();
-        var key = new ShotKey(2, 40);
-        f.Predict(key, 100);
-        Equal(f.IsFrozen(105), true);
-        r.RecordPendingInput(105, StateList.None); // client sent neutral movement while predicting HIT
-        f.RejectPrediction(key);
-        Equal(f.IsFrozen(105), false);
-        r.ReceiveAuthoritativePosition(104, Vector2.Zero);
-        Vector2 pos = Vector2.Zero;
-        Apply(r, ref pos);
-        At(pos, 0, 0); // no invisible input replay
-    }
 
-    private static void FalseHitDoesNotClearOtherFreeze(Reconciler r)
-    {
-        var f = new FreezeTimeline();
-        var rejected = new ShotKey(2, 41);
-        var confirmed = new ShotKey(2, 42);
-        f.Predict(rejected, 100);
-        f.Predict(confirmed, 103);
-        f.RejectPrediction(rejected);
-        Equal(f.IsFrozen(105), true);
-        f.ConfirmLocal(confirmed, 103);
-        Equal(f.IsFrozen(105), true);
-        Equal(f.IsFrozen(192), true);
-        Equal(f.IsFrozen(193), false);
-    }
+
+
+
 
     private static void OlderAckNeverRewinds(Reconciler r)
     {
@@ -893,7 +683,7 @@ internal static class Program
                 typeof(CollisionManager).GetField("resultsBuffer",
                     BindingFlags.NonPublic | BindingFlags.Instance)!
                     .SetValue(manager, new[] { new CollisionRecordOut("s1", "penguin", 1) });
-                Equal(ball.CanPredictPenguinHit(), penguin);
+                Equal(ball.CanShowPenguinContact(), penguin);
 
                 // Poi notifichiamo alla palla la collisione XY con il muro.
                 var handler = typeof(Ball).GetMethod("OnCollisionEnter",
@@ -940,7 +730,7 @@ internal static class Program
 
             Equal((bool)typeof(Ball).GetField("_locallyLanded",
                 BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(ball)!, true);
-            Equal(ball.CanPredictPenguinHit(), false);
+            Equal(ball.CanShowPenguinContact(), false);
             Equal(records.Count, 1);
             At(ball._position, 180, 250); // il frammento non avanza verso il pinguino.
 
@@ -973,10 +763,10 @@ internal static class Program
     private static void ObstacleBlocksPredictedHit(Reconciler r)
     {
         // Altezza valida per entrambi, ma un muro gia' urtato deve avere priorita'.
-        Equal(Ball.ShouldPredictPenguinHit(false, false), true);
-        Equal(Ball.ShouldPredictPenguinHit(true, false), false);
-        Equal(Ball.ShouldPredictPenguinHit(false, true), false);
-        Equal(Ball.ShouldPredictPenguinHit(true, true), false);
+        Equal(Ball.CanShowLocalPenguinContact(false, false), true);
+        Equal(Ball.CanShowLocalPenguinContact(true, false), false);
+        Equal(Ball.CanShowLocalPenguinContact(false, true), false);
+        Equal(Ball.CanShowLocalPenguinContact(true, true), false);
 
         // La coppia pinguino/palla potrebbe precedere muro/palla negli eventi:
         // il filtro deve leggere tutti i risultati C++ prima dei callback.
@@ -1122,6 +912,8 @@ internal static class Program
     }
 
     // Allontanarsi da TUTTE le uova interrompe la raccolta, anche tenendo premuto E.
+    // E premuto a vuoto non causa raccolta automatica se poi
+    // manteniamo il tasto premuto ed entriamo nella hitbox.
     private static void PickupRequiresContinuousOverlap(Reconciler r)
     {
         var handler = new PenguinColliderHandler("penguin");
@@ -1151,31 +943,7 @@ internal static class Program
 
     // La conferma HIT registra l'ACK autoritativo senza attribuire un freeze
     // arbitrario ai 90 input successivi (che potrebbero essere stati generati prima).
-    private static void HitConfirmationDoesNotFreezeByAck(Reconciler r)
-    {
-        var local = (Penguin)RuntimeHelpers.GetUninitializedObject(typeof(Penguin));
-        var remote = (Penguin)RuntimeHelpers.GetUninitializedObject(typeof(Penguin));
-        typeof(Penguin).GetField("LocalFreeze")!.SetValue(local, new FreezeTimeline());
-        typeof(Penguin).GetField("LocalFreeze")!.SetValue(remote, new FreezeTimeline());
-        local._penguinColliderHandler = new PenguinColliderHandler("penguin");
-        remote._penguinColliderHandler = new PenguinColliderHandler("penguinRed");
-        var events = (Events)RuntimeHelpers.GetUninitializedObject(typeof(Events));
-        typeof(Events).GetField("PendingShotResolutions")!.SetValue(
-            events, new Queue<ShotResolutionMessage>());
-        r.AttachMatchContext(1, local, remote, events);
 
-        for (uint seq = 101; seq <= 201; seq++)
-            r.RecordPendingInput(seq, StateList.Right);
-
-        events.PendingShotResolutions.Enqueue(new ShotResolutionMessage(
-            new ShotKey(1, 198), ShotOutcome.Penguin, 1, 200, 100,
-            Vector2.Zero, 2));
-        r.ReadAuthShot(201);
-        r.ReconcileShot(201);
-        var position = new Vector2(600, 0);
-        Apply(r, ref position);
-        At(position, 101 * Step, 0);
-    }
 
     // Il client registra la propria prediction del freeze sull'input corrente.
     // Non deve usare l'ACK del server per congelare ulteriori input futuri.
@@ -1190,202 +958,51 @@ internal static class Program
     }
 
     // Verifica che una prediction smentita non prolunghi il freeze.
-    private static void FreezeTimelines(Reconciler r)
-    {
-        var freeze = new FreezeTimeline();
-        var first = new ShotKey(1, 17);
-        var second = new ShotKey(1, 22);
-        freeze.Predict(first, 50);
-        Equal(freeze.IsFrozen(70), true);
-        freeze.RejectPrediction(first);
-        Equal(freeze.IsFrozen(70), false);
-        freeze.Predict(second, 51);
-        freeze.ConfirmLocal(second, 51);
-        Equal(freeze.IsFrozen(60), true);
-        Equal(freeze.IsFrozen(140), true);
-        Equal(freeze.IsFrozen(141), false);
-    }
 
-    private static void FlightTimelineAcrossClients(Reconciler r)
-    {
-        uint flightTicks = 12;
-        uint impactA = FreezeTimeline.ComputeImpactTick(15, flightTicks);
-        uint impactB = FreezeTimeline.ComputeImpactTick(83, flightTicks);
-        Equal(impactA, 27u);
-        Equal(impactB, 95u);
-        var a = new FreezeTimeline();
-        var b = new FreezeTimeline();
-        a.ConfirmLocal(new ShotKey(1, 7), impactA);
-        b.ConfirmLocal(new ShotKey(1, 7), impactB);
-        Equal(a.IsFrozen(27), true);
-        Equal(b.IsFrozen(95), true);
-        Equal(a.IsFrozen(117), false);
-        Equal(b.IsFrozen(185), false);
-    }
 
-    private static void BallVisualLifecycleBoundaries(Reconciler r)
-    {
-        Equal(GameWorld.Width, 800);
-        Equal(GameWorld.Height, 480);
-        Equal(GameWorld.ShotColliderWidth, 20);
-        Equal(GameWorld.ShotColliderHeight, 25);
-        Equal(Ball.LandingHoldSeconds, 0.5f);
-        Equal(Ball.LandingVisualSeconds, 3f);
-        Equal(Ball.IsLandingFragmentVisible(0f), true);
-        Equal(Ball.IsLandingFragmentVisible(2.999f), true);
-        Equal(Ball.IsLandingFragmentVisible(3f), false);
-        Equal(Ball.IsLandingFragmentVisible(3.001f), false);
-        Equal(Ball.LandingFragmentOpacity(-0.01f), 0f);
-        Equal(Ball.LandingFragmentOpacity(0f), 1f);
-        Equal(Ball.LandingFragmentOpacity(0.499f), 1f);
-        Equal(Ball.LandingFragmentOpacity(0.5f), 1f);
-        Equal(Ball.LandingFragmentOpacity(1.75f), 0.5f);
-        Equal(Ball.LandingFragmentOpacity(3f), 0f);
-        Equal(Ball.LandingFragmentOpacity(3.1f), 0f);
-        Equal(Ball.ShouldDrawLandingFragment(false, false, 1.75f), false);
-        // Un MISS deve apparire dal PRIMO frame di atterraggio, ancora prima
-        // che il server risponda, e continuare senza salti dopo la conferma.
-        Equal(Ball.ShouldDrawLandingFragment(true, false, 0f), true);
-        Equal(Ball.ShouldDrawLandingFragment(true, false, 0.15f), true);
-        Equal(Ball.ShouldDrawLandingFragment(true, false, 0.50f), true);
-        Equal(Ball.ShouldDrawLandingFragment(true, false, 1.75f), true);
-        Equal(Ball.ShouldDrawLandingFragment(true, false, 2.99f), true);
-        Equal(Ball.ShouldDrawLandingFragment(true, false, 3f), false);
-        // HIT predetto e poi negato dal server: NON ripristinare il frammento,
-        // nemmeno nell'intervallo in cui un normale MISS sarebbe visibile.
-        Equal(Ball.ShouldDrawLandingFragment(true, true, 0f), false);
-        Equal(Ball.ShouldDrawLandingFragment(true, true, 0.5f), false);
-        Equal(Ball.ShouldDrawLandingFragment(true, true, 1.75f), false);
-        Equal(Ball.ShouldDrawLandingFragment(true, true, 2.99f), false);
-        // Ciclo di vita indipendente da ShotResolved: il renderer segue soltanto
-        // gli eventi locali HIT o atterraggio e il cronometro della dissolvenza.
-        Equal(Ball.IsLocalVisualComplete(false, false, 0f), false);
-        Equal(Ball.IsLocalVisualComplete(true, false, 0f), true);
-        Equal(Ball.IsLocalVisualComplete(true, true, 0f), true);
-        Equal(Ball.IsLocalVisualComplete(false, true, 0f), false);
-        Equal(Ball.IsLocalVisualComplete(false, true, 0.5f), false);
-        Equal(Ball.IsLocalVisualComplete(false, true, 2.999f), false);
-        Equal(Ball.IsLocalVisualComplete(false, true, 3f), true);
-        Equal(Ball.IsLocalVisualComplete(false, true, 9f), true);
-        // Identica scadenza locale per HIT, ostacolo ed espirazione.
-        foreach (var outcome in new[] { ShotOutcome.Penguin, ShotOutcome.Obstacle, ShotOutcome.Expired })
-        {
-            uint impact = FreezeTimeline.ComputeImpactTick(180, 12);
-            Equal(ShotFlightTiming.IsFutureImpact(impact, 180), true);
-            Equal(ShotFlightTiming.IsFutureImpact(impact, 191), true);
-            Equal(ShotFlightTiming.IsFutureImpact(impact, 192), false);
-            Equal(ShotFlightTiming.IsFutureImpact(impact, 195), false);
-        }
-    }
+
+
+
 
     private static void FlightTickQuantization(Reconciler r)
     {
-        Equal(ShotFlightTiming.LandingTicks(0.5f, 30), 15u);
-        Equal(ShotFlightTiming.LandingTicks(MathF.BitIncrement(0.5f), 30), 15u);
-        Equal(ShotFlightTiming.LandingTicks(0.5001f, 30), 16u);
-        Equal(ShotFlightTiming.LandingTicks(0.86602545f, 30), 26u);
-        Equal(ShotFlightTiming.HasLanded(180, 194, 0.50000006f, 30), false);
-        Equal(ShotFlightTiming.HasLanded(180, 195, 0.50000006f, 30), true);
-        Equal(ShotFlightTiming.HasLanded(180, 196, 0.50000006f, 30), true);
+        Equal(Ball.LandingTicks(0.5f, 30), 15u);
+        Equal(Ball.LandingTicks(MathF.BitIncrement(0.5f), 30), 15u);
+        Equal(Ball.LandingTicks(0.5001f, 30), 16u);
+        Equal(Ball.LandingTicks(0.86602545f, 30), 26u);
+        Equal(Ball.HasLandedAtTick(180, 194, 0.50000006f, 30), false);
+        Equal(Ball.HasLandedAtTick(180, 195, 0.50000006f, 30), true);
+        Equal(Ball.HasLandedAtTick(180, 196, 0.50000006f, 30), true);
     }
 
-    private static void RemoteShotAndHitSameTcpBatch(Reconciler r)
-    {
-        byte[] remote = new byte[22];
-        remote[0] = (byte)MessageType.RemoteShot;
-        remote[13] = (byte)ShotType.Left;
-        BinaryPrimitives.WriteUInt32LittleEndian(remote.AsSpan(14, 4), 1u);
-        BinaryPrimitives.WriteUInt32LittleEndian(remote.AsSpan(18, 4), 33u);
-        var resolved = ResolutionPacket(owner: 1, shotTick: 33, outcome: ShotOutcome.Penguin, hitPlayerId: 2);
-        var framer = new NetworkPacketFramer();
-        framer.Append(remote.Concat(resolved).ToArray());
-        if (!framer.TryRead(out byte type1, out byte[] startPayload) || type1 != (byte)MessageType.RemoteShot)
-            throw new Exception("RemoteShot must be delivered before ShotResolved");
-        var shot = RemoteShotMessage.Parse(startPayload);
-        uint localObservedStart = 180;
-        if (!framer.TryRead(out byte type2, out byte[] resolvedPayload) || type2 != (byte)MessageType.ShotResolved)
-            throw new Exception("ShotResolved missing from same TCP batch");
-        var hit = ShotResolutionMessage.Parse(resolvedPayload);
-        Equal(hit.Key, shot.Key);
-        Equal(hit.FlightTicks, 12u);
-        uint hitTick = FreezeTimeline.ComputeImpactTick(localObservedStart, hit.FlightTicks);
-        Equal(hitTick, 192u);
-        var freeze = new FreezeTimeline();
-        freeze.ConfirmLocal(shot.Key, hitTick);
-        Equal(freeze.IsFrozen(180), false);
-        Equal(freeze.IsFrozen(191), false);
-        Equal(freeze.IsFrozen(192), true);
-        Equal(freeze.IsFrozen(281), true);
-        Equal(freeze.IsFrozen(282), false);
-        Equal(freeze.IsFrozen(300), false);
-    }
 
-    private static void AuthoritativeFreezeBoundaries(Reconciler r)
-    {
-        var freeze = new FreezeTimeline();
-        var key = new ShotKey(1, 7);
-        freeze.ConfirmLocal(key, 150);
-        Equal(freeze.IsFrozen(140), false);
-        Equal(freeze.IsFrozen(149), false);
-        Equal(freeze.IsFrozen(150), true);
-        Equal(freeze.IsFrozen(167), true);
-        Equal(freeze.IsFrozen(239), true);
-        Equal(freeze.IsFrozen(240), false);
-        Equal(freeze.IsFrozen(300), false);
-        Equal(Math.Max(0L, 240L - 167L), 73L);
-        Equal(Math.Max(0L, 240L - 300L), 0L);
-    }
 
-    private static void ConfirmedFreezeReplacesPrediction(Reconciler r)
-    {
-        var freeze = new FreezeTimeline();
-        var first = new ShotKey(1, 7);
-        var second = new ShotKey(2, 8);
-        freeze.Predict(first, 140);
-        Equal(freeze.IsFrozen(145), true);
-        Equal(freeze.TryGetPredictedHitTick(first, out uint predictedTick), true);
-        Equal(predictedTick, 140u);
-        freeze.ConfirmLocal(first, 150);
-        Equal(freeze.IsFrozen(145), false);
-        Equal(freeze.IsFrozen(150), true);
-        Equal(freeze.IsFrozen(240), false);
-        freeze.ConfirmLocal(second, 200);
-        Equal(freeze.IsFrozen(241), true);
-        Equal(freeze.IsFrozen(290), false);
-    }
 
-    private static void LocalFreezeReplayBoundary(Reconciler r)
-    {
-        for (uint seq = 149; seq <= 241; seq++)
-            r.RecordPendingInput(seq, seq >= 150 && seq <= 239 ? StateList.Freezing | StateList.Right : StateList.Right);
-        r.ReceiveAuthoritativePosition(148, new Vector2(100, 30));
-        var pos = new Vector2(500, 30);
-        Apply(r, ref pos);
-        At(pos, 100 + 3 * Step, 30);
-    }
 
-    // Il pinguino remoto si blocca subito e riparte se l'HIT viene smentito.
+
+
+
+
+    // Il remoto segue soltanto il bit di freeze del server.
     private static void RemotePredictedFreeze(Reconciler r)
     {
-        var timeline = new FreezeTimeline();
         var manager = new MovementsManagerRed();
         var input = new StateStruct();
-        var key = new ShotKey(1, 77);
-
-        timeline.Predict(key, 100);
-        manager.UpdateInput(ref input, timeline.IsFrozen(101), false, Dt, Vector2.Zero);
+        var receiver = typeof(MovementsManagerRed).GetMethod("HandleRemoteState",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        receiver.Invoke(manager, new object[] { 0f, 0f, (int)StateList.Freezing, 90u });
+        manager.UpdateInput(ref input, false, false, Dt, Vector2.Zero);
         Equal(input.IsPressed(StateList.Freezing), true);
-
-        timeline.RejectPrediction(key);
-        manager.UpdateInput(ref input, timeline.IsFrozen(102), false, Dt, Vector2.Zero);
+        receiver.Invoke(manager, new object[] { 0f, 0f, (int)StateList.None, 0u });
+        manager.UpdateInput(ref input, true, false, Dt, Vector2.Zero);
         Equal(input.IsPressed(StateList.Freezing), false);
     }
 
-    // Frozen server snapshots must not move an unfrozen-looking remote.
+    // Posizione e congelamento remoto provengono dallo stesso snapshot server.
     private static void RemoteSnapshotBlockedByServerFreeze(Reconciler r)
     {
         var remote = (Penguin)RuntimeHelpers.GetUninitializedObject(typeof(Penguin));
-        typeof(Penguin).GetField("LocalFreeze")!.SetValue(remote, new FreezeTimeline());
+        remote._penguinColliderHandler = new PenguinColliderHandler("penguinRed");
         remote._position = new Vector2(100f, 200f);
         var events = (Events)RuntimeHelpers.GetUninitializedObject(typeof(Events));
         typeof(Events).GetField("_redPenguin", BindingFlags.NonPublic | BindingFlags.Instance)!
@@ -1393,12 +1010,15 @@ internal static class Program
         var receive = typeof(Events).GetMethod("HandleRedState",
             BindingFlags.NonPublic | BindingFlags.Instance)!;
 
-        receive.Invoke(events, new object[] { 180f, 240f, (int)StateList.Freezing });
-        At(remote._position, 100f, 200f);
+        receive.Invoke(events, new object[] { 180f, 240f, (int)StateList.Freezing, 90u });
+        At(remote._position, 180f, 240f);
         At(events.LatestRemotePosition, 180f, 240f);
-
-        receive.Invoke(events, new object[] { 220f, 250f, (int)StateList.Right });
+        Equal(remote.IsServerFrozen, true);
+        Equal(remote.FreezeOpacity, 1f);
+        receive.Invoke(events, new object[] { 220f, 250f, (int)StateList.Right, 0u });
         At(remote._position, 220f, 250f);
+        Equal(remote.IsServerFrozen, false);
+        Equal(remote.FreezeOpacity, 0f);
     }
 
     // Verifica che il replay non attraversi gli ostacoli.
@@ -1629,21 +1249,72 @@ internal static class Program
             throw new Exception("Framer replayed already consumed message");
     }
 
+    // La grafica locale non cambia le uova: soltanto MsgShotResolved(Penguin).
+    private static void ConfirmedServerHitOnly(Reconciler r)
+    {
+        var local = (Penguin)RuntimeHelpers.GetUninitializedObject(typeof(Penguin));
+        local._penguinColliderHandler = new PenguinColliderHandler("penguin");
+        local._myEgg = "egg7";
+        local._penguinColliderHandler.isWithEgg = true;
+        local._position = new Vector2(100, 110);
+        local.SetServerFreeze(90);
+
+        var remote = (Penguin)RuntimeHelpers.GetUninitializedObject(typeof(Penguin));
+        remote._penguinColliderHandler = new PenguinColliderHandler("penguinRed");
+        var events = (Events)RuntimeHelpers.GetUninitializedObject(typeof(Events));
+        var queue = new Queue<ShotResolutionMessage>();
+        typeof(Events).GetField("PendingShotResolutions")!.SetValue(events, queue);
+        var session = (GameSession)RuntimeHelpers.GetUninitializedObject(typeof(GameSession));
+        session._myPenguin = local;
+        session._redPenguin = remote;
+        typeof(GameSession).GetField("_events")!
+            .SetValue(session, events);
+        typeof(GameSession).GetField("_localPlayerId", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(session, 1u);
+        var apply = typeof(GameSession).GetMethod("ApplyServerShotResults",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        queue.Enqueue(new ShotResolutionMessage(
+            new ShotKey(2, 10), ShotOutcome.Obstacle, 0, 30, 0, Vector2.Zero));
+        apply.Invoke(session, null);
+        Equal(local._myEgg, "egg7");
+        Equal(local._penguinColliderHandler.isWithEgg, true);
+
+        queue.Enqueue(new ShotResolutionMessage(
+            new ShotKey(2, 11), ShotOutcome.Penguin, 1, 31, 5, new Vector2(50, 90)));
+        apply.Invoke(session, null);
+        Equal(local._myEgg, (string?)null);
+        Equal(local._penguinColliderHandler.isWithEgg, false);
+        Equal(local.IsServerFrozen, true);
+        At(local._position, 50, 90);
+
+        local.SetServerFreeze(0);
+        Equal(local.IsServerFrozen, false);
+    }
+
     // Verifica messaggi accorpati e spezzati.
     private static void FramingBatchAndSplit(Reconciler r)
     {
         var framer = new NetworkPacketFramer();
-        byte[] auth = new byte[13];
+        byte[] auth = new byte[17];
         auth[0] = 4;
+        BinaryPrimitives.WriteUInt32LittleEndian(auth.AsSpan(13, 4), 90);
+        byte[] remoteState = new byte[17];
+        remoteState[0] = 6;
+        BinaryPrimitives.WriteUInt32LittleEndian(remoteState.AsSpan(13, 4), 45);
         byte[] remote = new byte[22];
         remote[0] = 7;
         byte[] resolved = ResolutionPacket();
-        byte[] input = auth.Concat(remote).Concat(resolved).ToArray();
+        byte[] input = auth.Concat(remoteState).Concat(remote).Concat(resolved).ToArray();
         int split = input.Length - 5;
         framer.Append(input.AsSpan(0, split));
-        if (!framer.TryRead(out byte t1, out byte[] p1) || t1 != 4 || p1.Length != 12)
+        if (!framer.TryRead(out byte t1, out byte[] p1) || t1 != 4 || p1.Length != 16 ||
+            BinaryPrimitives.ReadUInt32LittleEndian(p1.AsSpan(12, 4)) != 90)
             throw new Exception("AuthState lost in batch");
-        if (!framer.TryRead(out byte t2, out byte[] p2) || t2 != 7 || p2.Length != 21)
+        if (!framer.TryRead(out byte t2, out byte[] p2) || t2 != 6 || p2.Length != 16 ||
+            BinaryPrimitives.ReadUInt32LittleEndian(p2.AsSpan(12, 4)) != 45)
+            throw new Exception("RemoteState lost in batch");
+        if (!framer.TryRead(out byte tShot, out byte[] pShot) || tShot != 7 || pShot.Length != 21)
             throw new Exception("RemoteShot lost in batch");
         if (framer.TryRead(out _, out _))
             throw new Exception("Truncated trailing resolution incorrectly dispatched");

@@ -11,7 +11,16 @@ public class Penguin : CollisionExtensions //,GameComponent
 {
     private readonly Game _gameContext;
     private readonly IMovements _movementsManager;
-    public readonly FreezeTimeline LocalFreeze = new();
+    // Stato ricevuto dal server: nessuna prediction del congelamento.
+    public uint FreezeRemainingTicks { get; private set; }
+    public bool IsServerFrozen => FreezeRemainingTicks > 0;
+    public float FreezeOpacity => Math.Clamp(FreezeRemainingTicks / (3f * GameSession.TickRateHz), 0f, 1f);
+
+    public void SetServerFreeze(uint remainingTicks)
+    {
+        FreezeRemainingTicks = remainingTicks;
+        _penguinColliderHandler.isFrozen = IsServerFrozen;
+    }
     public PenguinColliderHandler _penguinColliderHandler;
     public PenguinShotHandler _penguinShotHandler;
     public PenguinInputHandler _penguinInputHandler;
@@ -44,7 +53,6 @@ public class Penguin : CollisionExtensions //,GameComponent
         _penguinInputHandler = new PenguinInputHandler(_tag);
         _physicsDeltaTime = physicsDeltaTime;
     }
-    
 
     private void resetTakingTimer()
     {
@@ -95,7 +103,7 @@ public class Penguin : CollisionExtensions //,GameComponent
             _tag.EndsWith("Red")
                 ? _penguinColliderHandler.isWithEgg
                 : _penguinInputHandler._stateStruct.IsPressed(StateList.WithEgg),
-            LocalFreeze.GetVisualOpacity(GameSession.LastSentInputTick)
+            FreezeOpacity
         );
     }
 
@@ -137,14 +145,10 @@ public class Penguin : CollisionExtensions //,GameComponent
                 break;
             case string t when _penguinColliderHandler.IsEnemyBall(t):
                 Ball ball = _gameContext.Components.OfType<Ball>().FirstOrDefault(b => b._tag == t);
-                if (ball != null && ball.CanPredictPenguinHit())
-                {
-                    uint hitTick = GameSession.LocalTick;
-                    bool predictedFreeze = LocalFreeze.Predict(ball.ShotKey, hitTick);
-                    //ball.PredictPenguinImpact();
-                    if (predictedFreeze)
-                        _penguinColliderHandler.isFrozen = true;
-                }
+                // L'impatto locale riguarda SOLO la grafica della palla.
+                // Freeze e perdita dell'uovo arrivano esclusivamente dal server.
+                if (ball != null && ball.CanShowPenguinContact())
+                    ball.HideAtLocalPenguinContact();
                 break;
             case "blueP" or "redP":
                 if ((_tag == "penguin" && otherTag == "blueP") ||
@@ -174,7 +178,7 @@ public class Penguin : CollisionExtensions //,GameComponent
        
         if (_accumulator >= _physicsDeltaTime)
         {
-            _penguinColliderHandler.isFrozen = LocalFreeze.IsFrozen(GameSession.LastSentInputTick);
+            _penguinColliderHandler.isFrozen = IsServerFrozen;
 
             _movementsManager.UpdateInput(
                 ref _penguinInputHandler._stateStruct,

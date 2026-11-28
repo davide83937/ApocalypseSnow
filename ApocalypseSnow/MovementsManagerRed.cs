@@ -12,8 +12,7 @@ public class MovementsManagerRed:IMovements
     private bool isWithEgg = false;
     private StateList _remoteState = StateList.None;
 
-    // Il bit del server serve a non anticipare il drop dell'uovo durante un HIT.
-    // L'animazione del freeze continua a usare la timeline locale.
+    // Il bit Freezing proviene esclusivamente dal server.
     public bool IsServerFrozen => (_remoteState & StateList.Freezing) != 0;
 
     
@@ -25,7 +24,7 @@ public class MovementsManagerRed:IMovements
             NetworkManager.Instance.OnRemoteStateReceived += HandleRemoteState;
         }
     }
-    private void HandleRemoteState(float x, float y, int mask)
+    private void HandleRemoteState(float x, float y, int mask, uint remainingTicks)
     {
         _remoteState = (StateList)mask;
     }
@@ -41,14 +40,10 @@ public class MovementsManagerRed:IMovements
         // 1. Spostiamo lo stato attuale in quello vecchio
         inputList.Update();
 
-        // Il server decide l'HIT; il tick di freeze visualizzato dal remoto
-        // si ricostruisce sulla timeline locale, senza copiare il suo bit Freezing.
-        inputList.Current = _remoteState & ~StateList.Freezing;
-        if (isFreezing)
-            inputList.Current |= StateList.Freezing;
+        // Nessun freeze predetto: usiamo direttamente lo stato ricevuto dal server.
+        inputList.Current = _remoteState;
 
-        // Il bit del server non allunga l'animazione del freeze locale, ma
-        // impedisce di mostrare movimenti quando lo stato autoritativo e' fermo.
+        // Il congelamento impedisce di mostrare movimenti che il server ha bloccato.
         if (inputList.IsPressed(StateList.Freezing) || IsServerFrozen)
             inputList.Current &= ~(StateList.Moving | StateList.Up | StateList.Down |
                                    StateList.Left | StateList.Right | StateList.ShootLeft |

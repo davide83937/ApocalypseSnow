@@ -16,10 +16,10 @@ public class NetworkManager: IDisposable
     private readonly byte[] _incomingBuffer = new byte[4096];
 
  
-    public event Action<uint, float, float> OnAuthStateReceived; //posizione autoritativa del player locale
+    public event Action<uint, float, float, uint> OnAuthStateReceived; // ACK, posizione, freeze residuo
     public event Action<uint, float, int, ShotType> OnAuthShotReceived; //shot autoritativo del player locale (seqN, mouseY, charge, shotType) rivedere la firma
 
-    public event Action<float, float, int> OnRemoteStateReceived;
+    public event Action<float, float, int, uint> OnRemoteStateReceived;
     public event Action<RemoteShotMessage> OnRemoteShotReceived; // authoritative remote shot metadata
     public event Action<ShotResolutionMessage> OnShotResolvedReceived;
 
@@ -134,7 +134,8 @@ public class NetworkManager: IDisposable
                         uint ackSeq = BitConverter.ToUInt32(payload, 0);
                         float x = BitConverter.ToSingle(payload, 4);
                         float y = BitConverter.ToSingle(payload, 8);
-                        OnAuthStateReceived?.Invoke(ackSeq, x, y);
+                        uint remaining = BitConverter.ToUInt32(payload, 12);
+                        OnAuthStateReceived?.Invoke(ackSeq, x, y, remaining);
                         break;
                     }
 
@@ -143,7 +144,8 @@ public class NetworkManager: IDisposable
                         float x = BitConverter.ToSingle(payload, 0);
                         float y = BitConverter.ToSingle(payload, 4);
                         int mask = BitConverter.ToInt32(payload, 8);
-                        OnRemoteStateReceived?.Invoke(x, y, mask);
+                        uint remaining = BitConverter.ToUInt32(payload, 12);
+                        OnRemoteStateReceived?.Invoke(x, y, mask, remaining);
                         break;
                     }
 

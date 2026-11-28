@@ -38,9 +38,8 @@ public class Ball : CollisionExtensions
 
     // Questi stati riguardano il client, non la decisione del server.
     private bool _locallyLanded;           // Mostriamo il frammento, non la palla in volo.
-    private bool _predictedHitVisual;      // HIT previsto: la palla sparisce subito.
-    private bool _predictedPenguinContact; // Evita doppie notifiche dello stesso contatto.
-    private bool _predictedObstacleBlock;  // Un muro impedisce di predire un HIT sul pinguino.
+    private bool _visualContactHidden;     // L'impatto locale nasconde solo lo sprite.
+    private bool _visualObstacleBlocked;   // Un muro impedisce l'effetto visivo sul pinguino.
     private float _landingVisualElapsed;
 
     // ===== TEXTURE E OMBRA =====
@@ -48,7 +47,6 @@ public class Ball : CollisionExtensions
     private Texture2D _brokenTexture;
     private int _halfTextureFractionWidth;
     private int _halfTextureFractionHeight;
-    private bool _hitObstacle = false;
     private Vector2 _shadowPosition;
     private float _shadowScale;
     private float _shadowOpacity;
@@ -94,6 +92,18 @@ public class Ball : CollisionExtensions
     public static float ComputeFlightDurationSeconds(float startVerticalSpeed, float gravity)
         => ShotPhysicsAPI.ShotFlightDuration(startVerticalSpeed, gravity);
 
+    // Il tick di atterraggio va arrotondato senza aggiungere un tick per rumore float.
+    public static uint LandingTicks(float durationSeconds, uint tickRateHz)
+    {
+        if (!float.IsFinite(durationSeconds) || durationSeconds < 0f || tickRateHz == 0)
+            throw new ArgumentOutOfRangeException(nameof(durationSeconds));
+
+        return checked((uint)Math.Ceiling((double)durationSeconds * tickRateHz - 0.0001d));
+    }
+
+    public static bool HasLandedAtTick(uint observedStartTick, uint localTick, float durationSeconds, uint tickRateHz)
+        => localTick >= checked(observedStartTick + LandingTicks(durationSeconds, tickRateHz));
+
     public readonly record struct FlightSample(Vector2 Screen, Vector2 Shadow, float Height);
 
     // La DLL calcola la traiettoria XYZ. Con Z=0 otteniamo la proiezione
@@ -137,7 +147,7 @@ public class Ball : CollisionExtensions
     
     public void Draw(SpriteBatch spriteBatch)
     {
-        if (!_hitObstacle)
+        if (!_locallyLanded)
         {
             spriteBatch.Draw(
                 _texture,
@@ -152,13 +162,15 @@ public class Ball : CollisionExtensions
             );
         }
 
-        Texture2D texToDraw = _hitObstacle ? _brokenTexture : _texture;
+        Texture2D texToDraw = _locallyLanded ? _brokenTexture : _texture;
+        float alpha = Math.Clamp((LandingVisualSeconds - _landingVisualElapsed) /
+                                 (LandingVisualSeconds - LandingHoldSeconds), 0f, 1f);
 
         spriteBatch.Draw(
             texToDraw,
             _position,
             null,
-            Color.White,
+            Color.White * (_locallyLanded ? alpha : 1f),
             0f,
             Vector2.Zero,
             _scale,
@@ -171,9 +183,9 @@ public class Ball : CollisionExtensions
     {
         float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-        // HIT previsto: nascondiamo immediatamente la palla in Draw,
-        // ma rimuoviamo il componente al successivo Update.
-        if (_predictedHitVisual)
+        // Impatto grafico locale: rimuoviamo solo lo sprite e il collider,
+        // senza modificare lo stato autoritativo della partita.
+        if (_visualContactHidden)
         {
             RemoveLocalVisual();
             return;
@@ -182,7 +194,9 @@ public class Ball : CollisionExtensions
         // Dopo un muro o l'atterraggio resta soltanto il frammento grafico.
         if (_locallyLanded)
         {
-            UpdateLandingVisual(deltaTime);
+            _landingVisualElapsed += deltaTime;
+            if (_landingVisualElapsed >= LandingVisualSeconds)
+                RemoveLocalVisual();
             return;
         }
 
@@ -199,8 +213,8 @@ public class Ball : CollisionExtensions
 
     private bool HasLanded()
         => _hasObservedStart
-            ? ShotFlightTiming.HasLanded(ObservedStartTick, GameSession.LocalTick,
-                                        _flightDuration, GameSession.TickRateHz)
+            ? HasLandedAtTick(ObservedStartTick, GameSession.LocalTick,
+                              _flightDuration, GameSession.TickRateHz)
             : _ballTime >= _flightDuration;
 
     private void LandAtEndOfFlight()
@@ -245,12 +259,12 @@ public class Ball : CollisionExtensions
 
     // ===== IMPATTI LOCALI =====
 
-    public static bool ShouldPredictPenguinHit(bool obstacleAlreadyHit, bool obstacleOverlapsNow)
+    public static bool CanShowLocalPenguinContact(bool obstacleAlreadyHit, bool obstacleOverlapsNow)
         => !obstacleAlreadyHit && !obstacleOverlapsNow;
 
-    public bool CanPredictPenguinHit()
+    public bool CanShowPenguinContact()
     {
-        if (_locallyLanded || _predictedHitVisual ||
+        if (_locallyLanded || _visualContactHidden ||
             _currentHeight >= GameWorld.PenguinCollisionHeight)
             return false;
 
@@ -259,20 +273,18 @@ public class Ball : CollisionExtensions
         bool obstacleOverlapsNow = CollisionManager.Instance.ShotOverlapsObstacle(
             _tag, _currentHeight);
         if (obstacleOverlapsNow)
-            _predictedObstacleBlock = true;
+            _visualObstacleBlocked = true;
 
-        return ShouldPredictPenguinHit(_predictedObstacleBlock, obstacleOverlapsNow);
+        return CanShowLocalPenguinContact(_visualObstacleBlocked, obstacleOverlapsNow);
     }
 
     protected override void OnCollisionEnter(string otherTag, CollisionRecordOut collisionRecordOut)
     {
-        if (_currentHeight >= 30f) return;
+        if (_currentHeight >= 90f) return;
         switch (otherTag)
         {
             case "obstacle":
-                _hitObstacle = true;
-                Game.Components.Remove(this);
-                CollisionManager.Instance.removeObject(_tag);
+                BeginLandingVisual();
                 break;
 
             case string t when isDeleteConditions(t):
@@ -293,21 +305,10 @@ public class Ball : CollisionExtensions
         );
     }
 
-        // La prediction dell'HIT e del freeze viene effettuata dal Penguin.
-        // Qui impediamo solamente che il medesimo contatto venga elaborato
-        // piu' volte o dopo un impatto con il muro.
-        if ((otherTag == "penguin" || otherTag == "penguinRed") &&
-            otherTag != _shooterTag && !_predictedPenguinContact && CanPredictPenguinHit())
-        {
-            _predictedPenguinContact = true;
-            CollisionManager.Instance.removeObject(_tag);
-        }
-    }
-
-    // Chiamato dal pinguino quando prevede un HIT: solo effetto locale.
-    public void PredictPenguinImpact()
+    // Solo grafica: non modifica freeze, uova o risultato del tiro.
+    public void HideAtLocalPenguinContact()
     {
-        _predictedHitVisual = true;
+        _visualContactHidden = true;
         CollisionManager.Instance.removeObject(_tag);
     }
 
@@ -318,13 +319,6 @@ public class Ball : CollisionExtensions
         CollisionManager.Instance.removeObject(_tag);
     }
 
-    private void UpdateLandingVisual(float deltaTime)
-    {
-        _landingVisualElapsed += deltaTime;
-        if (IsLocalVisualComplete(false, true, _landingVisualElapsed))
-            RemoveLocalVisual();
-    }
-
     private void RemoveLocalVisual()
     {
         CollisionManager.Instance.removeObject(_tag);
@@ -333,26 +327,6 @@ public class Ball : CollisionExtensions
     }
 
     // ===== RENDERING: NON MODIFICA LA FISICA =====
-
-    public static bool IsLandingFragmentVisible(float elapsed)
-        => elapsed >= 0f && elapsed < LandingVisualSeconds;
-
-    public static bool IsLocalVisualComplete(bool predictedHit, bool landed, float elapsed)
-        => predictedHit || (landed && !IsLandingFragmentVisible(elapsed));
-
-    public static float LandingFragmentOpacity(float elapsed)
-    {
-        if (!IsLandingFragmentVisible(elapsed))
-            return 0f;
-        if (elapsed <= LandingHoldSeconds)
-            return 1f;
-        return (LandingVisualSeconds - elapsed) / (LandingVisualSeconds - LandingHoldSeconds);
-    }
-
-    public static bool ShouldDrawLandingFragment(bool locallyLanded, bool predictedHit, float elapsed)
-        => locallyLanded && !predictedHit && LandingFragmentOpacity(elapsed) > 0f;
-
-
 
     private void DrawShadow(SpriteBatch spriteBatch)
     {

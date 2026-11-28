@@ -740,23 +740,33 @@ func (gameRoom *GameRoom) sendSpawnObstacleToBothPlayers() {
 	}
 }
 
+// I tick residui sono calcolati dal server: il client non simula il freeze.
+func (gameRoom *GameRoom) remainingFreezeTicks(player Player) uint32 {
+	if gameRoom.matchTick >= player.FreezeEndTick {
+		return 0
+	}
+	return player.FreezeEndTick - gameRoom.matchTick
+}
+
 // sendAuthStateToPlayer manda a un client il proprio stato autoritativo.
 func (gameRoom *GameRoom) sendAuthStateToPlayer(targetConn *PlayerConnection, player Player) {
-	packet := make([]byte, 13)
+	packet := make([]byte, 17)
 	packet[0] = MsgAuthState
 	binary.LittleEndian.PutUint32(packet[1:5], player.LastSeqN)
 	binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(player.X))
 	binary.LittleEndian.PutUint32(packet[9:13], math.Float32bits(player.Y))
+	binary.LittleEndian.PutUint32(packet[13:17], gameRoom.remainingFreezeTicks(player))
 	targetConn.TryEnqueueOutgoingPacket(packet, false)
 }
 
 // sendRemoteStateToPlayer manda a un client lo stato remoto dell’avversario.
 func (gameRoom *GameRoom) sendRemoteStateToPlayer(targetConn *PlayerConnection, opponent Player) {
-	packet := make([]byte, 13)
+	packet := make([]byte, 17)
 	packet[0] = MsgRemoteState
 	binary.LittleEndian.PutUint32(packet[1:5], math.Float32bits(opponent.X))
 	binary.LittleEndian.PutUint32(packet[5:9], math.Float32bits(opponent.Y))
 	binary.LittleEndian.PutUint32(packet[9:13], uint32(opponent.LastMask))
+	binary.LittleEndian.PutUint32(packet[13:17], gameRoom.remainingFreezeTicks(opponent))
 	targetConn.TryEnqueueOutgoingPacket(packet, false)
 }
 

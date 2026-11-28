@@ -27,7 +27,8 @@ public sealed class NetworkPacketFramer
         type = _pending[0];
         int payloadSize = type switch
         {
-            4 or 6 or 8 or 9 or 10 => 12,
+            4 or 6 => 16, // posizione e stato del freeze dal server
+            8 or 9 or 10 => 12,
             7 => RemoteShotMessage.PayloadLength,
             11 => ShotResolutionMessage.PayloadLength,
             13 => 16, // due punteggi, uova rimanenti, vincitore
